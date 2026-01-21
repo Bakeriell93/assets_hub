@@ -294,13 +294,18 @@ export const storageService = {
 
   updateAsset: async (id: string, updates: Partial<Asset>): Promise<void> => {
     try {
+      // Filter out undefined values (Firestore doesn't like undefined)
+      const cleanUpdates = Object.fromEntries(
+        Object.entries(updates).filter(([_, v]) => v !== undefined)
+      ) as Partial<Asset>;
+
       if (!isCloudEnabled) {
         const existing = readLS<Asset[]>(LS_KEYS.assets, []);
-        const next = existing.map(a => a.id === id ? ({ ...a, ...updates } as Asset) : a);
+        const next = existing.map(a => a.id === id ? ({ ...a, ...cleanUpdates } as Asset) : a);
         writeLS(LS_KEYS.assets, next);
         return;
       }
-      await updateDoc(doc(db!, ASSETS_COLLECTION, id), updates);
+      await updateDoc(doc(db!, ASSETS_COLLECTION, id), cleanUpdates);
     } catch (error) {
       handleError('updateAsset', error);
       throw error;

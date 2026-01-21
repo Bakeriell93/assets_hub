@@ -94,7 +94,29 @@ function App() {
   const handleSaveAsset = async (data: any, file?: File) => {
     // Editing should UPDATE, not create a new asset.
     if (editingAsset) {
-      await storageService.updateAsset(editingAsset.id, data);
+      // Build updates object, preserving important fields
+      const updates: Partial<Asset> = {
+        title: data.title,
+        type: data.type,
+        market: data.market,
+        platform: data.platform,
+        carModel: data.carModel,
+        objectives: data.objectives,
+        usageRights: data.usageRights,
+        uploadedBy: data.uploadedBy,
+        ctr: data.ctr,
+        cpl: data.cpl,
+        cr: data.cr,
+        comments: data.comments,
+        content: data.content,
+        // Preserve these fields from original asset
+        url: editingAsset.url,
+        size: editingAsset.size,
+        status: editingAsset.status,
+        createdAt: editingAsset.createdAt,
+      };
+      
+      await storageService.updateAsset(editingAsset.id, updates);
       setEditingAsset(null);
       setIsAssetModalOpen(false);
       return;
