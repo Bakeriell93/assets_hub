@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Asset, CAR_MODELS, CarModel, MARKETS, Market, PLATFORMS, Platform, AssetType, USAGE_RIGHTS, UsageRights, OBJECTIVES, AssetObjective, SystemConfig } from '../types';
+import { Asset, CAR_MODELS, CarModel, Collection, MARKETS, Market, PLATFORMS, Platform, AssetType, USAGE_RIGHTS, UsageRights, OBJECTIVES, AssetObjective, SystemConfig } from '../types';
 
 // Fixed: Added config to props interface to match App.tsx usage
 interface AssetFormModalProps {
@@ -9,9 +9,10 @@ interface AssetFormModalProps {
   onSave: (asset: Omit<Asset, 'id' | 'createdAt'> | Partial<Asset>, file?: File) => void;
   editingAsset?: Asset | null;
   config: SystemConfig;
+  collections: Collection[];
 }
 
-const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave, editingAsset, config }) => {
+const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave, editingAsset, config, collections }) => {
   const [title, setTitle] = useState('');
   const [uploaderName, setUploaderName] = useState('');
   const [type, setType] = useState<AssetType>('image');
@@ -20,6 +21,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [platform, setPlatform] = useState<Platform>(config.platforms[0] || PLATFORMS[0]);
   const [carModel, setCarModel] = useState<CarModel>(config.models[0] || CAR_MODELS[0]);
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
+  const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
   const [content, setContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
@@ -38,6 +40,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setPlatform(editingAsset.platform);
       setCarModel(editingAsset.carModel);
       setSelectedObjectives(editingAsset.objectives || []);
+      setSelectedCollectionIds(editingAsset.collectionIds || []);
       setContent(editingAsset.content || '');
       setCtr(editingAsset.ctr?.toString() || '');
       setCr(editingAsset.cr?.toString() || '');
@@ -52,6 +55,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setPlatform(config.platforms[0] || PLATFORMS[0]);
       setCarModel(config.models[0] || CAR_MODELS[0]);
       setSelectedObjectives([]);
+      setSelectedCollectionIds([]);
       setContent('');
       setCtr('');
       setCr('');
@@ -66,6 +70,12 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const toggleObjective = (obj: AssetObjective) => {
     setSelectedObjectives(prev => 
       prev.includes(obj) ? prev.filter(item => item !== obj) : [...prev, obj]
+    );
+  };
+
+  const toggleCollection = (id: string) => {
+    setSelectedCollectionIds(prev =>
+      prev.includes(id) ? prev.filter(x => x !== id) : [...prev, id]
     );
   };
 
@@ -84,6 +94,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       carModel,
       usageRights,
       objectives: selectedObjectives,
+      collectionIds: selectedCollectionIds.length ? selectedCollectionIds : undefined,
       content: type === 'text' ? content : undefined,
       uploadedBy: uploaderName || 'Anonymous',
       ctr: ctr ? parseFloat(ctr) : undefined,
@@ -178,6 +189,33 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                             </button>
                         ))}
                     </div>
+                </div>
+
+                <div>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Projects (Optional)</label>
+                    {collections.length === 0 ? (
+                      <div className="text-xs text-gray-400 font-bold bg-gray-50 border-2 border-gray-100 rounded-2xl p-4">
+                        No projects yet. Create one in the Projects tab to link assets.
+                      </div>
+                    ) : (
+                      <div className="flex flex-wrap gap-2 mt-1">
+                        {collections.map(c => (
+                          <button
+                            key={c.id}
+                            type="button"
+                            onClick={() => toggleCollection(c.id)}
+                            className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
+                              selectedCollectionIds.includes(c.id)
+                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
+                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                            }`}
+                            title={c.name}
+                          >
+                            {c.name}
+                          </button>
+                        ))}
+                      </div>
+                    )}
                 </div>
 
                 <div>

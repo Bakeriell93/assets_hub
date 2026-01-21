@@ -31,6 +31,7 @@ function App() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isAddingCollection, setIsAddingCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
+  const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
 
   // Filter States
   const [selectedMarket, setSelectedMarket] = useState<Market | 'All'>('All');
@@ -127,9 +128,10 @@ function App() {
 
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (newCollectionName) {
+    const trimmed = newCollectionName.trim();
+    if (trimmed) {
       await storageService.saveCollection({
-        name: newCollectionName,
+        name: trimmed,
         assetIds: [],
         createdAt: Date.now()
       });
@@ -138,13 +140,40 @@ function App() {
     }
   };
 
+  const normalize = (s: any) => String(s || '').toLowerCase();
+  const matchesSearch = (a: Asset, rawQuery: string) => {
+    const q = normalize(rawQuery).trim();
+    if (!q) return true;
+
+    // Support multi-term search: every term must match somewhere.
+    const terms = q.split(/\s+/).filter(Boolean);
+
+    const haystack = [
+      a.title,
+      a.description,
+      a.market,
+      a.platform,
+      a.carModel,
+      ...(a.objectives || []),
+      a.uploadedBy,
+      a.usageRights,
+      a.comments,
+      a.content,
+    ]
+      .map(normalize)
+      .join(' • ');
+
+    return terms.every(t => haystack.includes(t));
+  };
+
   const filteredAssets = assets.filter(a => {
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || a.carModel === selectedModel;
     const pMatch = selectedPlatform === 'All' || a.platform === selectedPlatform;
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
-    const sMatch = a.title.toLowerCase().includes(searchQuery.toLowerCase());
-    return mMatch && modelMatch && pMatch && objMatch && sMatch;
+    const cMatch = !activeCollectionId || (a.collectionIds || []).includes(activeCollectionId);
+    const sMatch = matchesSearch(a, searchQuery);
+    return mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch;
   });
 
   const sortedAssets = [...filteredAssets].sort((a, b) => {
@@ -237,6 +266,19 @@ function App() {
                     <h1 className="text-7xl font-black text-gray-900 tracking-tighter mb-4 leading-none uppercase">
                       {selectedMarket === 'All' ? 'GLOBAL' : selectedMarket} HUB
                     </h1>
+                    {activeCollectionId && (
+                      <div className="mt-2 flex items-center gap-3">
+                        <span className="text-[11px] font-black uppercase tracking-[0.3em] text-purple-700 bg-purple-50 border border-purple-100 px-4 py-2 rounded-full">
+                          Project: {collections.find(c => c.id === activeCollectionId)?.name || 'Selected'}
+                        </span>
+                        <button
+                          onClick={() => setActiveCollectionId(null)}
+                          className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-900"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    )}
                     <div className="flex items-center gap-4">
                       <span className="flex items-center gap-3 px-4 py-2 bg-green-500/10 text-green-600 text-[11px] font-black uppercase rounded-full border border-green-500/10 tracking-widest">
                         <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
@@ -349,8 +391,15 @@ function App() {
                         <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
                       </div>
                       <h4 className="text-3xl font-black text-gray-900 tracking-tighter mb-3 leading-tight uppercase">{c.name}</h4>
-                      <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] mb-8">{c.assetIds.length} Linked Creatives</p>
-                      <button className="w-full py-5 bg-gray-50 text-gray-900 rounded-[28px] text-[11px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">ENTER NODE</button>
+                      <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] mb-8">
+                        {assets.filter(a => (a.collectionIds || []).includes(c.id)).length} Linked Creatives
+                      </p>
+                      <button
+                        onClick={() => { setActiveCollectionId(c.id); setViewMode('repository'); }}
+                        className="w-full py-5 bg-gray-50 text-gray-900 rounded-[28px] text-[11px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all"
+                      >
+                        ENTER NODE
+                      </button>
                     </div>
                   ))}
                   {collections.length === 0 && (
@@ -371,6 +420,7 @@ function App() {
         onSave={handleSaveAsset}
         editingAsset={editingAsset}
         config={config}
+        collections={collections}
       />
       <AIInsightsModal 
         isOpen={isAIModalOpen} 
