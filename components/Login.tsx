@@ -1,10 +1,11 @@
 
 import React, { useState } from 'react';
 import { storageService } from '../services/storageService';
-import { authService } from '../services/authService';
+import { authService, AuthError } from '../services/authService';
+import { User } from '../types';
 
 interface LoginProps {
-  onLogin: (username: string, password: string) => void;
+  onLogin: (user: User) => void;
 }
 
 const Login: React.FC<LoginProps> = ({ onLogin }) => {
@@ -19,24 +20,21 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     setError('');
 
     try {
-      // Check for hardcoded admin first
-      const verified = authService.verify(username, password);
-      
-      // Real-time security reporting
-      await storageService.logSecurityEvent(`Login Attempt Identified: ${username || 'Anonymous'}`, verified.role === 'Admin' ? 'low' : 'medium');
-      
-      // If it's not the hardcoded admin and username was provided, check the cloud registry
-      if (username && verified.username !== 'fakhri') {
-        const cloudUser = await storageService.verifyCloudUser(username);
-        if (cloudUser) {
-           // We could override here if we want to trust Firestore over the authService's default Viewer
-        }
-      }
-      
-      onLogin(username || 'guest', password || 'test');
-    } catch (err) {
-      setError('Verification failed. Check connectivity.');
-      await storageService.logSecurityEvent(`Failed Access Attempt: Critical Error`, 'high');
+      const verifiedUser = await authService.verify(username, password);
+
+      await storageService.logSecurityEvent(
+        `Login Success: ${verifiedUser.username}`,
+        verifiedUser.role === 'Admin' ? 'low' : 'medium'
+      );
+
+      onLogin(verifiedUser);
+    } catch (err: any) {
+      const msg =
+        err instanceof AuthError
+          ? err.message
+          : 'Login failed due to a system error. Please try again.';
+      setError(msg);
+      await storageService.logSecurityEvent(`Login Failed: ${username || 'unknown'}`, 'high');
     } finally {
       setIsVerifying(false);
     }
@@ -95,9 +93,6 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
                   {isVerifying ? 'Verifying Node...' : 'Log in'}
                 </div>
               </button>
-              <p className="text-center mt-4 text-red-600 font-black uppercase text-[10px] tracking-widest animate-pulse">
-                Just click, it's just a test for now
-              </p>
             </div>
 
             <div className="text-center">

@@ -1,29 +1,40 @@
+import { User } from '../types';
+import { storageService } from './storageService';
 
-import { User, UserRole } from '../types';
-
-const ADMIN_UN = 'fakhri';
-const ADMIN_PW_OBF = 'RmFraHJpMTIzIQ=='; 
+export class AuthError extends Error {
+  code: 'INVALID_CREDENTIALS' | 'USER_NOT_FOUND' | 'MISSING_CREDENTIALS';
+  constructor(code: AuthError['code'], message: string) {
+    super(message);
+    this.name = 'AuthError';
+    this.code = code;
+  }
+}
 
 export const authService = {
-  verify: (username: string, password: string): User => {
-    const isPasswordCorrect = btoa(password) === ADMIN_PW_OBF;
-    const isAdmin = username.toLowerCase() === ADMIN_UN && isPasswordCorrect;
+  /**
+   * Strict login:
+   * - user must exist in the Users registry (Firestore or localStorage fallback)
+   * - password must match the stored password
+   */
+  verify: async (username: string, password: string): Promise<User> => {
+    const uname = (username || '').trim().toLowerCase();
+    const pw = password || '';
 
-    if (isAdmin) {
-      return {
-        id: 'admin_001',
-        username: 'fakhri',
-        role: 'Admin',
-        fullName: 'Fakhri Ashour'
-      };
+    if (!uname || !pw) {
+      throw new AuthError('MISSING_CREDENTIALS', 'Username and password are required.');
     }
 
-    // Default user access should always be set to viewer
-    return {
-      id: `user_${Math.random().toString(36).substr(2, 5)}`,
-      username: username || 'guest_user',
-      role: 'Viewer', 
-      fullName: username || 'Marketing Viewer'
-    };
+    const user = await storageService.verifyCloudUser(uname);
+    if (!user) {
+      throw new AuthError('USER_NOT_FOUND', 'User not found. Ask an admin to create your account.');
+    }
+
+    // NOTE: This is still plaintext password matching (better than "allow all"),
+    // but for real production you should use Firebase Auth / hashed passwords.
+    if (!user.password || user.password !== pw) {
+      throw new AuthError('INVALID_CREDENTIALS', 'Invalid username or password.');
+    }
+
+    return user;
   }
 };

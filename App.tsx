@@ -56,9 +56,8 @@ function App() {
     }
   }, [isLoggedIn]);
 
-  const handleLogin = (u: string, p: string) => {
-    const verifiedUser = authService.verify(u, p);
-    setCurrentUser(verifiedUser);
+  const handleLogin = (user: User) => {
+    setCurrentUser(user);
     setIsLoggedIn(true);
   };
 
