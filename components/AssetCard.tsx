@@ -12,9 +12,73 @@ interface AssetCardProps {
 
 const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdit, onDelete }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDownloading, setIsDownloading] = useState(false);
   const isHighPerformer = (asset.ctr && asset.ctr > 2) || (asset.cr && asset.cr > 1.5);
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
+
+  const downloadUrl = (url: string, filename: string) => {
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = filename;
+    a.rel = 'noopener';
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  };
+
+  const loadImage = (url: string) =>
+    new Promise<HTMLImageElement>((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      img.onload = () => resolve(img);
+      img.onerror = reject;
+      img.src = url;
+    });
+
+  const downloadForMetaStory = async () => {
+    if (!asset.url || asset.type !== 'image') return;
+    setIsDownloading(true);
+    try {
+      // Non-AI fallback (reliable): Fit into 1080x1920 with blurred background.
+      const img = await loadImage(asset.url);
+      const W = 1080;
+      const H = 1920;
+      const canvas = document.createElement('canvas');
+      canvas.width = W;
+      canvas.height = H;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('Canvas not supported');
+
+      // Background: cover + blur
+      const bgScale = Math.max(W / img.width, H / img.height);
+      const bgW = img.width * bgScale;
+      const bgH = img.height * bgScale;
+      const bgX = (W - bgW) / 2;
+      const bgY = (H - bgH) / 2;
+      ctx.filter = 'blur(28px)';
+      ctx.drawImage(img, bgX, bgY, bgW, bgH);
+      ctx.filter = 'none';
+      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      ctx.fillRect(0, 0, W, H);
+
+      // Foreground: contain
+      const fgScale = Math.min(W / img.width, H / img.height);
+      const fgW = img.width * fgScale;
+      const fgH = img.height * fgScale;
+      const fgX = (W - fgW) / 2;
+      const fgY = (H - fgH) / 2;
+      ctx.drawImage(img, fgX, fgY, fgW, fgH);
+
+      const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      if (!blob) throw new Error('Failed to export image');
+      const outUrl = URL.createObjectURL(blob);
+      downloadUrl(outUrl, `${asset.title || 'asset'}-META-STORY.jpg`);
+      setTimeout(() => URL.revokeObjectURL(outUrl), 60_000);
+    } finally {
+      setIsDownloading(false);
+    }
+  };
 
   const handleDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -106,6 +170,26 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
             >
               Preview
             </button>
+
+            {asset.type === 'image' && asset.url && (
+              <div className="flex gap-2" onClick={(e) => e.stopPropagation()}>
+                <button
+                  disabled={isDownloading}
+                  onClick={() => downloadUrl(asset.url!, `${asset.title || 'asset'}.jpg`)}
+                  className="bg-white px-5 py-3 rounded-2xl text-gray-900 hover:bg-gray-100 transition-all shadow-2xl font-black text-[10px] uppercase tracking-widest"
+                >
+                  Download
+                </button>
+                <button
+                  disabled={isDownloading}
+                  onClick={downloadForMetaStory}
+                  className="bg-blue-600 px-5 py-3 rounded-2xl text-white hover:bg-blue-700 transition-all shadow-2xl font-black text-[10px] uppercase tracking-widest"
+                  title="Creates a 1080x1920 Story version (non-AI fit)"
+                >
+                  {isDownloading ? 'Creating…' : 'Download Meta'}
+                </button>
+              </div>
+            )}
         </div>
       </div>
 

@@ -91,6 +91,18 @@ function App() {
     localStorage.removeItem(SESSION_STORAGE_KEY);
   };
 
+  const handleSaveAsset = async (data: any, file?: File) => {
+    // Editing should UPDATE, not create a new asset.
+    if (editingAsset) {
+      await storageService.updateAsset(editingAsset.id, data);
+      setEditingAsset(null);
+      setIsAssetModalOpen(false);
+      return;
+    }
+    await storageService.addAsset(data, file);
+    setIsAssetModalOpen(false);
+  };
+
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
     if (newCollectionName) {
@@ -333,8 +345,8 @@ function App() {
 
       <AssetFormModal 
         isOpen={isAssetModalOpen} 
-        onClose={() => setIsAssetModalOpen(false)} 
-        onSave={storageService.addAsset}
+        onClose={() => { setIsAssetModalOpen(false); setEditingAsset(null); }} 
+        onSave={handleSaveAsset}
         editingAsset={editingAsset}
         config={config}
       />

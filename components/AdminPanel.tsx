@@ -2,6 +2,8 @@
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, Asset, SystemConfig } from '../types';
 import { storageService, SecurityLog } from '../services/storageService';
+import { storage } from '../services/firebase';
+import { getMetadata, ref as storageRef } from 'firebase/storage';
 
 interface AdminPanelProps {
   onClose: () => void;
@@ -44,6 +46,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   };
 
   const tryResolveRemoteFileSize = async (url: string): Promise<number | null> => {
+    // Prefer Firebase Storage metadata (most reliable).
+    try {
+      if (storage) {
+        // firebase/storage ref() can handle gs:// and (in many cases) download URLs.
+        const r = storageRef(storage, url);
+        const meta = await getMetadata(r);
+        if (typeof meta.size === 'number' && meta.size > 0) return meta.size;
+      }
+    } catch {
+      // ignore and fall back
+    }
+
     // Best effort only. Firebase Storage download URLs usually allow HEAD, but if not,
     // fallback to GET with Range and parse Content-Range.
     try {
