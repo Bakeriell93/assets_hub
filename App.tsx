@@ -309,22 +309,44 @@ function App() {
             )}
 
             {viewMode === 'analytics' && (
-              <div className="space-y-16 animate-in slide-in-from-bottom-8 duration-700">
-                 <h2 className="text-6xl font-black text-gray-900 tracking-tighter uppercase">CAMPAIGN ANALYTICS</h2>
-                 <div className="grid grid-cols-1 lg:grid-cols-2 gap-12">
-                    <div className="bg-white p-14 rounded-[64px] shadow-2xl shadow-gray-100 border border-gray-50">
-                        <h3 className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mb-12">Engagement Matrix by Model</h3>
-                        <div className="space-y-10">
+              <div className="space-y-10 animate-in slide-in-from-bottom-8 duration-700">
+                 <div className="flex items-end justify-between gap-6">
+                   <div>
+                     <h2 className="text-5xl font-black text-gray-900 tracking-tighter uppercase leading-none">CAMPAIGN ANALYTICS</h2>
+                     <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.45em] mt-3">Compact overview • Counts + Performance</p>
+                   </div>
+                   <div className="flex items-center gap-3">
+                     <span className="px-4 py-2 rounded-full bg-white border border-gray-100 text-[10px] font-black uppercase tracking-widest text-gray-500">
+                       Total Assets: {assets.length}
+                     </span>
+                     <span className="px-4 py-2 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-black uppercase tracking-widest text-blue-700">
+                       Images: {assets.filter(a => a.type === 'image').length}
+                     </span>
+                   </div>
+                 </div>
+
+                 <div className="grid grid-cols-1 xl:grid-cols-3 gap-8">
+                    <div className="bg-white p-10 rounded-[48px] shadow-xl shadow-gray-100 border border-gray-50">
+                        <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.45em] mb-8">Engagement + Count by Model</h3>
+                        <div className="space-y-7">
                            {config.models.map(m => {
                               const modelAssets = assets.filter(a => a.carModel === m);
+                              const modelImageCount = modelAssets.filter(a => a.type === 'image').length;
                               const avgCtr = modelAssets.length ? modelAssets.reduce((sum, a) => sum + (a.ctr || 0), 0) / modelAssets.length : 0;
                               return (
-                                <div key={m} className="space-y-4">
-                                   <div className="flex justify-between items-center text-[12px] font-black uppercase tracking-widest">
-                                      <span className="text-gray-900">{m}</span>
-                                      <span className="text-blue-600 bg-blue-50 px-4 py-1.5 rounded-xl">{avgCtr.toFixed(2)}% CTR</span>
+                                <div key={m} className="space-y-3">
+                                   <div className="flex justify-between items-center gap-4">
+                                      <div className="min-w-0">
+                                        <p className="text-[12px] font-black uppercase tracking-widest text-gray-900 truncate">{m}</p>
+                                        <p className="text-[10px] font-black text-gray-400 uppercase tracking-[0.3em] mt-1">
+                                          {modelAssets.length} total • {modelImageCount} images
+                                        </p>
+                                      </div>
+                                      <span className="shrink-0 text-blue-700 bg-blue-50 border border-blue-100 px-3 py-1.5 rounded-xl text-[10px] font-black uppercase tracking-widest">
+                                        {avgCtr.toFixed(2)}% CTR
+                                      </span>
                                    </div>
-                                   <div className="h-6 bg-gray-50 rounded-full overflow-hidden border border-gray-100 p-1.5">
+                                   <div className="h-4 bg-gray-50 rounded-full overflow-hidden border border-gray-100 p-1">
                                       <div className="h-full bg-blue-600 rounded-full transition-all duration-1000 shadow-lg" style={{ width: `${Math.min(avgCtr * 10, 100)}%` }}></div>
                                    </div>
                                 </div>
@@ -332,26 +354,66 @@ function App() {
                            })}
                         </div>
                     </div>
-                    <div className="bg-white p-14 rounded-[64px] shadow-2xl shadow-gray-100 border border-gray-50">
-                        <h3 className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mb-12">Regional Content Saturation</h3>
-                        <div className="grid grid-cols-2 gap-8">
+
+                    <div className="bg-white p-10 rounded-[48px] shadow-xl shadow-gray-100 border border-gray-50">
+                        <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.45em] mb-8">Market Saturation (Count)</h3>
+                        <div className="grid grid-cols-2 gap-5">
                            {config.markets.map(m => {
                               const marketCount = assets.filter(a => a.market === m).length;
                               const pct = assets.length ? (marketCount / assets.length) * 100 : 0;
                               return (
-                                <div key={m} className="p-10 bg-gray-50/50 rounded-[48px] border border-gray-100 group hover:bg-gray-900 transition-all shadow-sm">
-                                   <p className="text-[11px] font-black text-gray-400 group-hover:text-blue-400 uppercase tracking-[0.4em] mb-3">{m} CLUSTER</p>
-                                   <p className="text-6xl font-black text-gray-900 group-hover:text-white transition-colors tracking-tighter">{marketCount}</p>
-                                   <div className="mt-8 flex items-center gap-4">
-                                      <div className="flex-1 h-2.5 bg-gray-200 group-hover:bg-white/10 rounded-full overflow-hidden p-0.5">
-                                         <div className="h-full bg-blue-600 group-hover:bg-blue-400 rounded-full shadow-lg shadow-blue-500/20" style={{ width: `${pct}%` }}></div>
-                                      </div>
-                                      <span className="text-[11px] font-black text-blue-600 group-hover:text-white">{pct.toFixed(0)}%</span>
+                                <div key={m} className="p-6 bg-gray-50/50 rounded-[28px] border border-gray-100 hover:bg-gray-900 transition-all group">
+                                   <div className="flex items-center justify-between">
+                                     <p className="text-[10px] font-black text-gray-400 group-hover:text-blue-400 uppercase tracking-[0.4em]">{m}</p>
+                                     <span className="text-[10px] font-black text-blue-600 group-hover:text-white">{pct.toFixed(0)}%</span>
+                                   </div>
+                                   <p className="text-4xl font-black text-gray-900 group-hover:text-white transition-colors tracking-tighter mt-3">{marketCount}</p>
+                                   <div className="mt-4 h-2 bg-gray-200 group-hover:bg-white/10 rounded-full overflow-hidden">
+                                      <div className="h-full bg-blue-600 group-hover:bg-blue-400 rounded-full" style={{ width: `${pct}%` }}></div>
                                    </div>
                                 </div>
                               );
                            })}
                         </div>
+                    </div>
+
+                    <div className="bg-white p-10 rounded-[48px] shadow-xl shadow-gray-100 border border-gray-50">
+                      <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.45em] mb-8">Content Type Mix (per Model)</h3>
+                      <div className="space-y-5">
+                        {config.models.map(m => {
+                          const modelAssets = assets.filter(a => a.carModel === m);
+                          const img = modelAssets.filter(a => a.type === 'image').length;
+                          const vid = modelAssets.filter(a => a.type === 'video').length;
+                          const txt = modelAssets.filter(a => a.type === 'text').length;
+                          const other = Math.max(0, modelAssets.length - img - vid - txt);
+                          return (
+                            <div key={m} className="p-6 bg-gray-50/50 rounded-[28px] border border-gray-100">
+                              <div className="flex items-center justify-between gap-4">
+                                <p className="text-[12px] font-black uppercase tracking-widest text-gray-900 truncate">{m}</p>
+                                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest">{modelAssets.length} total</span>
+                              </div>
+                              <div className="mt-4 grid grid-cols-4 gap-2 text-center">
+                                <div className="py-2 rounded-xl bg-white border border-gray-100">
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Img</p>
+                                  <p className="text-lg font-black text-gray-900">{img}</p>
+                                </div>
+                                <div className="py-2 rounded-xl bg-white border border-gray-100">
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Vid</p>
+                                  <p className="text-lg font-black text-gray-900">{vid}</p>
+                                </div>
+                                <div className="py-2 rounded-xl bg-white border border-gray-100">
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Txt</p>
+                                  <p className="text-lg font-black text-gray-900">{txt}</p>
+                                </div>
+                                <div className="py-2 rounded-xl bg-white border border-gray-100">
+                                  <p className="text-[9px] font-black text-gray-400 uppercase tracking-widest">Oth</p>
+                                  <p className="text-lg font-black text-gray-900">{other}</p>
+                                </div>
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
                     </div>
                  </div>
               </div>
