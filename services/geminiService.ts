@@ -16,11 +16,10 @@ export const geminiService = {
     config: SystemConfig,
     context: ContextInfo
   ): Promise<string> => {
-    // TEMP: Hardcode key for testing. Prefer env via Vite define when deploying.
-    const apiKey =
-      process.env.API_KEY ||
-      process.env.GEMINI_API_KEY ||
-      "AIzaSyCJ6NU2zP_2UFKFxMKg4Xs79OiLCBfjE6U";
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key is not configured. Please set GEMINI_API_KEY in Netlify environment variables.');
+    }
     const ai = new GoogleGenAI({ apiKey });
 
     // Calculate key metrics
@@ -97,11 +96,10 @@ Keep it concise (under 200 words) and actionable.`;
     config: SystemConfig,
     context: ContextInfo
   ): Promise<string> => {
-    // TEMP: Hardcode key for testing. Prefer env via Vite define when deploying.
-    const apiKey =
-      process.env.API_KEY ||
-      process.env.GEMINI_API_KEY ||
-      "AIzaSyCJ6NU2zP_2UFKFxMKg4Xs79OiLCBfjE6U";
+    const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      throw new Error('Gemini API key is not configured. Please set GEMINI_API_KEY in Netlify environment variables.');
+    }
     const ai = new GoogleGenAI({ apiKey });
 
     // Build asset summary for context
