@@ -37,14 +37,14 @@ const AIInsightsModal: React.FC<AIInsightsModalProps> = ({
   const [autoInsights, setAutoInsights] = useState<string>('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
+  // Only regenerate insights when modal opens, not on every filter change
+  // This reduces unnecessary API calls and costs
   useEffect(() => {
-    if (isOpen) {
-      setAutoInsights('');
-      setMessages([]);
+    if (isOpen && autoInsights === '') {
       generateAutoInsights();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isOpen, currentView, selectedMarket, selectedModel, selectedPlatform]);
+  }, [isOpen]);
 
   useEffect(() => {
     messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
@@ -74,11 +74,18 @@ const AIInsightsModal: React.FC<AIInsightsModalProps> = ({
 
   const handleSend = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!input.trim() || isLoading) return;
+    const question = input.trim();
+    if (!question || isLoading) return;
+
+    // Prevent duplicate questions in quick succession (cost optimization)
+    const lastMessage = messages[messages.length - 1];
+    if (lastMessage?.role === 'user' && lastMessage.content === question) {
+      return; // Same question, skip API call
+    }
 
     const userMessage: Message = {
       role: 'user',
-      content: input.trim(),
+      content: question,
       timestamp: Date.now(),
     };
 
@@ -88,7 +95,7 @@ const AIInsightsModal: React.FC<AIInsightsModalProps> = ({
 
     try {
       const response = await geminiService.answerQuestion(
-        input.trim(),
+        question,
         assets,
         collections,
         config,
