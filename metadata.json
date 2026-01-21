@@ -1,0 +1,7 @@
+{
+  "name": "BYD Assets Hub",
+  "description": "A centralized content organizer for marketing assets across multiple markets, platforms, and car models. Features real-time organization and AI-powered copy generation.",
+  "requestFramePermissions": [
+    "geolocation"
+  ]
+}
