@@ -267,14 +267,18 @@ function App() {
                       {selectedMarket === 'All' ? 'GLOBAL' : selectedMarket} HUB
                     </h1>
                     {activeCollectionId && (
-                      <div className="mt-2 flex items-center gap-3">
+                      <div className="mt-3 flex flex-wrap items-center gap-3">
                         <span className="text-[11px] font-black uppercase tracking-[0.3em] text-purple-700 bg-purple-50 border border-purple-100 px-4 py-2 rounded-full">
                           Folder: {collections.find(c => c.id === activeCollectionId)?.name || 'Selected'}
                         </span>
                         <button
                           onClick={() => setActiveCollectionId(null)}
-                          className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-900"
+                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 text-white text-[10px] font-black uppercase tracking-[0.25em] hover:bg-black transition-all shadow-lg"
+                          title="Leave this folder view"
                         >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7 7-7m-7 7h18" />
+                          </svg>
                           Leave Folder
                         </button>
                       </div>
