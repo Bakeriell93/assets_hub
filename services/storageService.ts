@@ -90,6 +90,8 @@ export interface SecurityLog {
   ip: string;
   location: string;
   severity: 'low' | 'medium' | 'high';
+  isActionLog?: boolean; // True for manually added action logs
+  createdBy?: string; // Username who created this action log
 }
 
 const handleError = (context: string, error: any) => {
@@ -221,18 +223,32 @@ export const storageService = {
     }, (error) => handleError('subscribeToSecurityLogs', error));
   },
 
-  logSecurityEvent: async (event: string, severity: 'low' | 'medium' | 'high') => {
-    const mockIPs = ['192.168.1.1', '45.12.33.2', '104.28.14.12', '185.22.14.99'];
-    const mockLocs = ['Frankfurt, DE', 'Shenzhen, CN', 'St. Petersburg, RU', 'San Jose, US'];
-    
+  logSecurityEvent: async (event: string, severity: 'low' | 'medium' | 'high', ip?: string, location?: string) => {
     try {
+      // Get real IP and location if not provided
+      let realIp = ip;
+      let realLocation = location;
+
+      if (!realIp || !realLocation) {
+        try {
+          const ipInfo = await fetch('/api/get-ip-info').then(r => r.json());
+          realIp = ipInfo.ip || 'unknown';
+          realLocation = ipInfo.location || 'Unknown Location';
+        } catch {
+          // Fallback if API fails
+          realIp = realIp || 'unknown';
+          realLocation = realLocation || 'Unknown Location';
+        }
+      }
+
       const payload = {
         id: `log_${Date.now()}`,
         event,
         timestamp: Date.now(),
-        ip: mockIPs[Math.floor(Math.random() * mockIPs.length)],
-        location: mockLocs[Math.floor(Math.random() * mockLocs.length)],
-        severity
+        ip: realIp,
+        location: realLocation,
+        severity,
+        isActionLog: false
       };
 
       if (!isCloudEnabled) {
@@ -245,6 +261,105 @@ export const storageService = {
     } catch (e) {
       // Don't loop logs on failure
       console.warn("Could not log security event:", e);
+    }
+  },
+
+  addActionLog: async (event: string, severity: 'low' | 'medium' | 'high', createdBy: string, ip?: string, location?: string): Promise<void> => {
+    try {
+      let realIp = ip;
+      let realLocation = location;
+
+      if (!realIp || !realLocation) {
+        try {
+          const ipInfo = await fetch('/api/get-ip-info').then(r => r.json());
+          realIp = ipInfo.ip || 'unknown';
+          realLocation = ipInfo.location || 'Unknown Location';
+        } catch {
+          realIp = realIp || 'unknown';
+          realLocation = realLocation || 'Unknown Location';
+        }
+      }
+
+      const payload = {
+        id: `action_${Date.now()}`,
+        event,
+        timestamp: Date.now(),
+        ip: realIp,
+        location: realLocation,
+        severity,
+        isActionLog: true,
+        createdBy
+      };
+
+      if (!isCloudEnabled) {
+        const existing = readLS<SecurityLog[]>(LS_KEYS.securityLogs, []);
+        writeLS(LS_KEYS.securityLogs, [payload, ...existing].slice(0, 200));
+        return;
+      }
+
+      await addDoc(collection(db!, SECURITY_LOGS_COLLECTION), payload);
+    } catch (error) {
+      handleError('addActionLog', error);
+      throw error;
+    }
+  },
+
+  updateActionLog: async (logId: string, updates: Partial<SecurityLog>): Promise<void> => {
+    try {
+      if (!isCloudEnabled) {
+        const existing = readLS<SecurityLog[]>(LS_KEYS.securityLogs, []);
+        const next = existing.map(log => 
+          log.id === logId && log.isActionLog 
+            ? { ...log, ...updates } as SecurityLog 
+            : log
+        );
+        writeLS(LS_KEYS.securityLogs, next);
+        return;
+      }
+
+      const logRef = doc(db!, SECURITY_LOGS_COLLECTION, logId);
+      const logSnap = await getDoc(logRef);
+      if (!logSnap.exists()) {
+        throw new Error('Action log not found');
+      }
+      const logData = logSnap.data() as SecurityLog;
+      if (!logData.isActionLog) {
+        throw new Error('Only action logs can be modified');
+      }
+
+      await updateDoc(logRef, updates);
+    } catch (error) {
+      handleError('updateActionLog', error);
+      throw error;
+    }
+  },
+
+  deleteActionLog: async (logId: string): Promise<void> => {
+    try {
+      if (!isCloudEnabled) {
+        const existing = readLS<SecurityLog[]>(LS_KEYS.securityLogs, []);
+        const log = existing.find(l => l.id === logId);
+        if (!log || !log.isActionLog) {
+          throw new Error('Only action logs can be deleted');
+        }
+        writeLS(LS_KEYS.securityLogs, existing.filter(l => l.id !== logId));
+        return;
+      }
+
+      const logRef = doc(db!, SECURITY_LOGS_COLLECTION, logId);
+      const logSnap = await getDoc(logRef);
+      if (!logSnap.exists()) {
+        throw new Error('Action log not found');
+      }
+      const logData = logSnap.data() as SecurityLog;
+      if (!logData.isActionLog) {
+        throw new Error('Only action logs can be deleted');
+      }
+
+      await deleteDoc(logRef);
+    } catch (error) {
+      handleError('deleteActionLog', error);
+      throw error;
     }
   },
 

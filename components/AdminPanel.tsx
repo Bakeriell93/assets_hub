@@ -28,6 +28,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   // Backfill cache for older assets that may not have `size` stored in Firestore.
   const [resolvedAssetSizes, setResolvedAssetSizes] = useState<Record<string, number>>({});
 
+  // Action logs management (super admin only)
+  const [isAddingActionLog, setIsAddingActionLog] = useState(false);
+  const [editingActionLog, setEditingActionLog] = useState<SecurityLog | null>(null);
+  const [newActionLog, setNewActionLog] = useState({ event: '', severity: 'medium' as 'low' | 'medium' | 'high' });
+
   // Form states
   const [newUser, setNewUser] = useState({ fullName: '', username: '', password: '', role: 'Viewer' as UserRole });
   const [newConfigValue, setNewConfigValue] = useState('');
@@ -36,6 +41,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     const unsubLogs = storageService.subscribeToSecurityLogs(setSecurityLogs);
     return () => unsubLogs();
   }, []);
+
+  // Initialize action log form when editing
+  useEffect(() => {
+    if (editingActionLog) {
+      setNewActionLog({ event: editingActionLog.event, severity: editingActionLog.severity });
+    }
+  }, [editingActionLog]);
 
   const formatSize = (bytes: number) => {
     if (!bytes || bytes === 0) return '0 B';
@@ -406,11 +418,102 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                     <h3 className="text-3xl font-black text-gray-900 tracking-tight uppercase">Threat Monitoring</h3>
                     <p className="text-xs font-bold text-red-500 uppercase tracking-widest mt-1">Unauthorized Access is Monitored and Reported</p>
                   </div>
-                  <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-100 text-red-600 rounded-full text-[10px] font-black uppercase">
-                    <span className="w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
-                    Live Intrusion Detection Active
+                  <div className="flex items-center gap-4">
+                    {isSuperAdmin(currentUser) && !isAddingActionLog && !editingActionLog && (
+                      <button
+                        onClick={() => setIsAddingActionLog(true)}
+                        className="px-6 py-3 bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-purple-700 transition-all"
+                      >
+                        + Add Action Log
+                      </button>
+                    )}
+                    <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-100 text-red-600 rounded-full text-[10px] font-black uppercase">
+                      <span className="w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
+                      Live Intrusion Detection Active
+                    </div>
                   </div>
                 </div>
+
+                {/* Add/Edit Action Log Form (Super Admin Only) */}
+                {(isAddingActionLog || editingActionLog) && isSuperAdmin(currentUser) && (
+                  <form
+                    onSubmit={async (e) => {
+                      e.preventDefault();
+                      try {
+                        if (editingActionLog) {
+                          await storageService.updateActionLog(editingActionLog.id, {
+                            event: newActionLog.event,
+                            severity: newActionLog.severity,
+                          });
+                          setEditingActionLog(null);
+                        } else {
+                          await storageService.addActionLog(
+                            newActionLog.event,
+                            newActionLog.severity,
+                            currentUser.username
+                          );
+                          setIsAddingActionLog(false);
+                        }
+                        setNewActionLog({ event: '', severity: 'medium' });
+                      } catch (err: any) {
+                        alert(err.message || 'Failed to save action log');
+                      }
+                    }}
+                    className="bg-purple-50 p-10 rounded-[48px] border-2 border-purple-200 space-y-6"
+                  >
+                    <h4 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                      {editingActionLog ? 'Edit Action Log' : 'Add Action Log'}
+                    </h4>
+                    <div className="space-y-4">
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
+                          Event Description
+                        </label>
+                        <input
+                          required
+                          type="text"
+                          value={newActionLog.event}
+                          onChange={(e) => setNewActionLog({ ...newActionLog, event: e.target.value })}
+                          className="w-full px-6 py-4 bg-white border-2 border-purple-300 rounded-2xl outline-none focus:border-purple-500 text-sm font-bold"
+                          placeholder="e.g. Manual security audit performed"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-[10px] font-black text-gray-500 uppercase tracking-widest mb-2">
+                          Severity Level
+                        </label>
+                        <select
+                          value={newActionLog.severity}
+                          onChange={(e) => setNewActionLog({ ...newActionLog, severity: e.target.value as any })}
+                          className="w-full px-6 py-4 bg-white border-2 border-purple-300 rounded-2xl outline-none focus:border-purple-500 text-sm font-bold"
+                        >
+                          <option value="low">Low</option>
+                          <option value="medium">Medium</option>
+                          <option value="high">High</option>
+                        </select>
+                      </div>
+                    </div>
+                    <div className="flex gap-3">
+                      <button
+                        type="submit"
+                        className="px-8 py-4 bg-purple-600 text-white text-[11px] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-purple-700 transition-all"
+                      >
+                        {editingActionLog ? 'Update Log' : 'Add Log'}
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => {
+                          setIsAddingActionLog(false);
+                          setEditingActionLog(null);
+                          setNewActionLog({ event: '', severity: 'medium' });
+                        }}
+                        className="px-8 py-4 bg-white text-gray-400 text-[11px] font-black uppercase tracking-widest rounded-2xl border border-gray-200 hover:bg-gray-50 transition-all"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </form>
+                )}
 
                 <div className="bg-gray-50/50 rounded-[48px] overflow-hidden border border-gray-100 shadow-sm">
                   <table className="w-full text-left">
@@ -420,14 +523,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                         <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Network Node (IP)</th>
                         <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Geo-Location</th>
                         <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Risk</th>
+                        {isSuperAdmin(currentUser) && (
+                          <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                        )}
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-gray-100">
                       {securityLogs.length > 0 ? securityLogs.map(log => (
                         <tr key={log.id} className="hover:bg-white transition-all group">
                           <td className="px-10 py-8">
-                            <p className="text-gray-900 font-black text-sm">{log.event}</p>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight">{new Date(log.timestamp).toLocaleString()}</p>
+                            <div className="flex items-center gap-2">
+                              <p className="text-gray-900 font-black text-sm">{log.event}</p>
+                              {log.isActionLog && (
+                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-black uppercase rounded border border-purple-200">
+                                  Action
+                                </span>
+                              )}
+                            </div>
+                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight mt-1">
+                              {new Date(log.timestamp).toLocaleString()}
+                              {log.createdBy && ` • By ${log.createdBy}`}
+                            </p>
                           </td>
                           <td className="px-10 py-8">
                             <code className="bg-gray-100 px-3 py-1 rounded text-xs font-mono text-gray-600">{log.ip}</code>
@@ -442,10 +558,46 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                                 'bg-blue-50 border-blue-100 text-blue-600'
                             }`}>{log.severity}</span>
                           </td>
+                          {isSuperAdmin(currentUser) && (
+                            <td className="px-10 py-8">
+                              {log.isActionLog ? (
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                  <button
+                                    onClick={() => {
+                                      setEditingActionLog(log);
+                                      setNewActionLog({ event: log.event, severity: log.severity });
+                                      setIsAddingActionLog(false);
+                                    }}
+                                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase hover:bg-blue-100 transition-all"
+                                  >
+                                    Edit
+                                  </button>
+                                  <button
+                                    onClick={async () => {
+                                      if (confirm('Delete this action log?')) {
+                                        try {
+                                          await storageService.deleteActionLog(log.id);
+                                        } catch (err: any) {
+                                          alert(err.message || 'Failed to delete');
+                                        }
+                                      }
+                                    }}
+                                    className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-[9px] font-black uppercase hover:bg-red-100 transition-all"
+                                  >
+                                    Delete
+                                  </button>
+                                </div>
+                              ) : (
+                                <span className="text-gray-300 text-[9px] font-black uppercase italic">Auto</span>
+                              )}
+                            </td>
+                          )}
                         </tr>
                       )) : (
                         <tr>
-                          <td colSpan={4} className="px-10 py-20 text-center text-gray-300 font-black uppercase tracking-[0.4em]">No Live Threat Data Registered</td>
+                          <td colSpan={isSuperAdmin(currentUser) ? 5 : 4} className="px-10 py-20 text-center text-gray-300 font-black uppercase tracking-[0.4em]">
+                            No Live Threat Data Registered
+                          </td>
                         </tr>
                       )}
                     </tbody>
@@ -456,6 +608,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                   NOTE: All unauthorized attempts to access BYD Assets Hub project binaries are automatically logged by the cloud node. 
                   Geolocation data is utilized during audit sessions to ensure physical traceability of marketing creative downloads. 
                   Unauthorized distribution of assets violates internal compliance protocols.
+                  {isSuperAdmin(currentUser) && (
+                    <span className="block mt-3 text-purple-400">
+                      SUPER ADMIN: You can add, edit, and delete action logs manually for audit purposes.
+                    </span>
+                  )}
                 </div>
               </div>
             )}
