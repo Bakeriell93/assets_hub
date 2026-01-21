@@ -13,6 +13,8 @@ import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, Syst
 type SortOption = 'newest' | 'ctr' | 'cr' | 'cpl';
 type ViewMode = 'repository' | 'analytics' | 'collections';
 
+const SESSION_STORAGE_KEY = 'byd_assets_hub_session';
+
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
   const [isLoggedIn, setIsLoggedIn] = useState(false);
@@ -45,6 +47,21 @@ function App() {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
 
+  // Restore session from localStorage on mount
+  useEffect(() => {
+    try {
+      const savedSession = localStorage.getItem(SESSION_STORAGE_KEY);
+      if (savedSession) {
+        const user = JSON.parse(savedSession) as User;
+        setCurrentUser(user);
+        setIsLoggedIn(true);
+      }
+    } catch (err) {
+      console.warn('Failed to restore session:', err);
+      localStorage.removeItem(SESSION_STORAGE_KEY);
+    }
+  }, []);
+
   useEffect(() => {
     if (isLoggedIn) {
       const unsubAssets = storageService.subscribeToAssets(setAssets);
@@ -59,11 +76,19 @@ function App() {
   const handleLogin = (user: User) => {
     setCurrentUser(user);
     setIsLoggedIn(true);
+    // Save session to localStorage
+    try {
+      localStorage.setItem(SESSION_STORAGE_KEY, JSON.stringify(user));
+    } catch (err) {
+      console.warn('Failed to save session:', err);
+    }
   };
 
   const handleLogout = () => {
     setIsLoggedIn(false);
     setCurrentUser(null);
+    // Clear session from localStorage
+    localStorage.removeItem(SESSION_STORAGE_KEY);
   };
 
   const handleCreateCollection = async (e: React.FormEvent) => {
