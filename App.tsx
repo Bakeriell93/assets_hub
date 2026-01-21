@@ -237,7 +237,7 @@ function App() {
             <div className="flex gap-4">
               <button onClick={() => setIsAIModalOpen(true)} className="px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] hover:from-purple-700 hover:to-indigo-700 transition-all shadow-xl shadow-purple-200">AI Insights</button>
               {currentUser?.role !== 'Viewer' && (
-                <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-10 py-4 bg-blue-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">PUBLISH</button>
+                <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-10 py-4 bg-blue-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">UPLOAD</button>
               )}
             </div>
           </div>
@@ -269,13 +269,13 @@ function App() {
                     {activeCollectionId && (
                       <div className="mt-2 flex items-center gap-3">
                         <span className="text-[11px] font-black uppercase tracking-[0.3em] text-purple-700 bg-purple-50 border border-purple-100 px-4 py-2 rounded-full">
-                          Project: {collections.find(c => c.id === activeCollectionId)?.name || 'Selected'}
+                          Folder: {collections.find(c => c.id === activeCollectionId)?.name || 'Selected'}
                         </span>
                         <button
                           onClick={() => setActiveCollectionId(null)}
                           className="text-[10px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-900"
                         >
-                          Clear
+                          Leave Folder
                         </button>
                       </div>
                     )}
@@ -460,7 +460,7 @@ function App() {
                         onClick={() => { setActiveCollectionId(c.id); setViewMode('repository'); }}
                         className="w-full py-5 bg-gray-50 text-gray-900 rounded-[28px] text-[11px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all"
                       >
-                        ENTER NODE
+                        ENTER FOLDER
                       </button>
                     </div>
                   ))}
