@@ -28,9 +28,10 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
   };
 
   const loadImage = async (url: string): Promise<HTMLImageElement> => {
-    // Fix CORS: Fetch as blob first, then create object URL
-    // This bypasses CORS restrictions from Firebase Storage
-    const response = await fetch(url);
+    // Firebase Storage often blocks browser fetch/canvas via CORS.
+    // Use Netlify Function proxy to fetch server-side and return the bytes with CORS headers.
+    const proxied = `/.netlify/functions/fetch-image?url=${encodeURIComponent(url)}`;
+    const response = await fetch(proxied);
     if (!response.ok) throw new Error(`Failed to fetch image: ${response.statusText}`);
     const blob = await response.blob();
     const objectUrl = URL.createObjectURL(blob);
