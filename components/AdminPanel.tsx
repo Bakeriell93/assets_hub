@@ -595,24 +595,27 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                 )}
 
                 <div className="bg-gray-50/50 rounded-[48px] overflow-hidden border border-gray-100 shadow-sm">
-                  <table className="w-full text-left">
-                    <thead>
-                      <tr className="bg-gray-100/30">
-                        <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Event Description</th>
-                        <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Network Node (IP)</th>
-                        <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Geo-Location</th>
-                        <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Risk</th>
-                        {isSuperAdmin(currentUser) && (
-                          <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
-                        )}
-                      </tr>
-                    </thead>
+                  <div className="w-full overflow-x-auto">
+                    <table className="w-full min-w-[980px] text-left table-fixed">
+                      <thead className="sticky top-0 z-10">
+                        <tr className="bg-gray-100/80 backdrop-blur">
+                          <th className="w-[48%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Event Description</th>
+                          <th className="w-[18%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Network Node (IP)</th>
+                          <th className="w-[18%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Geo-Location</th>
+                          <th className="w-[10%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Risk</th>
+                          {isSuperAdmin(currentUser) && (
+                            <th className="w-[6%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                          )}
+                        </tr>
+                      </thead>
                     <tbody className="divide-y divide-gray-100">
                       {securityLogs.length > 0 ? securityLogs.map(log => (
                         <tr key={log.id} className="hover:bg-white transition-all group">
-                          <td className="px-10 py-8">
+                          <td className="px-10 py-8 align-top">
                             <div className="flex items-center gap-2">
-                              <p className="text-gray-900 font-black text-sm">{log.event}</p>
+                              <p className="text-gray-900 font-black text-sm truncate max-w-[520px]" title={log.event}>
+                                {log.event}
+                              </p>
                               {log.isActionLog && (
                                 <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-black uppercase rounded border border-purple-200">
                                   Action
@@ -624,13 +627,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                               {log.createdBy && ` • By ${log.createdBy}`}
                             </p>
                           </td>
-                          <td className="px-10 py-8">
-                            <code className="bg-gray-100 px-3 py-1 rounded text-xs font-mono text-gray-600">{log.ip}</code>
+                          <td className="px-10 py-8 align-top">
+                            <code className="block bg-gray-100 px-3 py-1 rounded text-xs font-mono text-gray-600 truncate" title={log.ip}>
+                              {log.ip}
+                            </code>
                           </td>
-                          <td className="px-10 py-8">
-                            <span className="text-[11px] font-bold text-gray-500 uppercase">{log.location}</span>
+                          <td className="px-10 py-8 align-top">
+                            <span className="block text-[11px] font-bold text-gray-500 uppercase truncate" title={log.location}>
+                              {log.location}
+                            </span>
                           </td>
-                          <td className="px-10 py-8">
+                          <td className="px-10 py-8 align-top">
                             <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
                                 log.severity === 'high' ? 'bg-red-50 border-red-100 text-red-600' :
                                 log.severity === 'medium' ? 'bg-orange-50 border-orange-100 text-orange-600' :
@@ -638,7 +645,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                             }`}>{log.severity}</span>
                           </td>
                           {isSuperAdmin(currentUser) && (
-                            <td className="px-10 py-8">
+                            <td className="px-10 py-8 align-top">
                               {log.isActionLog ? (
                                 <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
@@ -680,7 +687,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                         </tr>
                       )}
                     </tbody>
-                  </table>
+                    </table>
+                  </div>
                 </div>
 
                 <div className="p-10 bg-gray-900 rounded-[48px] border border-white/5 text-white/40 text-[10px] font-bold uppercase tracking-widest leading-relaxed">
