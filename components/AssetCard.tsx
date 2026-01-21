@@ -16,16 +16,56 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
 
-  const downloadUrl = (url: string, filename: string) => {
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = filename;
-    a.rel = 'noopener';
-    // If the browser ignores download for cross-origin URLs, open in a new tab.
-    a.target = '_blank';
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
+  const guessFilename = (url: string, fallbackBase: string) => {
+    const cleaned = url.split('?')[0] || '';
+    const last = cleaned.split('/').pop() || '';
+    const extMatch = last.match(/\.(png|jpe?g|webp|gif)$/i);
+    const ext = (extMatch?.[0] || '.jpg').toLowerCase();
+    const safeBase = (fallbackBase || 'asset')
+      .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
+      .trim()
+      .slice(0, 80) || 'asset';
+    return safeBase.endsWith(ext) ? safeBase : `${safeBase}${ext}`;
+  };
+
+  const forceDownloadUrl = async (url: string, filenameBase: string) => {
+    const filename = guessFilename(url, filenameBase);
+
+    // Best path: fetch bytes -> Blob -> object URL -> download (works even when `download` is ignored).
+    try {
+      const res = await fetch(url, { method: 'GET' });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+
+      URL.revokeObjectURL(blobUrl);
+      return;
+    } catch (err) {
+      // Likely CORS blocked fetch; fall back to trying direct download attribute.
+      console.warn('Direct fetch download failed, falling back:', err);
+    }
+
+    try {
+      const a = document.createElement('a');
+      a.href = url;
+      a.download = filename;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      return;
+    } catch (err) {
+      console.warn('Download attribute fallback failed, opening new tab:', err);
+      window.open(url, '_blank', 'noopener,noreferrer');
+    }
   };
 
   const handleDelete = (e: React.MouseEvent) => {
@@ -124,7 +164,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
             {asset.type === 'image' && asset.url && (
               <div className="flex flex-wrap items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <button
-                  onClick={() => downloadUrl(asset.url!, `${asset.title || 'asset'}.jpg`)}
+                  onClick={() => void forceDownloadUrl(asset.url!, asset.title || 'asset')}
                   className="bg-white px-4 py-2.5 rounded-2xl text-gray-900 hover:bg-gray-100 transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap disabled:opacity-50"
                 >
                   Download
