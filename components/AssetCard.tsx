@@ -217,7 +217,18 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
         </div>
 
         <h3 className="text-lg font-black text-gray-900 line-clamp-1 mb-1 tracking-tight">{asset.title}</h3>
-        <p className="text-[11px] text-blue-500/60 font-black uppercase mb-5 tracking-widest">{asset.carModel}</p>
+        <p className="text-[11px] text-blue-500/60 font-black uppercase mb-3 tracking-widest">{asset.carModel}</p>
+        
+        {/* Objectives */}
+        {asset.objectives && asset.objectives.length > 0 && (
+          <div className="flex flex-wrap gap-1.5 mb-4">
+            {asset.objectives.map(obj => (
+              <span key={obj} className="px-2 py-0.5 rounded-md bg-green-50 text-[9px] font-black text-green-700 uppercase tracking-tight border border-green-100">
+                {obj}
+              </span>
+            ))}
+          </div>
+        )}
 
         {/* Performance Metrics Summary */}
         <div className="flex flex-wrap gap-2 mt-auto">

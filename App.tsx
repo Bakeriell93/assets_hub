@@ -379,6 +379,58 @@ function App() {
         config={config}
       />
       {isAdminPanelOpen && <AdminPanel assets={assets} config={config} users={users} currentUser={currentUser!} onClose={() => setIsAdminPanelOpen(false)} />}
+      
+      {/* Preview Modal */}
+      {previewAsset && (
+        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" onClick={() => setPreviewAsset(null)}>
+          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setPreviewAsset(null)}></div>
+          <div className="relative max-w-6xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
+            <div className="absolute top-4 right-4 z-10">
+              <button 
+                onClick={() => setPreviewAsset(null)}
+                className="p-3 bg-white/90 hover:bg-white rounded-full transition-all shadow-lg"
+              >
+                <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+              </button>
+            </div>
+            
+            {previewAsset.type === 'image' && previewAsset.url && (
+              <img src={previewAsset.url} alt={previewAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
+            )}
+            {previewAsset.type === 'video' && previewAsset.url && (
+              <video src={previewAsset.url} controls className="w-full h-auto max-h-[90vh]" />
+            )}
+            {previewAsset.type === 'text' && (
+              <div className="p-12 max-h-[90vh] overflow-y-auto">
+                <h2 className="text-3xl font-black text-gray-900 mb-4">{previewAsset.title}</h2>
+                <p className="text-lg text-gray-700 whitespace-pre-wrap">{previewAsset.content}</p>
+              </div>
+            )}
+            {previewAsset.type === 'design' && (
+              <div className="p-12 text-center">
+                <h2 className="text-3xl font-black text-gray-900 mb-4">{previewAsset.title}</h2>
+                <p className="text-gray-600">Design file - download to view</p>
+              </div>
+            )}
+            
+            <div className="p-6 bg-gray-50 border-t border-gray-100">
+              <div className="flex flex-wrap gap-2 mb-3">
+                <span className="px-3 py-1 rounded-lg bg-gray-200 text-[10px] font-black text-gray-700 uppercase">{previewAsset.market}</span>
+                <span className="px-3 py-1 rounded-lg bg-blue-100 text-[10px] font-black text-blue-700 uppercase">{previewAsset.platform}</span>
+                <span className="px-3 py-1 rounded-lg bg-purple-100 text-[10px] font-black text-purple-700 uppercase">{previewAsset.carModel}</span>
+              </div>
+              {previewAsset.objectives && previewAsset.objectives.length > 0 && (
+                <div className="flex flex-wrap gap-2 mb-3">
+                  {previewAsset.objectives.map(obj => (
+                    <span key={obj} className="px-3 py-1 rounded-lg bg-green-100 text-[10px] font-black text-green-700 uppercase">{obj}</span>
+                  ))}
+                </div>
+              )}
+              <p className="text-sm text-gray-600">Uploaded by {previewAsset.uploadedBy} • {new Date(previewAsset.createdAt).toLocaleDateString()}</p>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
