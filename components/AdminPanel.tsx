@@ -22,6 +22,7 @@ const isSuperAdmin = (user: User | null): boolean => {
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users, currentUser }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'config' | 'stats' | 'security'>('users');
   const [isAddingUser, setIsAddingUser] = useState(false);
+  const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isAddingConfig, setIsAddingConfig] = useState<keyof SystemConfig | null>(null);
   const [revokingUserId, setRevokingUserId] = useState<string | null>(null);
   const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>([]);
@@ -144,6 +145,52 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     }
   };
 
+  const handleEditUserSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingUserId) return;
+    
+    const userToEdit = users.find(u => u.id === editingUserId);
+    if (!userToEdit) return;
+
+    // Prevent editing super admin
+    if (isSuperAdmin(userToEdit)) {
+      alert('Super admin details cannot be modified.');
+      setEditingUserId(null);
+      setNewUser({ fullName: '', username: '', password: '', role: 'Viewer' });
+      return;
+    }
+
+    try {
+      await storageService.saveUser({
+        ...userToEdit,
+        fullName: newUser.fullName,
+        username: newUser.username.toLowerCase(),
+        role: newUser.role,
+        password: newUser.password || userToEdit.password, // Keep existing password if not changed
+      });
+      await storageService.logSecurityEvent(`User updated: ${userToEdit.username} by ${currentUser.username}`, 'low');
+      setEditingUserId(null);
+      setNewUser({ fullName: '', username: '', password: '', role: 'Viewer' });
+    } catch (err: any) {
+      alert(err.message || 'Failed to update user');
+    }
+  };
+
+  // Initialize edit form when editing user
+  useEffect(() => {
+    if (editingUserId) {
+      const userToEdit = users.find(u => u.id === editingUserId);
+      if (userToEdit) {
+        setNewUser({
+          fullName: userToEdit.fullName,
+          username: userToEdit.username,
+          password: '', // Don't pre-fill password for security
+          role: userToEdit.role,
+        });
+      }
+    }
+  }, [editingUserId, users]);
+
   const handleAddConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (isAddingConfig && newConfigValue && !config[isAddingConfig].includes(newConfigValue)) {
@@ -211,8 +258,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                   )}
                 </div>
 
-                {isAddingUser && (
-                  <form onSubmit={handleAddUserSubmit} className="bg-gray-50 p-10 rounded-[48px] border border-gray-100 space-y-8 animate-in zoom-in-95 duration-300">
+                {(isAddingUser || editingUserId) && (
+                  <form onSubmit={editingUserId ? handleEditUserSubmit : handleAddUserSubmit} className="bg-gray-50 p-10 rounded-[48px] border border-gray-100 space-y-8 animate-in zoom-in-95 duration-300">
+                    <h4 className="text-xl font-black text-gray-900 uppercase tracking-tight">
+                      {editingUserId ? 'Edit User Identity' : 'Provision New User'}
+                    </h4>
                     <div className="grid grid-cols-2 gap-8">
                       <div className="space-y-3">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Full Legal Name</label>
@@ -220,13 +270,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                       </div>
                       <div className="space-y-3">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Unique Username</label>
-                        <input required type="text" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} className="w-full px-6 py-5 bg-white border border-gray-200 rounded-3xl outline-none focus:border-blue-500 text-sm font-bold shadow-sm" placeholder="fakhri_admin" />
+                        <input required type="text" value={newUser.username} onChange={e => setNewUser({...newUser, username: e.target.value})} disabled={!!editingUserId} className="w-full px-6 py-5 bg-white border border-gray-200 rounded-3xl outline-none focus:border-blue-500 text-sm font-bold shadow-sm disabled:bg-gray-100 disabled:text-gray-500" placeholder="fakhri_admin" />
+                        {editingUserId && (
+                          <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight mt-1">Username cannot be changed</p>
+                        )}
                       </div>
                     </div>
                     <div className="grid grid-cols-2 gap-8">
                       <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Secure Key (Password)</label>
-                        <input required type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} className="w-full px-6 py-5 bg-white border border-gray-200 rounded-3xl outline-none focus:border-blue-500 text-sm font-bold shadow-sm" placeholder="••••••••" />
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">
+                          Secure Key (Password) {editingUserId && <span className="text-gray-400 normal-case">(leave blank to keep current)</span>}
+                        </label>
+                        <input type="password" value={newUser.password} onChange={e => setNewUser({...newUser, password: e.target.value})} required={!editingUserId} className="w-full px-6 py-5 bg-white border border-gray-200 rounded-3xl outline-none focus:border-blue-500 text-sm font-bold shadow-sm" placeholder={editingUserId ? "•••••••• (optional)" : "••••••••"} />
                       </div>
                       <div className="space-y-3">
                         <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Permission Tier</label>
@@ -238,8 +293,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                       </div>
                     </div>
                     <div className="flex gap-4 pt-4">
-                      <button type="submit" className="px-10 py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl shadow-2xl shadow-blue-200">Commit Identity</button>
-                      <button type="button" onClick={() => setIsAddingUser(false)} className="px-10 py-5 bg-white text-gray-400 text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl border border-gray-200">Abort</button>
+                      <button type="submit" className="px-10 py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl shadow-2xl shadow-blue-200">
+                        {editingUserId ? 'Update Identity' : 'Commit Identity'}
+                      </button>
+                      <button type="button" onClick={() => {
+                        setIsAddingUser(false);
+                        setEditingUserId(null);
+                        setNewUser({ fullName: '', username: '', password: '', role: 'Viewer' });
+                      }} className="px-10 py-5 bg-white text-gray-400 text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl border border-gray-200">
+                        Abort
+                      </button>
                     </div>
                   </form>
                 )}
@@ -299,15 +362,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                                     <button onClick={() => setRevokingUserId(null)} className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl text-[10px] font-black uppercase">Cancel</button>
                                 </div>
                             ) : (
-                                <button onClick={() => {
-                                  // Log attempt to revoke
-                                  if (u.role === 'Admin' && !isSuperAdmin(currentUser)) {
-                                    storageService.logSecurityEvent(`BLOCKED: Non-super admin attempted to revoke admin: ${u.username}`, 'high');
-                                    alert('Only super admin can revoke other admins.');
-                                    return;
-                                  }
-                                  setRevokingUserId(u.id);
-                                }} className="text-red-500 hover:text-red-700 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Revoke Access</button>
+                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                    <button 
+                                      onClick={() => {
+                                        setEditingUserId(u.id);
+                                        setIsAddingUser(false);
+                                        setRevokingUserId(null);
+                                      }} 
+                                      className="px-4 py-2 bg-blue-50 text-blue-600 rounded-xl text-[10px] font-black uppercase hover:bg-blue-100 transition-all"
+                                    >
+                                      Edit
+                                    </button>
+                                    <button onClick={() => {
+                                      // Log attempt to revoke
+                                      if (u.role === 'Admin' && !isSuperAdmin(currentUser)) {
+                                        storageService.logSecurityEvent(`BLOCKED: Non-super admin attempted to revoke admin: ${u.username}`, 'high');
+                                        alert('Only super admin can revoke other admins.');
+                                        return;
+                                      }
+                                      setRevokingUserId(u.id);
+                                      setEditingUserId(null);
+                                      setIsAddingUser(false);
+                                    }} className="px-4 py-2 bg-red-50 text-red-600 rounded-xl text-[10px] font-black uppercase hover:bg-red-100 transition-all">
+                                      Revoke
+                                    </button>
+                                </div>
                             )}
                           </td>
                         </tr>
