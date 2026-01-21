@@ -3,7 +3,7 @@ import React, { useEffect, useState } from 'react';
 import Sidebar from './components/Sidebar';
 import AssetCard from './components/AssetCard';
 import AssetFormModal from './components/AssetFormModal';
-import AICopyModal from './components/AICopyModal';
+import AIInsightsModal from './components/AIInsightsModal';
 import AdminPanel from './components/AdminPanel';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
@@ -206,7 +206,7 @@ function App() {
             </div>
             
             <div className="flex gap-4">
-              <button onClick={() => setIsAIModalOpen(true)} className="px-10 py-4 bg-[#111111] text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] hover:bg-black transition-all shadow-xl shadow-gray-200">AI LAB</button>
+              <button onClick={() => setIsAIModalOpen(true)} className="px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] hover:from-purple-700 hover:to-indigo-700 transition-all shadow-xl shadow-purple-200">AI Insights</button>
               {currentUser?.role !== 'Viewer' && (
                 <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-10 py-4 bg-blue-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">PUBLISH</button>
               )}
@@ -372,11 +372,16 @@ function App() {
         editingAsset={editingAsset}
         config={config}
       />
-      <AICopyModal 
+      <AIInsightsModal 
         isOpen={isAIModalOpen} 
-        onClose={() => setIsAIModalOpen(false)} 
-        onSave={storageService.addAsset}
+        onClose={() => setIsAIModalOpen(false)}
+        assets={assets}
+        collections={collections}
         config={config}
+        currentView={viewMode}
+        selectedMarket={selectedMarket !== 'All' ? selectedMarket : undefined}
+        selectedModel={selectedModel !== 'All' ? selectedModel : undefined}
+        selectedPlatform={selectedPlatform !== 'All' ? selectedPlatform : undefined}
       />
       {isAdminPanelOpen && <AdminPanel assets={assets} config={config} users={users} currentUser={currentUser!} onClose={() => setIsAdminPanelOpen(false)} />}
       

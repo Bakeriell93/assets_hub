@@ -1,43 +1,137 @@
 
 import { GoogleGenAI } from "@google/genai";
-import { CarModel, Market, Platform } from "../types";
+import { Asset, Collection, SystemConfig } from "../types";
+
+interface ContextInfo {
+  currentView?: 'repository' | 'analytics' | 'collections';
+  selectedMarket?: string;
+  selectedModel?: string;
+  selectedPlatform?: string;
+}
 
 export const geminiService = {
-  generateMarketingCopy: async (
-    carModel: CarModel,
-    market: Market,
-    platform: Platform,
-    tone: string,
-    keyPoints: string
+  generateInsights: async (
+    assets: Asset[],
+    collections: Collection[],
+    config: SystemConfig,
+    context: ContextInfo
   ): Promise<string> => {
-    // Initialize Gemini Client right before making the API call to ensure it uses the correct context.
-    // Always use the named parameter `apiKey` and pass `process.env.API_KEY` directly.
     const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
 
-    const prompt = `
-      Act as a world-class automotive marketing copywriter.
-      
-      Task: Write a creative and engaging ad copy for the following specification:
-      - Car Model: ${carModel}
-      - Target Market: ${market} (Write in the language appropriate for this country, but if it's multiple (like CH), use English or provide options. Actually, for this demo, provide the copy in English followed by a translation in the local language of the market if applicable).
-      - Platform: ${platform} (Optimize the length and style for this platform).
-      - Tone: ${tone}
-      - Key Selling Points to include: ${keyPoints}
+    // Calculate key metrics
+    const totalAssets = assets.length;
+    const avgCtr = assets.length > 0 
+      ? assets.reduce((sum, a) => sum + (a.ctr || 0), 0) / assets.length 
+      : 0;
+    const avgCr = assets.length > 0
+      ? assets.reduce((sum, a) => sum + (a.cr || 0), 0) / assets.length
+      : 0;
+    const topPerformer = assets.length > 0 
+      ? assets.reduce((best, a) => 
+          (a.ctr || 0) > (best.ctr || 0) ? a : best, assets[0]
+        )
+      : null;
 
-      Output format:
-      Return ONLY the ad copy text. Do not include introductory phrases like "Here is the copy".
-      If the platform is 'Meta' or 'Video', suggest a visual direction in brackets [] at the start.
-    `;
+    const marketDistribution = config.markets.map(m => ({
+      market: m,
+      count: assets.filter(a => a.market === m).length
+    }));
+
+    const platformDistribution = config.platforms.map(p => ({
+      platform: p,
+      count: assets.filter(a => a.platform === p).length
+    }));
+
+    const prompt = `You are an AI marketing analyst for BYD Assets Hub. Analyze the following data and provide concise, actionable insights.
+
+Current Context:
+- View: ${context.currentView || 'repository'}
+- Selected Market: ${context.selectedMarket || 'All'}
+- Selected Model: ${context.selectedModel || 'All'}
+- Selected Platform: ${context.selectedPlatform || 'All'}
+
+Asset Statistics:
+- Total Assets: ${totalAssets}
+- Average CTR: ${avgCtr.toFixed(2)}%
+- Average CR: ${avgCr.toFixed(2)}%
+- Top Performer: ${topPerformer ? `${topPerformer.title} (CTR: ${topPerformer.ctr || 0}%)` : 'None'}
+
+Market Distribution:
+${marketDistribution.map(m => `- ${m.market}: ${m.count} assets`).join('\n')}
+
+Platform Distribution:
+${platformDistribution.map(p => `- ${p.platform}: ${p.count} assets`).join('\n')}
+
+Collections: ${collections.length} active projects
+
+Provide 3-4 key insights in a clear, professional format. Focus on:
+1. Performance highlights
+2. Content gaps or opportunities
+3. Recommendations for optimization
+4. Trends or patterns
+
+Keep it concise (under 200 words) and actionable.`;
 
     try {
-      // Use ai.models.generateContent to query the model with the prompt.
       const response = await ai.models.generateContent({
-        model: 'gemini-3-flash-preview',
+        model: 'gemini-1.5-flash',
         contents: prompt,
       });
+      return response.text || "Unable to generate insights at this time.";
+    } catch (error) {
+      console.error("Gemini API Error:", error);
+      throw error;
+    }
+  },
 
-      // The response.text is a property that directly returns the string output.
-      return response.text || "Failed to generate content.";
+  answerQuestion: async (
+    question: string,
+    assets: Asset[],
+    collections: Collection[],
+    config: SystemConfig,
+    context: ContextInfo
+  ): Promise<string> => {
+    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+
+    // Build asset summary for context
+    const assetSummary = assets.slice(0, 20).map(a => ({
+      title: a.title,
+      market: a.market,
+      platform: a.platform,
+      model: a.carModel,
+      ctr: a.ctr,
+      cr: a.cr,
+      objectives: a.objectives,
+    }));
+
+    const prompt = `You are an AI assistant for BYD Assets Hub, a marketing asset management system. Answer the user's question based on the following data.
+
+Current Context:
+- View: ${context.currentView || 'repository'}
+- Selected Market: ${context.selectedMarket || 'All'}
+- Selected Model: ${context.selectedModel || 'All'}
+- Selected Platform: ${context.selectedPlatform || 'All'}
+
+Asset Database (${assets.length} total assets):
+${JSON.stringify(assetSummary, null, 2)}
+
+Collections: ${collections.length} active projects
+${collections.map(c => `- ${c.name}: ${c.assetIds.length} assets`).join('\n')}
+
+Available Markets: ${config.markets.join(', ')}
+Available Models: ${config.models.join(', ')}
+Available Platforms: ${config.platforms.join(', ')}
+
+User Question: ${question}
+
+Provide a helpful, accurate answer based on the data above. If the question requires data that isn't available, say so clearly. Be concise but thorough.`;
+
+    try {
+      const response = await ai.models.generateContent({
+        model: 'gemini-1.5-flash',
+        contents: prompt,
+      });
+      return response.text || "I couldn't generate a response. Please try rephrasing your question.";
     } catch (error) {
       console.error("Gemini API Error:", error);
       throw error;
