@@ -16,7 +16,12 @@ export const geminiService = {
     config: SystemConfig,
     context: ContextInfo
   ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // TEMP: Hardcode key for testing. Prefer env via Vite define when deploying.
+    const apiKey =
+      process.env.API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      "AIzaSyCJ6NU2zP_2UFKFxMKg4Xs79OiLCBfjE6U";
+    const ai = new GoogleGenAI({ apiKey });
 
     // Calculate key metrics
     const totalAssets = assets.length;
@@ -74,7 +79,8 @@ Keep it concise (under 200 words) and actionable.`;
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        // Use a model confirmed to work with @google/genai in this project.
+        model: 'gemini-3-flash-preview',
         contents: prompt,
       });
       return response.text || "Unable to generate insights at this time.";
@@ -91,7 +97,12 @@ Keep it concise (under 200 words) and actionable.`;
     config: SystemConfig,
     context: ContextInfo
   ): Promise<string> => {
-    const ai = new GoogleGenAI({ apiKey: process.env.API_KEY });
+    // TEMP: Hardcode key for testing. Prefer env via Vite define when deploying.
+    const apiKey =
+      process.env.API_KEY ||
+      process.env.GEMINI_API_KEY ||
+      "AIzaSyCJ6NU2zP_2UFKFxMKg4Xs79OiLCBfjE6U";
+    const ai = new GoogleGenAI({ apiKey });
 
     // Build asset summary for context
     const assetSummary = assets.slice(0, 20).map(a => ({
@@ -128,7 +139,8 @@ Provide a helpful, accurate answer based on the data above. If the question requ
 
     try {
       const response = await ai.models.generateContent({
-        model: 'gemini-1.5-flash',
+        // Use a model confirmed to work with @google/genai in this project.
+        model: 'gemini-3-flash-preview',
         contents: prompt,
       });
       return response.text || "I couldn't generate a response. Please try rephrasing your question.";
