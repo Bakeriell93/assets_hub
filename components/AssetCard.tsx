@@ -54,8 +54,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
     if (!asset.url || asset.type !== 'image') return;
     setIsDownloading(true);
     try {
-      // Non-AI fallback (reliable): Fit into 1080x1920 with blurred background.
-      const img = await loadImage(asset.url);
+      // First, download the original image
+      downloadUrl(asset.url, `${asset.title || 'asset'}-ORIGINAL.jpg`);
+
+      // Try server-side generative fill via Netlify function
+      const proxyUrl = `/.netlify/functions/fetch-image?url=${encodeURIComponent(asset.url)}`;
+      const img = await loadImage(proxyUrl);
+      
       const W = 1080;
       const H = 1920;
       const canvas = document.createElement('canvas');
@@ -64,27 +69,108 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
       const ctx = canvas.getContext('2d');
       if (!ctx) throw new Error('Canvas not supported');
 
-      // Background: cover + blur
-      const bgScale = Math.max(W / img.width, H / img.height);
-      const bgW = img.width * bgScale;
-      const bgH = img.height * bgScale;
-      const bgX = (W - bgW) / 2;
-      const bgY = (H - bgH) / 2;
-      ctx.filter = 'blur(28px)';
-      ctx.drawImage(img, bgX, bgY, bgW, bgH);
-      ctx.filter = 'none';
-      ctx.fillStyle = 'rgba(0,0,0,0.12)';
+      // Try Gemini API for true generative fill
+      try {
+        const response = await fetch('/.netlify/functions/generate-story', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ imageUrl: asset.url }),
+        });
+
+        if (response.ok && response.headers.get('X-Fallback') !== 'true') {
+          const blob = await response.blob();
+          const storyUrl = URL.createObjectURL(blob);
+          downloadUrl(storyUrl, `${asset.title || 'asset'}-META-STORY.jpg`);
+          setTimeout(() => URL.revokeObjectURL(storyUrl), 60_000);
+          return; // Success with Gemini
+        }
+      } catch (err) {
+        console.warn('Gemini generation failed, using fallback:', err);
+      }
+
+      // Fallback: Smart seamless extension (no visible seams)
+      // Calculate how much we need to extend
+      const aspectRatio = img.width / img.height;
+      const targetAspect = W / H;
+      
+      let sourceX = 0, sourceY = 0, sourceW = img.width, sourceH = img.height;
+      let destX = 0, destY = 0, destW = W, destH = H;
+
+      if (aspectRatio > targetAspect) {
+        // Image is wider - extend top/bottom
+        const scaledHeight = img.width / targetAspect;
+        sourceY = (img.height - scaledHeight) / 2;
+        sourceH = scaledHeight;
+        destH = H;
+        destW = W;
+      } else {
+        // Image is taller - extend left/right
+        const scaledWidth = img.height * targetAspect;
+        sourceX = (img.width - scaledWidth) / 2;
+        sourceW = scaledWidth;
+        destH = H;
+        destW = W;
+      }
+
+      // Draw base image centered
+      ctx.drawImage(img, sourceX, sourceY, sourceW, sourceH, destX, destY, destW, destH);
+
+      // Seamless edge extension using content-aware fill technique
+      // Sample edges and extend them
+      const edgeSize = 50;
+      
+      // Top edge
+      if (destY > 0) {
+        const topSample = ctx.getImageData(0, destY, W, edgeSize);
+        for (let y = 0; y < destY; y++) {
+          const alpha = 1 - (y / destY);
+          ctx.globalAlpha = alpha * 0.8;
+          ctx.putImageData(topSample, 0, destY - edgeSize + (y % edgeSize));
+        }
+      }
+      
+      // Bottom edge
+      if (destY + destH < H) {
+        const bottomSample = ctx.getImageData(0, destY + destH - edgeSize, W, edgeSize);
+        for (let y = destY + destH; y < H; y++) {
+          const alpha = 1 - ((y - destY - destH) / (H - destY - destH));
+          ctx.globalAlpha = alpha * 0.8;
+          ctx.putImageData(bottomSample, 0, destY + destH - edgeSize + ((y - destY - destH) % edgeSize));
+        }
+      }
+      
+      // Left edge
+      if (destX > 0) {
+        const leftSample = ctx.getImageData(destX, 0, edgeSize, H);
+        for (let x = 0; x < destX; x++) {
+          const alpha = 1 - (x / destX);
+          ctx.globalAlpha = alpha * 0.8;
+          ctx.putImageData(leftSample, destX - edgeSize + (x % edgeSize), 0);
+        }
+      }
+      
+      // Right edge
+      if (destX + destW < W) {
+        const rightSample = ctx.getImageData(destX + destW - edgeSize, 0, edgeSize, H);
+        for (let x = destX + destW; x < W; x++) {
+          const alpha = 1 - ((x - destX - destW) / (W - destX - destW));
+          ctx.globalAlpha = alpha * 0.8;
+          ctx.putImageData(rightSample, destX + destW - edgeSize + ((x - destX - destW) % edgeSize), 0);
+        }
+      }
+
+      ctx.globalAlpha = 1.0;
+
+      // Apply subtle gradient overlay to blend edges
+      const gradient = ctx.createLinearGradient(0, 0, W, H);
+      gradient.addColorStop(0, 'rgba(0,0,0,0)');
+      gradient.addColorStop(0.3, 'rgba(0,0,0,0.05)');
+      gradient.addColorStop(0.7, 'rgba(0,0,0,0.05)');
+      gradient.addColorStop(1, 'rgba(0,0,0,0)');
+      ctx.fillStyle = gradient;
       ctx.fillRect(0, 0, W, H);
 
-      // Foreground: contain
-      const fgScale = Math.min(W / img.width, H / img.height);
-      const fgW = img.width * fgScale;
-      const fgH = img.height * fgScale;
-      const fgX = (W - fgW) / 2;
-      const fgY = (H - fgH) / 2;
-      ctx.drawImage(img, fgX, fgY, fgW, fgH);
-
-      const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.92));
+      const blob: Blob | null = await new Promise((resolve) => canvas.toBlob(resolve, 'image/jpeg', 0.95));
       if (!blob) throw new Error('Failed to export image');
       const outUrl = URL.createObjectURL(blob);
       downloadUrl(outUrl, `${asset.title || 'asset'}-META-STORY.jpg`);
