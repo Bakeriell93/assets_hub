@@ -16,6 +16,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users 
   const [isAddingConfig, setIsAddingConfig] = useState<keyof SystemConfig | null>(null);
   const [revokingUserId, setRevokingUserId] = useState<string | null>(null);
   const [securityLogs, setSecurityLogs] = useState<SecurityLog[]>([]);
+  // Backfill cache for older assets that may not have `size` stored in Firestore.
+  const [resolvedAssetSizes, setResolvedAssetSizes] = useState<Record<string, number>>({});
 
   // Form states
   const [newUser, setNewUser] = useState({ fullName: '', username: '', password: '', role: 'Viewer' as UserRole });
@@ -33,6 +35,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users 
     const i = Math.floor(Math.log(bytes) / Math.log(k));
     return parseFloat((bytes / Math.pow(k, i)).toFixed(2)) + ' ' + sizes[i];
   };
+
+  const tryResolveRemoteFileSize = async (url: string): Promise<number | null> => {
+    // Best effort only. Firebase Storage download URLs usually allow HEAD, but if not,
+    // fallback to GET with Range and parse Content-Range.
+    try {
+      const head = await fetch(url, { method: 'HEAD' });
+      const len = head.headers.get('content-length');
+      if (len) return Number(len);
+    } catch {
+      // ignore
+    }
+
+    try {
+      const resp = await fetch(url, {
+        method: 'GET',
+        headers: { Range: 'bytes=0-0' },
+      });
+      const contentRange = resp.headers.get('content-range'); // "bytes 0-0/12345"
+      if (contentRange && contentRange.includes('/')) {
+        const total = contentRange.split('/').pop();
+        if (total) return Number(total);
+      }
+      const len = resp.headers.get('content-length');
+      if (len) return Number(len);
+    } catch {
+      // ignore
+    }
+
+    return null;
+  };
+
+  // Backfill missing sizes from URL headers (so "Cloud Storage Load" is accurate).
+  useEffect(() => {
+    let cancelled = false;
+
+    const run = async () => {
+      const missing = assets.filter(a => !a.size && a.url && !resolvedAssetSizes[a.id]);
+      if (missing.length === 0) return;
+
+      const updates: Record<string, number> = {};
+      await Promise.all(
+        missing.map(async (a) => {
+          const bytes = await tryResolveRemoteFileSize(a.url!);
+          if (typeof bytes === 'number' && Number.isFinite(bytes) && bytes > 0) {
+            updates[a.id] = bytes;
+          }
+        })
+      );
+
+      if (!cancelled && Object.keys(updates).length > 0) {
+        setResolvedAssetSizes(prev => ({ ...prev, ...updates }));
+      }
+    };
+
+    run();
+    return () => {
+      cancelled = true;
+    };
+  }, [assets, resolvedAssetSizes]);
 
   const handleAddUserSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -62,7 +123,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users 
     }
   };
 
-  const totalBytes = assets.reduce((acc, asset) => acc + (asset.size || 0), 0);
+  const totalBytes = assets.reduce((acc, asset) => acc + (asset.size || resolvedAssetSizes[asset.id] || 0), 0);
   const storageFormatted = formatSize(totalBytes);
 
   return (
