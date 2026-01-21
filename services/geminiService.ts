@@ -18,7 +18,7 @@ export const geminiService = {
   ): Promise<string> => {
     const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('Gemini API key is not configured. Please set GEMINI_API_KEY in Netlify environment variables.');
+      throw new Error('Gemini API key is not configured. Please set GEMINI_API_KEY in your hosting provider environment variables (Vercel/Netlify).');
     }
     const ai = new GoogleGenAI({ apiKey });
 
@@ -98,7 +98,7 @@ Keep it concise (under 200 words) and actionable.`;
   ): Promise<string> => {
     const apiKey = process.env.API_KEY || process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      throw new Error('Gemini API key is not configured. Please set GEMINI_API_KEY in Netlify environment variables.');
+      throw new Error('Gemini API key is not configured. Please set GEMINI_API_KEY in your hosting provider environment variables (Vercel/Netlify).');
     }
     const ai = new GoogleGenAI({ apiKey });
 

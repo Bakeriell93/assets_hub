@@ -16,6 +16,22 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
 
+  const isAllowedProxyHost = (u: URL) => {
+    return u.hostname === 'firebasestorage.googleapis.com' || u.hostname === 'storage.googleapis.com';
+  };
+
+  const maybeProxyUrl = (url: string) => {
+    try {
+      const u = new URL(url);
+      if (isAllowedProxyHost(u)) {
+        return `/api/fetch-image?url=${encodeURIComponent(u.toString())}`;
+      }
+    } catch {
+      // ignore (data: urls, relative urls)
+    }
+    return url;
+  };
+
   const guessFilename = (url: string, fallbackBase: string) => {
     const cleaned = url.split('?')[0] || '';
     const last = cleaned.split('/').pop() || '';
@@ -30,10 +46,11 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
 
   const forceDownloadUrl = async (url: string, filenameBase: string) => {
     const filename = guessFilename(url, filenameBase);
+    const fetchUrl = maybeProxyUrl(url);
 
     // Best path: fetch bytes -> Blob -> object URL -> download (works even when `download` is ignored).
     try {
-      const res = await fetch(url, { method: 'GET' });
+      const res = await fetch(fetchUrl, { method: 'GET' });
       if (!res.ok) throw new Error(`HTTP ${res.status}`);
       const blob = await res.blob();
       const blobUrl = URL.createObjectURL(blob);
