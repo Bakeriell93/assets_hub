@@ -1,6 +1,7 @@
 
 import React, { useState } from 'react';
 import { Asset, UserRole } from '../types';
+import DownloadFormatModal from './DownloadFormatModal';
 
 interface AssetCardProps {
   asset: Asset;
@@ -12,6 +13,7 @@ interface AssetCardProps {
 
 const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdit, onDelete }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
+  const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const isHighPerformer = (asset.ctr && asset.ctr > 2) || (asset.cr && asset.cr > 1.5);
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
@@ -32,11 +34,17 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
     return url;
   };
 
-  const guessFilename = (url: string, fallbackBase: string) => {
+  const guessFilename = (url: string, fallbackBase: string, format?: 'original' | 'webp' | 'png' | 'jpg') => {
     const cleaned = url.split('?')[0] || '';
     const last = cleaned.split('/').pop() || '';
-    const extMatch = last.match(/\.(png|jpe?g|webp|gif)$/i);
-    const ext = (extMatch?.[0] || '.jpg').toLowerCase();
+    const extMatch = last.match(/\.([a-z0-9]+)(?:\?|$)/i);
+    let ext = (extMatch?.[0] || '.jpg').toLowerCase();
+    
+    // Override extension if format conversion requested
+    if (format && format !== 'original') {
+      ext = `.${format}`;
+    }
+    
     const safeBase = (fallbackBase || 'asset')
       .replace(/[<>:"/\\|?*\x00-\x1F]/g, '')
       .trim()
@@ -44,17 +52,64 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
     return safeBase.endsWith(ext) ? safeBase : `${safeBase}${ext}`;
   };
 
-  const forceDownloadUrl = async (url: string, filenameBase: string) => {
-    const filename = guessFilename(url, filenameBase);
-    const fetchUrl = maybeProxyUrl(url);
+  const convertImageFormat = async (imageUrl: string, format: 'webp' | 'png' | 'jpg'): Promise<Blob> => {
+    return new Promise((resolve, reject) => {
+      const img = new Image();
+      img.crossOrigin = 'anonymous';
+      
+      img.onload = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = img.width;
+        canvas.height = img.height;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) {
+          reject(new Error('Canvas context not available'));
+          return;
+        }
+        
+        ctx.drawImage(img, 0, 0);
+        
+        const mimeType = format === 'webp' ? 'image/webp' : format === 'png' ? 'image/png' : 'image/jpeg';
+        const quality = format === 'jpg' ? 0.92 : undefined;
+        
+        canvas.toBlob(
+          (blob) => {
+            if (blob) {
+              resolve(blob);
+            } else {
+              reject(new Error('Failed to convert image'));
+            }
+          },
+          mimeType,
+          quality
+        );
+      };
+      
+      img.onerror = () => reject(new Error('Failed to load image'));
+      img.src = maybeProxyUrl(imageUrl);
+    });
+  };
 
-    // Best path: fetch bytes -> Blob -> object URL -> download (works even when `download` is ignored).
+  const handleDownload = async (format: 'original' | 'webp' | 'png' | 'jpg') => {
+    if (!asset.url) return;
+
+    const filename = guessFilename(asset.url, asset.title || 'asset', format);
+    const fetchUrl = maybeProxyUrl(asset.url);
+
     try {
-      const res = await fetch(fetchUrl, { method: 'GET' });
-      if (!res.ok) throw new Error(`HTTP ${res.status}`);
-      const blob = await res.blob();
-      const blobUrl = URL.createObjectURL(blob);
+      let blob: Blob;
+      
+      if (format === 'original') {
+        // Download original - single fetch, no conversion
+        const res = await fetch(fetchUrl, { method: 'GET' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        blob = await res.blob();
+      } else {
+        // Convert format - fetch once, convert client-side (no extra API calls)
+        blob = await convertImageFormat(asset.url, format);
+      }
 
+      const blobUrl = URL.createObjectURL(blob);
       const a = document.createElement('a');
       a.href = blobUrl;
       a.download = filename;
@@ -62,26 +117,22 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
       document.body.appendChild(a);
       a.click();
       a.remove();
-
       URL.revokeObjectURL(blobUrl);
-      return;
     } catch (err) {
-      // Likely CORS blocked fetch; fall back to trying direct download attribute.
-      console.warn('Direct fetch download failed, falling back:', err);
-    }
-
-    try {
-      const a = document.createElement('a');
-      a.href = url;
-      a.download = filename;
-      a.rel = 'noopener';
-      document.body.appendChild(a);
-      a.click();
-      a.remove();
-      return;
-    } catch (err) {
-      console.warn('Download attribute fallback failed, opening new tab:', err);
-      window.open(url, '_blank', 'noopener,noreferrer');
+      console.error('Download failed:', err);
+      // Fallback to direct download
+      try {
+        const a = document.createElement('a');
+        a.href = asset.url;
+        a.download = filename;
+        a.rel = 'noopener';
+        document.body.appendChild(a);
+        a.click();
+        a.remove();
+      } catch (fallbackErr) {
+        console.error('Fallback download failed:', fallbackErr);
+        window.open(asset.url, '_blank', 'noopener,noreferrer');
+      }
     }
   };
 
@@ -181,7 +232,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
             {asset.type === 'image' && asset.url && (
               <div className="flex flex-wrap items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <button
-                  onClick={() => void forceDownloadUrl(asset.url!, asset.title || 'asset')}
+                  onClick={(e) => { e.stopPropagation(); setIsDownloadModalOpen(true); }}
                   className="bg-white px-4 py-2.5 rounded-2xl text-gray-900 hover:bg-gray-100 transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap disabled:opacity-50"
                 >
                   Download
@@ -254,6 +305,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
             <span className="truncate max-w-[80px] bg-gray-50 px-2 py-1 rounded-md">{asset.uploadedBy}</span>
         </div>
       </div>
+
+      <DownloadFormatModal
+        isOpen={isDownloadModalOpen}
+        onClose={() => setIsDownloadModalOpen(false)}
+        asset={asset}
+        onDownload={handleDownload}
+      />
     </div>
   );
 };
