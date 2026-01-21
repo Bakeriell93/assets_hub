@@ -344,7 +344,7 @@ function App() {
         onSave={storageService.addAsset}
         config={config}
       />
-      {isAdminPanelOpen && <AdminPanel assets={assets} config={config} users={users} onClose={() => setIsAdminPanelOpen(false)} />}
+      {isAdminPanelOpen && <AdminPanel assets={assets} config={config} users={users} currentUser={currentUser!} onClose={() => setIsAdminPanelOpen(false)} />}
     </div>
   );
 }

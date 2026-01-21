@@ -24,7 +24,7 @@ export const authService = {
       throw new AuthError('MISSING_CREDENTIALS', 'Username and password are required.');
     }
 
-    // Permanent hardcoded admin (always allowed)
+    // Permanent hardcoded super admin (always allowed, cannot be removed)
     // Username: fakhri
     // Password: Fakhri123!
     const ADMIN_UN = 'fakhri';
@@ -35,6 +35,7 @@ export const authService = {
         username: 'fakhri',
         role: 'Admin',
         fullName: 'Fakhri Ashour',
+        isSuperAdmin: true, // Mark as super admin
       };
     }
 

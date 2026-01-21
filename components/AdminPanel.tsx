@@ -8,9 +8,16 @@ interface AdminPanelProps {
   assets: Asset[];
   config: SystemConfig;
   users: User[];
+  currentUser: User;
 }
 
-const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users }) => {
+// Helper to check if user is super admin
+const isSuperAdmin = (user: User | null): boolean => {
+  if (!user) return false;
+  return user.id === 'admin_001' || user.username === 'fakhri' || user.isSuperAdmin === true;
+};
+
+const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users, currentUser }) => {
   const [activeTab, setActiveTab] = useState<'users' | 'config' | 'stats' | 'security'>('users');
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [isAddingConfig, setIsAddingConfig] = useState<keyof SystemConfig | null>(null);
@@ -228,20 +235,53 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users 
                             <p className="text-[11px] text-gray-400 font-bold uppercase tracking-tight">@{u.username}</p>
                           </td>
                           <td className="px-10 py-8">
-                            <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
-                                u.role === 'Admin' ? 'bg-purple-50 border-purple-100 text-purple-600' :
-                                u.role === 'Editor' ? 'bg-blue-50 border-blue-100 text-blue-600' :
-                                'bg-gray-100 border-gray-200 text-gray-500'
-                            }`}>{u.role}</span>
+                            {isSuperAdmin(u) ? (
+                              <span className="px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border bg-gradient-to-r from-purple-50 to-blue-50 border-purple-200 text-purple-700 shadow-sm">
+                                Super Admin
+                              </span>
+                            ) : (
+                              <span className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-widest border ${
+                                  u.role === 'Admin' ? 'bg-purple-50 border-purple-100 text-purple-600' :
+                                  u.role === 'Editor' ? 'bg-blue-50 border-blue-100 text-blue-600' :
+                                  'bg-gray-100 border-gray-200 text-gray-500'
+                              }`}>{u.role}</span>
+                            )}
                           </td>
                           <td className="px-10 py-8">
-                            {revokingUserId === u.id ? (
+                            {isSuperAdmin(u) ? (
+                              <span className="text-gray-300 text-[10px] font-black uppercase tracking-widest italic">Protected</span>
+                            ) : revokingUserId === u.id ? (
                                 <div className="flex items-center gap-3">
-                                    <button onClick={() => { storageService.removeUser(u.id); setRevokingUserId(null); }} className="px-4 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase">Confirm</button>
+                                    <button onClick={async () => { 
+                                      try {
+                                        // Only super admin can remove other admins
+                                        if (u.role === 'Admin' && !isSuperAdmin(currentUser)) {
+                                          await storageService.logSecurityEvent(`BLOCKED: Non-super admin attempted to revoke admin access: ${u.username}`, 'high');
+                                          alert('Only super admin can revoke other admins.');
+                                          setRevokingUserId(null);
+                                          return;
+                                        }
+                                        await storageService.removeUser(u.id);
+                                        await storageService.logSecurityEvent(`User access revoked: ${u.username} (${u.role}) by ${currentUser.username}`, 'medium');
+                                        setRevokingUserId(null);
+                                      } catch (err: any) {
+                                        await storageService.logSecurityEvent(`Failed to revoke access: ${u.username} - ${err.message}`, 'high');
+                                        alert(err.message || 'Failed to revoke access');
+                                        setRevokingUserId(null);
+                                      }
+                                    }} className="px-4 py-2 bg-red-600 text-white rounded-xl text-[10px] font-black uppercase">Confirm</button>
                                     <button onClick={() => setRevokingUserId(null)} className="px-4 py-2 bg-gray-100 text-gray-500 rounded-xl text-[10px] font-black uppercase">Cancel</button>
                                 </div>
                             ) : (
-                                <button onClick={() => setRevokingUserId(u.id)} className="text-red-500 hover:text-red-700 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Revoke Access</button>
+                                <button onClick={() => {
+                                  // Log attempt to revoke
+                                  if (u.role === 'Admin' && !isSuperAdmin(currentUser)) {
+                                    storageService.logSecurityEvent(`BLOCKED: Non-super admin attempted to revoke admin: ${u.username}`, 'high');
+                                    alert('Only super admin can revoke other admins.');
+                                    return;
+                                  }
+                                  setRevokingUserId(u.id);
+                                }} className="text-red-500 hover:text-red-700 text-[10px] font-black uppercase tracking-widest opacity-0 group-hover:opacity-100 transition-opacity">Revoke Access</button>
                             )}
                           </td>
                         </tr>

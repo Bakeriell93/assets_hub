@@ -15,6 +15,7 @@ import {
   collection, 
   addDoc, 
   getDocs, 
+  getDoc,
   deleteDoc, 
   doc, 
   updateDoc, 
@@ -198,7 +199,10 @@ export const storageService = {
 
   subscribeToSecurityLogs: (onUpdate: (logs: SecurityLog[]) => void): (() => void) => {
     if (!isCloudEnabled) {
-      const emit = () => onUpdate(sortByCreatedAtDesc(readLS<SecurityLog[]>(LS_KEYS.securityLogs, [])));
+      const emit = () => {
+        const logs = readLS<SecurityLog[]>(LS_KEYS.securityLogs, []);
+        onUpdate([...logs].sort((a, b) => b.timestamp - a.timestamp));
+      };
       emit();
       const handler = () => emit();
       window.addEventListener('storage', handler);
@@ -353,14 +357,37 @@ export const storageService = {
   },
 
   removeUser: async (userId: string): Promise<void> => {
+    // Prevent removing super admin (fakhri)
+    if (userId === 'admin_001' || userId === 'fakhri') {
+      throw new Error('Cannot remove super admin. Super admin access is permanent.');
+    }
+    
     try {
       if (!isCloudEnabled) {
         const existing = readLS<User[]>(LS_KEYS.users, []);
-        writeLS(LS_KEYS.users, existing.filter(u => u.id !== userId));
+        const userToRemove = existing.find(u => u.id === userId);
+        if (userToRemove?.isSuperAdmin) {
+          throw new Error('Cannot remove super admin. Super admin access is permanent.');
+        }
+        writeLS(LS_KEYS.users, existing.filter(u => u.id !== userId && !u.isSuperAdmin));
         return;
       }
+      
+      // Check if user is super admin in Firestore
+      const userDocRef = doc(db!, USERS_COLLECTION, userId);
+      const userDocSnap = await getDoc(userDocRef);
+      if (userDocSnap.exists()) {
+        const userData = userDocSnap.data() as User;
+        if (userData.isSuperAdmin || userId === 'admin_001' || userId === 'fakhri') {
+          throw new Error('Cannot remove super admin. Super admin access is permanent.');
+        }
+      }
+      
       await deleteDoc(doc(db!, USERS_COLLECTION, userId));
-    } catch (error) {
+    } catch (error: any) {
+      if (error.message?.includes('super admin')) {
+        throw error;
+      }
       handleError('removeUser', error);
       throw error;
     }

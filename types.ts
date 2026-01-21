@@ -25,6 +25,7 @@ export interface User {
   fullName: string;
   password?: string;
   createdAt?: number;
+  isSuperAdmin?: boolean; // True for permanent super admin (fakhri)
 }
 
 export interface Collection {
