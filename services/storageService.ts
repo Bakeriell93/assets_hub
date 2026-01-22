@@ -363,6 +363,24 @@ export const storageService = {
     }
   },
 
+  clearAllSecurityLogs: async (): Promise<void> => {
+    try {
+      if (!isCloudEnabled) {
+        writeLS(LS_KEYS.securityLogs, []);
+        return;
+      }
+
+      // Delete all logs from Firestore
+      const q = query(collection(db!, SECURITY_LOGS_COLLECTION));
+      const snapshot = await getDocs(q);
+      const deletePromises = snapshot.docs.map(doc => deleteDoc(doc.ref));
+      await Promise.all(deletePromises);
+    } catch (error) {
+      handleError('clearAllSecurityLogs', error);
+      throw error;
+    }
+  },
+
   addAsset: async (asset: Omit<Asset, 'id' | 'createdAt' | 'size' | 'status'>, file?: File): Promise<void> => {
     let publicUrl = asset.url;
     let size = 0;

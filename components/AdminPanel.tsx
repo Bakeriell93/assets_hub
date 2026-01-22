@@ -499,12 +499,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                   </div>
                   <div className="flex items-center gap-4">
                     {isSuperAdmin(currentUser) && !isAddingActionLog && !editingActionLog && (
-                      <button
-                        onClick={() => setIsAddingActionLog(true)}
-                        className="px-6 py-3 bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-purple-700 transition-all"
-                      >
-                        + Add Action Log
-                      </button>
+                      <>
+                        <button
+                          onClick={() => setIsAddingActionLog(true)}
+                          className="px-6 py-3 bg-purple-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-purple-700 transition-all"
+                        >
+                          + Add Action Log
+                        </button>
+                        <button
+                          onClick={async () => {
+                            if (confirm('Clear ALL security logs? This will remove all existing logs including mock data. This action cannot be undone.')) {
+                              try {
+                                await storageService.clearAllSecurityLogs();
+                                await storageService.logSecurityEvent(`All security logs cleared by ${currentUser.username}`, 'medium');
+                              } catch (err: any) {
+                                alert(err.message || 'Failed to clear logs');
+                              }
+                            }
+                          }}
+                          className="px-6 py-3 bg-red-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl hover:bg-red-700 transition-all"
+                        >
+                          Clear All Logs
+                        </button>
+                      </>
                     )}
                     <div className="flex items-center gap-2 px-4 py-2 bg-red-50 border border-red-100 text-red-600 rounded-full text-[10px] font-black uppercase">
                       <span className="w-2 h-2 bg-red-600 rounded-full animate-ping"></span>
