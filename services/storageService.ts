@@ -27,7 +27,7 @@ import {
   limit
 } from "firebase/firestore";
 import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
-import { Asset, Market, CarModel, Platform, User, SystemConfig, MARKETS, CAR_MODELS, PLATFORMS, Collection } from '../types';
+import { Asset, AssetStatus, Market, CarModel, Platform, User, SystemConfig, MARKETS, CAR_MODELS, PLATFORMS, Collection } from '../types';
 
 const ASSETS_COLLECTION = 'assets';
 const CONFIG_COLLECTION = 'config';
@@ -393,33 +393,48 @@ export const storageService = {
           // Local fallback: store file as data URL (works in AI Studio too)
           publicUrl = await fileToDataUrl(file);
         } else {
-          const storageRef = ref(storage, `content/${Date.now()}-${file.name}`);
-          const snapshot = await uploadBytes(storageRef, file);
-          publicUrl = await getDownloadURL(snapshot.ref);
+          try {
+            const storageRef = ref(storage, `content/${Date.now()}-${file.name}`);
+            const snapshot = await uploadBytes(storageRef, file);
+            publicUrl = await getDownloadURL(snapshot.ref);
+          } catch (uploadError) {
+            console.error('Firebase Storage upload failed:', uploadError);
+            // Fallback to data URL if Firebase Storage fails
+            publicUrl = await fileToDataUrl(file);
+            console.warn('Using data URL fallback for asset');
+          }
         }
       } else if (asset.content) {
         size = new Blob([asset.content]).size;
       }
 
-      const payload = { 
+      const payload: Omit<Asset, 'id'> = { 
         ...asset, 
         url: publicUrl || '', 
         createdAt: Date.now(),
         size: size,
-        status: 'Approved' 
+        status: 'Approved' as AssetStatus,
+        market: asset.market,
+        platform: asset.platform,
+        carModel: asset.carModel,
+        objectives: asset.objectives || [],
+        uploadedBy: asset.uploadedBy || 'Anonymous'
       };
 
       if (!isCloudEnabled) {
         const existing = readLS<Asset[]>(LS_KEYS.assets, []);
-        const id = `asset_${Date.now()}`;
-        writeLS(LS_KEYS.assets, [{ ...(payload as any), id } as Asset, ...existing]);
+        const id = `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
+        const newAsset = { ...(payload as any), id } as Asset;
+        writeLS(LS_KEYS.assets, [newAsset, ...existing]);
         await storageService.logSecurityEvent(`Asset Published (local): ${asset.title}`, 'low');
         return;
       }
 
-      await addDoc(collection(db!, ASSETS_COLLECTION), payload);
+      const docRef = await addDoc(collection(db!, ASSETS_COLLECTION), payload);
+      console.log('Asset saved successfully with ID:', docRef.id);
       await storageService.logSecurityEvent(`Asset Published: ${asset.title}`, 'low');
     } catch (error) {
+      console.error('addAsset error:', error);
       handleError('addAsset', error);
       throw error;
     }

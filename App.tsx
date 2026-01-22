@@ -93,37 +93,55 @@ function App() {
   };
 
   const handleSaveAsset = async (data: any, file?: File) => {
-    // Editing should UPDATE, not create a new asset.
-    if (editingAsset) {
-      // Build updates object, preserving important fields
-      const updates: Partial<Asset> = {
-        title: data.title,
-        type: data.type,
-        market: data.market,
-        platform: data.platform,
-        carModel: data.carModel,
-        objectives: data.objectives,
-        usageRights: data.usageRights,
-        uploadedBy: data.uploadedBy,
-        ctr: data.ctr,
-        cpl: data.cpl,
-        cr: data.cr,
-        comments: data.comments,
-        content: data.content,
-        // Preserve these fields from original asset
-        url: editingAsset.url,
-        size: editingAsset.size,
-        status: editingAsset.status,
-        createdAt: editingAsset.createdAt,
-      };
+    try {
+      // Editing should UPDATE, not create a new asset.
+      if (editingAsset) {
+        // Build updates object, preserving important fields
+        const updates: Partial<Asset> = {
+          title: data.title,
+          type: data.type,
+          market: data.market,
+          platform: data.platform,
+          carModel: data.carModel,
+          objectives: data.objectives,
+          usageRights: data.usageRights,
+          uploadedBy: data.uploadedBy,
+          ctr: data.ctr,
+          cpl: data.cpl,
+          cr: data.cr,
+          comments: data.comments,
+          content: data.content,
+          // Preserve these fields from original asset
+          url: editingAsset.url,
+          size: editingAsset.size,
+          status: editingAsset.status,
+          createdAt: editingAsset.createdAt,
+        };
+        
+        await storageService.updateAsset(editingAsset.id, updates);
+        setEditingAsset(null);
+        setIsAssetModalOpen(false);
+        return;
+      }
       
-      await storageService.updateAsset(editingAsset.id, updates);
-      setEditingAsset(null);
+      // Validate required fields for new asset
+      if (!data.title || !data.market || !data.platform || !data.carModel) {
+        alert('Please fill in all required fields (Title, Market, Platform, Car Model)');
+        return;
+      }
+      
+      if (!file && data.type !== 'text' && !data.content) {
+        alert('Please select a file to upload');
+        return;
+      }
+      
+      await storageService.addAsset(data, file);
       setIsAssetModalOpen(false);
-      return;
+    } catch (error: any) {
+      console.error('Failed to save asset:', error);
+      alert(`Failed to upload asset: ${error.message || 'Unknown error'}`);
+      // Don't close modal on error so user can retry
     }
-    await storageService.addAsset(data, file);
-    setIsAssetModalOpen(false);
   };
 
   const handleCreateCollection = async (e: React.FormEvent) => {
