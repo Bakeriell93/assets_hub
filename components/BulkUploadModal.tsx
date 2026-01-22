@@ -213,16 +213,11 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
   const inputClasses = "w-full rounded-lg border-gray-300 border p-2 focus:ring-2 focus:ring-blue-500 focus:border-transparent bg-white text-gray-900 text-sm";
 
   return (
-    <div className="fixed inset-0 z-[120] overflow-y-auto">
-      <div className="flex items-center justify-center min-h-screen pt-4 px-4 pb-20 text-center sm:block sm:p-0">
-        <div className="fixed inset-0 transition-opacity" aria-hidden="true" onClick={handleClose}>
-          <div className="absolute inset-0 bg-gray-900 opacity-75 backdrop-blur-sm"></div>
-        </div>
-
-        <span className="hidden sm:inline-block sm:align-middle sm:h-screen" aria-hidden="true">&#8203;</span>
-
-        <div className="inline-block align-bottom bg-white rounded-3xl text-left overflow-hidden shadow-2xl transform transition-all sm:my-8 sm:align-middle sm:max-w-7xl w-full h-[90vh] flex flex-col">
-          {/* Header */}
+    <div className="fixed inset-0 z-[120] flex items-center justify-center p-6">
+      <div className="absolute inset-0 bg-gray-900/75 backdrop-blur-sm" onClick={handleClose}></div>
+      
+      <div className="relative bg-white rounded-3xl shadow-2xl w-full max-w-7xl h-[90vh] flex flex-col z-10" onClick={(e) => e.stopPropagation()}>
+        {/* Header */}
           <div className="px-8 py-6 border-b border-gray-200 bg-gradient-to-r from-blue-600 to-indigo-600 text-white flex items-center justify-between">
             <div>
               <h3 className="text-2xl font-black tracking-tight">Bulk Upload</h3>
@@ -473,7 +468,6 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
               </div>
             )}
           </div>
-        </div>
       </div>
     </div>
   );
