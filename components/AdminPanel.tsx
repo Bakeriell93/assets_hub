@@ -596,65 +596,65 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
 
                 <div className="bg-gray-50/50 rounded-[48px] overflow-hidden border border-gray-100 shadow-sm">
                   <div className="w-full overflow-x-auto">
-                    <table className="w-full min-w-[980px] text-left table-fixed">
-                      <thead className="sticky top-0 z-10">
-                        <tr className="bg-gray-100/80 backdrop-blur">
-                          <th className="w-[48%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Event Description</th>
-                          <th className="w-[18%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Network Node (IP)</th>
-                          <th className="w-[18%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Geo-Location</th>
-                          <th className="w-[10%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Risk</th>
+                    <table className="w-full text-left">
+                      <thead className="sticky top-0 z-10 bg-gray-100/95 backdrop-blur-sm">
+                        <tr>
+                          <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Event</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">IP</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-left">Location</th>
+                          <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Risk</th>
                           {isSuperAdmin(currentUser) && (
-                            <th className="w-[6%] px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
+                            <th className="px-4 py-4 text-[10px] font-black text-gray-400 uppercase tracking-widest text-center">Actions</th>
                           )}
                         </tr>
                       </thead>
                     <tbody className="divide-y divide-gray-100">
                       {securityLogs.length > 0 ? securityLogs.map(log => (
                         <tr key={log.id} className="hover:bg-white transition-all group">
-                          <td className="px-10 py-8 align-top">
-                            <div className="flex items-center gap-2">
-                              <p className="text-gray-900 font-black text-sm truncate max-w-[520px]" title={log.event}>
+                          <td className="px-4 py-4 align-top max-w-[400px]">
+                            <div className="flex items-start gap-2">
+                              <p className="text-gray-900 font-black text-xs leading-tight" title={log.event}>
                                 {log.event}
                               </p>
                               {log.isActionLog && (
-                                <span className="px-2 py-0.5 bg-purple-100 text-purple-700 text-[8px] font-black uppercase rounded border border-purple-200">
+                                <span className="px-1.5 py-0.5 bg-purple-100 text-purple-700 text-[7px] font-black uppercase rounded border border-purple-200 whitespace-nowrap">
                                   Action
                                 </span>
                               )}
                             </div>
-                            <p className="text-[10px] text-gray-400 font-bold uppercase tracking-tight mt-1">
+                            <p className="text-[9px] text-gray-400 font-bold uppercase tracking-tight mt-1">
                               {new Date(log.timestamp).toLocaleString()}
-                              {log.createdBy && ` • By ${log.createdBy}`}
+                              {log.createdBy && ` • ${log.createdBy}`}
                             </p>
                           </td>
-                          <td className="px-10 py-8 align-top">
-                            <code className="block bg-gray-100 px-3 py-1 rounded text-xs font-mono text-gray-600 truncate" title={log.ip}>
+                          <td className="px-4 py-4 align-top">
+                            <code className="block bg-gray-100 px-2 py-1 rounded text-[10px] font-mono text-gray-600" title={log.ip}>
                               {log.ip}
                             </code>
                           </td>
-                          <td className="px-10 py-8 align-top">
-                            <span className="block text-[11px] font-bold text-gray-500 uppercase truncate" title={log.location}>
+                          <td className="px-4 py-4 align-top">
+                            <span className="block text-[10px] font-bold text-gray-500 uppercase" title={log.location}>
                               {log.location}
                             </span>
                           </td>
-                          <td className="px-10 py-8 align-top">
-                            <span className={`px-4 py-1.5 rounded-full text-[9px] font-black uppercase tracking-widest border ${
+                          <td className="px-4 py-4 align-top text-center">
+                            <span className={`inline-block px-3 py-1 rounded-full text-[8px] font-black uppercase tracking-widest border ${
                                 log.severity === 'high' ? 'bg-red-50 border-red-100 text-red-600' :
                                 log.severity === 'medium' ? 'bg-orange-50 border-orange-100 text-orange-600' :
                                 'bg-blue-50 border-blue-100 text-blue-600'
                             }`}>{log.severity}</span>
                           </td>
                           {isSuperAdmin(currentUser) && (
-                            <td className="px-10 py-8 align-top">
+                            <td className="px-4 py-4 align-top text-center">
                               {log.isActionLog ? (
-                                <div className="flex items-center gap-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                                <div className="flex items-center justify-center gap-1.5 opacity-0 group-hover:opacity-100 transition-opacity">
                                   <button
                                     onClick={() => {
                                       setEditingActionLog(log);
                                       setNewActionLog({ event: log.event, severity: log.severity });
                                       setIsAddingActionLog(false);
                                     }}
-                                    className="px-3 py-1.5 bg-blue-50 text-blue-600 rounded-lg text-[9px] font-black uppercase hover:bg-blue-100 transition-all"
+                                    className="px-2 py-1 bg-blue-50 text-blue-600 rounded text-[8px] font-black uppercase hover:bg-blue-100 transition-all"
                                   >
                                     Edit
                                   </button>
@@ -668,20 +668,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                                         }
                                       }
                                     }}
-                                    className="px-3 py-1.5 bg-red-50 text-red-600 rounded-lg text-[9px] font-black uppercase hover:bg-red-100 transition-all"
+                                    className="px-2 py-1 bg-red-50 text-red-600 rounded text-[8px] font-black uppercase hover:bg-red-100 transition-all"
                                   >
-                                    Delete
+                                    Del
                                   </button>
                                 </div>
                               ) : (
-                                <span className="text-gray-300 text-[9px] font-black uppercase italic">Auto</span>
+                                <span className="text-gray-300 text-[8px] font-black uppercase italic">Auto</span>
                               )}
                             </td>
                           )}
                         </tr>
                       )) : (
                         <tr>
-                          <td colSpan={isSuperAdmin(currentUser) ? 5 : 4} className="px-10 py-20 text-center text-gray-300 font-black uppercase tracking-[0.4em]">
+                          <td colSpan={isSuperAdmin(currentUser) ? 5 : 4} className="px-4 py-20 text-center text-gray-300 font-black uppercase tracking-[0.4em]">
                             No Live Threat Data Registered
                           </td>
                         </tr>

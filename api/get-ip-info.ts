@@ -20,33 +20,66 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     let location = 'Unknown Location';
     let ip = String(realIp);
 
-    try {
-      const geoResponse = await fetch(`https://ipapi.co/${ip}/json/`, {
-        headers: { 'User-Agent': 'BYD-Assets-Hub/1.0' }
-      });
-      
-      if (geoResponse.ok) {
-        const geoData = await geoResponse.json();
-        if (geoData.city && geoData.country_name) {
-          location = `${geoData.city}, ${geoData.country_code}`;
-        } else if (geoData.country_name) {
-          location = geoData.country_name;
+    // Try multiple geolocation services for better reliability
+    const geoApis = [
+      // ipapi.co (free tier: 1000/day)
+      async () => {
+        const res = await fetch(`https://ipapi.co/${ip}/json/`, {
+          headers: { 'User-Agent': 'BYD-Assets-Hub/1.0' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.city && data.country_code) {
+            return `${data.city}, ${data.country_code}`;
+          }
+          if (data.country_name) return data.country_name;
         }
-      }
-    } catch (geoErr) {
-      // Fallback to ip-api.com
-      try {
-        const fallbackResponse = await fetch(`http://ip-api.com/json/${ip}?fields=status,message,city,countryCode`);
-        if (fallbackResponse.ok) {
-          const fallbackData = await fallbackResponse.json();
-          if (fallbackData.city && fallbackData.countryCode) {
-            location = `${fallbackData.city}, ${fallbackData.countryCode}`;
+        return null;
+      },
+      // ip-api.com (free tier: 45/min)
+      async () => {
+        const res = await fetch(`https://ip-api.com/json/${ip}?fields=status,message,city,countryCode`, {
+          headers: { 'User-Agent': 'BYD-Assets-Hub/1.0' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.status === 'success' && data.city && data.countryCode) {
+            return `${data.city}, ${data.countryCode}`;
           }
         }
-      } catch {
-        // If both fail, use IP as location identifier
-        location = `IP: ${ip}`;
+        return null;
+      },
+      // ipgeolocation.io (free tier: 1000/month)
+      async () => {
+        const res = await fetch(`https://api.ipgeolocation.io/ipgeo?ip=${ip}&apiKey=free`, {
+          headers: { 'User-Agent': 'BYD-Assets-Hub/1.0' }
+        });
+        if (res.ok) {
+          const data = await res.json();
+          if (data.city && data.country_code2) {
+            return `${data.city}, ${data.country_code2}`;
+          }
+        }
+        return null;
       }
+    ];
+
+    for (const geoApi of geoApis) {
+      try {
+        const result = await geoApi();
+        if (result) {
+          location = result;
+          break;
+        }
+      } catch {
+        // Continue to next API
+        continue;
+      }
+    }
+
+    // If all APIs fail, use IP as fallback
+    if (location === 'Unknown Location') {
+      location = ip !== 'unknown' ? `IP: ${ip}` : 'Unknown Location';
     }
 
     return res.status(200).json({ ip, location });
