@@ -5,15 +5,17 @@ import DownloadFormatModal from './DownloadFormatModal';
 
 interface AssetCardProps {
   asset: Asset;
+  packageAssets?: Asset[]; // All assets in the package (if this is a package)
   userRole: UserRole;
   onPreview: (asset: Asset) => void;
   onEdit: (asset: Asset) => void;
   onDelete: (id: string) => void;
 }
 
-const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdit, onDelete }) => {
+const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, onPreview, onEdit, onDelete }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const isPackage = packageAssets.length > 1;
   const isHighPerformer = (asset.ctr && asset.ctr > 2) || (asset.cr && asset.cr > 1.5);
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
@@ -90,11 +92,12 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
     });
   };
 
-  const handleDownload = async (format: 'original' | 'webp' | 'png' | 'jpg') => {
-    if (!asset.url) return;
+  const handleDownload = async (format: 'original' | 'webp' | 'png' | 'jpg', assetId?: string) => {
+    const targetAsset = assetId ? packageAssets.find(a => a.id === assetId) : asset;
+    if (!targetAsset || !targetAsset.url) return;
 
-    const filename = guessFilename(asset.url, asset.title || 'asset', format);
-    const fetchUrl = maybeProxyUrl(asset.url);
+    const filename = guessFilename(targetAsset.url, targetAsset.title || 'asset', format);
+    const fetchUrl = maybeProxyUrl(targetAsset.url);
 
     try {
       let blob: Blob;
@@ -106,7 +109,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
         blob = await res.blob();
       } else {
         // Convert format - fetch once, convert client-side (no extra API calls)
-        blob = await convertImageFormat(asset.url, format);
+        blob = await convertImageFormat(targetAsset.url, format);
       }
 
       const blobUrl = URL.createObjectURL(blob);
@@ -123,7 +126,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
       // Fallback to direct download
       try {
         const a = document.createElement('a');
-        a.href = asset.url;
+        a.href = targetAsset.url;
         a.download = filename;
         a.rel = 'noopener';
         document.body.appendChild(a);
@@ -131,8 +134,24 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
         a.remove();
       } catch (fallbackErr) {
         console.error('Fallback download failed:', fallbackErr);
-        window.open(asset.url, '_blank', 'noopener,noreferrer');
+        window.open(targetAsset.url, '_blank', 'noopener,noreferrer');
       }
+    }
+  };
+
+  const handleDownloadAll = async () => {
+    // Download all assets in package individually (could be enhanced with ZIP later)
+    try {
+      for (const pkgAsset of packageAssets) {
+        if (pkgAsset.url) {
+          await handleDownload('original', pkgAsset.id);
+          // Small delay between downloads
+          await new Promise(resolve => setTimeout(resolve, 300));
+        }
+      }
+    } catch (err) {
+      console.error('Failed to download package:', err);
+      alert('Some files in the package failed to download');
     }
   };
 
@@ -152,7 +171,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
       className={`group bg-white rounded-[32px] border-2 overflow-hidden transition-all duration-500 flex flex-col h-full relative cursor-pointer ${isHighPerformer ? 'border-blue-500 shadow-blue-100 shadow-2xl' : 'border-transparent hover:border-blue-200 shadow-xl shadow-gray-100 hover:shadow-2xl'}`}
       onClick={() => onPreview(asset)}
     >
-      {isHighPerformer && (
+      {isPackage && (
+        <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-purple-600 text-white text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg flex items-center gap-1.5">
+          <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" /></svg>
+          Package ({packageAssets.length})
+        </div>
+      )}
+      {isHighPerformer && !isPackage && (
         <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-blue-600 text-white text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg flex items-center gap-1.5">
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M9.049 2.927c.3-.921 1.603-.921 1.902 0l1.07 3.292a1 1 0 00.95.69h3.462c.969 0 1.371 1.24.588 1.81l-2.8 2.034a1 1 0 00-.364 1.118l1.07 3.292c.3.921-.755 1.688-1.54 1.118l-2.8-2.034a1 1 0 00-1.175 0l-2.8 2.034c-.784.57-1.838-.197-1.539-1.118l1.07-3.292a1 1 0 00-.364-1.118L2.98 8.72c-.783-.57-.38-1.81.588-1.81h3.461a1 1 0 00.951-.69l1.07-3.292z" /></svg>
           Elite Asset
@@ -310,7 +335,9 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, userRole, onPreview, onEdi
         isOpen={isDownloadModalOpen}
         onClose={() => setIsDownloadModalOpen(false)}
         asset={asset}
+        packageAssets={isPackage ? packageAssets : undefined}
         onDownload={handleDownload}
+        onDownloadAll={isPackage ? handleDownloadAll : undefined}
       />
     </div>
   );

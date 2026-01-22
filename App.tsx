@@ -5,6 +5,7 @@ import AssetCard from './components/AssetCard';
 import AssetFormModal from './components/AssetFormModal';
 import AIInsightsModal from './components/AIInsightsModal';
 import AdminPanel from './components/AdminPanel';
+import BulkUploadModal from './components/BulkUploadModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
@@ -46,6 +47,7 @@ function App() {
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
+  const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
 
   // Restore session from localStorage on mount
@@ -116,6 +118,8 @@ function App() {
           size: editingAsset.size,
           status: editingAsset.status,
           createdAt: editingAsset.createdAt,
+          // Only include collectionIds if it's provided and not undefined
+          ...(data.collectionIds !== undefined ? { collectionIds: data.collectionIds } : {}),
         };
         
         await storageService.updateAsset(editingAsset.id, updates);
@@ -141,6 +145,25 @@ function App() {
       console.error('Failed to save asset:', error);
       alert(`Failed to upload asset: ${error.message || 'Unknown error'}`);
       // Don't close modal on error so user can retry
+    }
+  };
+
+  const handleSavePackage = async (packageAssets: Array<{ asset: Omit<Asset, 'id' | 'createdAt'>; file?: File }>) => {
+    try {
+      if (packageAssets.length === 0) {
+        alert('Package must contain at least one asset');
+        return;
+      }
+
+      // Upload all assets in the package
+      for (const { asset, file } of packageAssets) {
+        await storageService.addAsset(asset, file);
+      }
+
+      setIsAssetModalOpen(false);
+    } catch (error: any) {
+      console.error('Failed to save package:', error);
+      alert(`Failed to upload package: ${error.message || 'Unknown error'}`);
     }
   };
 
@@ -194,12 +217,39 @@ function App() {
     return mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch;
   });
 
-  const sortedAssets = [...filteredAssets].sort((a, b) => {
-    if (sortBy === 'ctr') return (b.ctr || 0) - (a.ctr || 0);
-    if (sortBy === 'cr') return (b.cr || 0) - (a.cr || 0);
-    if (sortBy === 'cpl') return (a.cpl || 999) - (b.cpl || 999);
-    return b.createdAt - a.createdAt;
+  // Group assets by packageId - show only the first asset of each package, or standalone assets
+  const packageMap = new Map<string, Asset[]>();
+  const standaloneAssets: Asset[] = [];
+
+  filteredAssets.forEach(asset => {
+    if (asset.packageId) {
+      if (!packageMap.has(asset.packageId)) {
+        packageMap.set(asset.packageId, []);
+      }
+      packageMap.get(asset.packageId)!.push(asset);
+    } else {
+      standaloneAssets.push(asset);
+    }
   });
+
+  // Sort packages by their first asset's createdAt
+  const packageGroups = Array.from(packageMap.values())
+    .map(pkgAssets => ({
+      packageId: pkgAssets[0].packageId!,
+      assets: pkgAssets.sort((a, b) => (a.packageOrder || 0) - (b.packageOrder || 0)),
+      representative: pkgAssets.sort((a, b) => (a.packageOrder || 0) - (b.packageOrder || 0))[0]
+    }))
+    .sort((a, b) => b.representative.createdAt - a.representative.createdAt);
+
+  const sortedAssets = [
+    ...packageGroups.map(g => g.representative),
+    ...standaloneAssets.sort((a, b) => {
+      if (sortBy === 'ctr') return (b.ctr || 0) - (a.ctr || 0);
+      if (sortBy === 'cr') return (b.cr || 0) - (a.cr || 0);
+      if (sortBy === 'cpl') return (a.cpl || 999) - (b.cpl || 999);
+      return b.createdAt - a.createdAt;
+    })
+  ];
 
   if (!isLoggedIn) return <Login onLogin={handleLogin} />;
 
@@ -255,7 +305,10 @@ function App() {
             <div className="flex gap-4">
               <button onClick={() => setIsAIModalOpen(true)} className="px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] hover:from-purple-700 hover:to-indigo-700 transition-all shadow-xl shadow-purple-200">AI Insights</button>
               {currentUser?.role !== 'Viewer' && (
-                <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-10 py-4 bg-blue-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">UPLOAD</button>
+                <>
+                  <button onClick={() => setIsBulkUploadOpen(true)} className="px-10 py-4 bg-green-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-green-200 hover:bg-green-700 transition-all">BULK UPLOAD</button>
+                  <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-10 py-4 bg-blue-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">UPLOAD</button>
+                </>
               )}
             </div>
           </div>
@@ -316,16 +369,22 @@ function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
-                  {sortedAssets.map(asset => (
-                    <AssetCard 
-                      key={asset.id}
-                      asset={asset}
-                      userRole={currentUser?.role!}
-                      onPreview={setPreviewAsset}
-                      onEdit={(a) => { setEditingAsset(a); setIsAssetModalOpen(true); }}
-                      onDelete={storageService.deleteAsset}
-                    />
-                  ))}
+                  {sortedAssets.map(asset => {
+                    const packageAssets = asset.packageId 
+                      ? packageMap.get(asset.packageId) || [asset]
+                      : [asset];
+                    return (
+                      <AssetCard 
+                        key={asset.id}
+                        asset={asset}
+                        packageAssets={packageAssets}
+                        userRole={currentUser?.role!}
+                        onPreview={setPreviewAsset}
+                        onEdit={(a) => { setEditingAsset(a); setIsAssetModalOpen(true); }}
+                        onDelete={storageService.deleteAsset}
+                      />
+                    );
+                  })}
                 </div>
               </div>
             )}
@@ -502,6 +561,7 @@ function App() {
         isOpen={isAssetModalOpen} 
         onClose={() => { setIsAssetModalOpen(false); setEditingAsset(null); }} 
         onSave={handleSaveAsset}
+        onSavePackage={handleSavePackage}
         editingAsset={editingAsset}
         config={config}
         collections={collections}
@@ -518,6 +578,11 @@ function App() {
         selectedPlatform={selectedPlatform !== 'All' ? selectedPlatform : undefined}
       />
       {isAdminPanelOpen && <AdminPanel assets={assets} config={config} users={users} currentUser={currentUser!} onClose={() => setIsAdminPanelOpen(false)} />}
+      <BulkUploadModal
+        isOpen={isBulkUploadOpen}
+        onClose={() => setIsBulkUploadOpen(false)}
+        config={config}
+      />
       
       {/* Preview Modal */}
       {previewAsset && (

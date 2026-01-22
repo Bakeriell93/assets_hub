@@ -5,17 +5,23 @@ interface DownloadFormatModalProps {
   isOpen: boolean;
   onClose: () => void;
   asset: Asset;
-  onDownload: (format: 'original' | 'webp' | 'png' | 'jpg') => Promise<void>;
+  packageAssets?: Asset[]; // All assets in package
+  onDownload: (format: 'original' | 'webp' | 'png' | 'jpg', assetId?: string) => Promise<void>;
+  onDownloadAll?: () => Promise<void>;
 }
 
 const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
   isOpen,
   onClose,
   asset,
+  packageAssets = [asset],
   onDownload,
+  onDownloadAll,
 }) => {
   const [isDownloading, setIsDownloading] = useState(false);
   const [selectedFormat, setSelectedFormat] = useState<'original' | 'webp' | 'png' | 'jpg'>('original');
+  const [selectedAssetId, setSelectedAssetId] = useState<string | 'all'>(asset.id);
+  const isPackage = packageAssets.length > 1;
 
   if (!isOpen) return null;
 
@@ -36,7 +42,11 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
   const handleDownload = async () => {
     setIsDownloading(true);
     try {
-      await onDownload(selectedFormat);
+      if (selectedAssetId === 'all' && onDownloadAll) {
+        await onDownloadAll();
+      } else {
+        await onDownload(selectedFormat, selectedAssetId === 'all' ? undefined : selectedAssetId);
+      }
       onClose();
     } catch (err) {
       console.error('Download failed:', err);
@@ -60,7 +70,9 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
         onClick={(e) => e.stopPropagation()}
       >
         <div className="flex items-center justify-between">
-          <h3 className="text-2xl font-black text-gray-900 tracking-tight">Download Format</h3>
+          <h3 className="text-2xl font-black text-gray-900 tracking-tight">
+            {isPackage ? 'Download Package' : 'Download Format'}
+          </h3>
           <button
             onClick={onClose}
             className="p-2 hover:bg-gray-100 rounded-xl transition-colors"
@@ -71,31 +83,81 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
           </button>
         </div>
 
-        <div className="space-y-3">
-          {formatOptions.map((option) => (
+        {isPackage && (
+          <div className="space-y-3">
+            <label className="block text-xs font-black text-gray-500 uppercase tracking-widest mb-2">
+              Select Format/Platform
+            </label>
             <button
-              key={option.value}
-              onClick={() => option.available && setSelectedFormat(option.value)}
-              disabled={!option.available || isDownloading}
+              onClick={() => setSelectedAssetId('all')}
               className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${
-                selectedFormat === option.value
-                  ? 'border-blue-600 bg-blue-50 text-blue-900'
-                  : option.available
-                  ? 'border-gray-200 bg-white text-gray-900 hover:border-blue-300 hover:bg-gray-50'
-                  : 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
+                selectedAssetId === 'all'
+                  ? 'border-purple-600 bg-purple-50 text-purple-900'
+                  : 'border-gray-200 bg-white text-gray-900 hover:border-purple-300 hover:bg-gray-50'
               }`}
             >
               <div className="flex items-center justify-between">
-                <span className="font-black text-sm uppercase tracking-wider">{option.label}</span>
-                {selectedFormat === option.value && (
-                  <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                <span className="font-black text-sm uppercase tracking-wider">All Formats (ZIP)</span>
+                {selectedAssetId === 'all' && (
+                  <svg className="w-5 h-5 text-purple-600" fill="currentColor" viewBox="0 0 20 20">
                     <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
                   </svg>
                 )}
               </div>
             </button>
-          ))}
-        </div>
+            {packageAssets.map((pkgAsset) => (
+              <button
+                key={pkgAsset.id}
+                onClick={() => setSelectedAssetId(pkgAsset.id)}
+                className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${
+                  selectedAssetId === pkgAsset.id
+                    ? 'border-blue-600 bg-blue-50 text-blue-900'
+                    : 'border-gray-200 bg-white text-gray-900 hover:border-blue-300 hover:bg-gray-50'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <div>
+                    <span className="font-black text-sm uppercase tracking-wider block">{pkgAsset.platform}</span>
+                    <span className="text-xs text-gray-500 font-bold mt-1">{pkgAsset.title}</span>
+                  </div>
+                  {selectedAssetId === pkgAsset.id && (
+                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
+
+        {!isPackage && (
+          <div className="space-y-3">
+            {formatOptions.map((option) => (
+              <button
+                key={option.value}
+                onClick={() => option.available && setSelectedFormat(option.value)}
+                disabled={!option.available || isDownloading}
+                className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${
+                  selectedFormat === option.value
+                    ? 'border-blue-600 bg-blue-50 text-blue-900'
+                    : option.available
+                    ? 'border-gray-200 bg-white text-gray-900 hover:border-blue-300 hover:bg-gray-50'
+                    : 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
+                }`}
+              >
+                <div className="flex items-center justify-between">
+                  <span className="font-black text-sm uppercase tracking-wider">{option.label}</span>
+                  {selectedFormat === option.value && (
+                    <svg className="w-5 h-5 text-blue-600" fill="currentColor" viewBox="0 0 20 20">
+                      <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                    </svg>
+                  )}
+                </div>
+              </button>
+            ))}
+          </div>
+        )}
 
         {isDesignFile && (
           <div className="p-4 bg-orange-50 border border-orange-200 rounded-xl">

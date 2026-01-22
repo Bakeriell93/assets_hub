@@ -408,8 +408,13 @@ export const storageService = {
         size = new Blob([asset.content]).size;
       }
 
-      const payload: Omit<Asset, 'id'> = { 
-        ...asset, 
+      // Filter out undefined values (Firestore doesn't allow undefined)
+      const cleanAsset = Object.fromEntries(
+        Object.entries(asset).filter(([_, v]) => v !== undefined)
+      ) as Omit<Asset, 'id' | 'createdAt' | 'size' | 'status'>;
+
+      const payload: any = { 
+        ...cleanAsset, 
         url: publicUrl || '', 
         createdAt: Date.now(),
         size: size,
@@ -421,16 +426,21 @@ export const storageService = {
         uploadedBy: asset.uploadedBy || 'Anonymous'
       };
 
+      // Final filter to remove any undefined values from the payload
+      const finalPayload = Object.fromEntries(
+        Object.entries(payload).filter(([_, v]) => v !== undefined)
+      ) as Omit<Asset, 'id'>;
+
       if (!isCloudEnabled) {
         const existing = readLS<Asset[]>(LS_KEYS.assets, []);
         const id = `asset_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`;
-        const newAsset = { ...(payload as any), id } as Asset;
+        const newAsset = { ...finalPayload, id } as Asset;
         writeLS(LS_KEYS.assets, [newAsset, ...existing]);
         await storageService.logSecurityEvent(`Asset Published (local): ${asset.title}`, 'low');
         return;
       }
 
-      const docRef = await addDoc(collection(db!, ASSETS_COLLECTION), payload);
+      const docRef = await addDoc(collection(db!, ASSETS_COLLECTION), finalPayload);
       console.log('Asset saved successfully with ID:', docRef.id);
       await storageService.logSecurityEvent(`Asset Published: ${asset.title}`, 'low');
     } catch (error) {

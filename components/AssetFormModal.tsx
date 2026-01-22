@@ -7,12 +7,13 @@ interface AssetFormModalProps {
   isOpen: boolean;
   onClose: () => void;
   onSave: (asset: Omit<Asset, 'id' | 'createdAt'> | Partial<Asset>, file?: File) => void;
+  onSavePackage?: (assets: Array<{ asset: Omit<Asset, 'id' | 'createdAt'>; file?: File }>) => void;
   editingAsset?: Asset | null;
   config: SystemConfig;
   collections: Collection[];
 }
 
-const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave, editingAsset, config, collections }) => {
+const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave, onSavePackage, editingAsset, config, collections }) => {
   const [title, setTitle] = useState('');
   const [uploaderName, setUploaderName] = useState('');
   const [type, setType] = useState<AssetType>('image');
@@ -24,6 +25,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
   const [content, setContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
+  const [files, setFiles] = useState<File[]>([]);
+  const [isPackageMode, setIsPackageMode] = useState(false);
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
   
   const [ctr, setCtr] = useState<string>('');
@@ -62,6 +65,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setCpl('');
       setComments('');
       setUsageRights(USAGE_RIGHTS[0]);
+      setFile(null);
+      setFiles([]);
+      setIsPackageMode(false);
     }
   }, [editingAsset, isOpen, config]);
 
@@ -79,10 +85,60 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     );
   };
 
-  const handleSubmit = (e: React.FormEvent) => {
+  const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedObjectives.length === 0) {
       alert("Please select at least one campaign objective.");
+      return;
+    }
+
+    if (isPackageMode && files.length === 0) {
+      alert("Please select at least one file for the package.");
+      return;
+    }
+
+    if (!isPackageMode && !file && type !== 'text' && !content) {
+      alert("Please select a file to upload.");
+      return;
+    }
+
+    if (isPackageMode && onSavePackage) {
+      // Create package with multiple files
+      const packageId = `pkg_${Date.now()}`;
+      const packageAssets = files.map((f, idx) => {
+        // Extract platform from filename or use default
+        const filename = f.name.toLowerCase();
+        let assetPlatform = platform;
+        if (filename.includes('google') || filename.includes('gads')) assetPlatform = 'Google';
+        else if (filename.includes('meta') || filename.includes('facebook') || filename.includes('instagram')) assetPlatform = 'Meta';
+        else if (filename.includes('video') || filename.includes('youtube')) assetPlatform = 'Video';
+        else if (filename.includes('dooh') || filename.includes('display')) assetPlatform = 'DOOH';
+        else if (filename.includes('banner')) assetPlatform = 'Banner';
+
+        return {
+          asset: {
+            title: `${title} - ${assetPlatform}`,
+            type,
+            market,
+            platform: assetPlatform,
+            carModel,
+            usageRights,
+            objectives: selectedObjectives,
+            ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+            uploadedBy: uploaderName || 'Anonymous',
+            ctr: ctr ? parseFloat(ctr) : undefined,
+            cpl: cpl ? parseFloat(cpl) : undefined,
+            cr: cr ? parseFloat(cr) : undefined,
+            comments: comments || undefined,
+            packageId,
+            packageOrder: idx
+          } as Omit<Asset, 'id' | 'createdAt'>,
+          file: f
+        };
+      });
+
+      await onSavePackage(packageAssets);
+      onClose();
       return;
     }
 
@@ -94,7 +150,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       carModel,
       usageRights,
       objectives: selectedObjectives,
-      collectionIds: selectedCollectionIds.length ? selectedCollectionIds : undefined,
+      ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
       content: type === 'text' ? content : undefined,
       uploadedBy: uploaderName || 'Anonymous',
       ctr: ctr ? parseFloat(ctr) : undefined,
@@ -244,20 +300,79 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                 </div>
 
                 {!editingAsset && (
-                  type === 'text' ? (
-                      <div>
-                          <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Ad Copy Content</label>
-                          <textarea required rows={4} value={content} onChange={(e) => setContent(e.target.value)} className={inputClasses} placeholder="Paste copy here..." />
+                  <>
+                    {type !== 'text' && (
+                      <div className="flex items-center gap-3 mb-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={isPackageMode}
+                            onChange={(e) => {
+                              setIsPackageMode(e.target.checked);
+                              setFile(null);
+                              setFiles([]);
+                            }}
+                            className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-xs font-black text-gray-700 uppercase tracking-widest">
+                            Upload as Package (Multiple Formats)
+                          </span>
+                        </label>
                       </div>
-                  ) : (
-                      <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center hover:border-blue-400 bg-gray-50/50 transition-colors relative">
-                          <input type="file" required accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : '*/*'} onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
-                          <div className="space-y-2 pointer-events-none">
-                              <p className="text-sm font-bold text-gray-600">{file ? file.name : `Select ${type} file`}</p>
-                              <p className="text-xs text-gray-400">High quality recommended</p>
+                    )}
+                    {type === 'text' ? (
+                        <div>
+                            <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Ad Copy Content</label>
+                            <textarea required rows={4} value={content} onChange={(e) => setContent(e.target.value)} className={inputClasses} placeholder="Paste copy here..." />
+                        </div>
+                    ) : isPackageMode ? (
+                        <div className="space-y-4">
+                          <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center hover:border-blue-400 bg-gray-50/50 transition-colors relative">
+                            <input 
+                              type="file" 
+                              required 
+                              multiple
+                              accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : '*/*'} 
+                              onChange={(e) => {
+                                const selectedFiles = Array.from(e.target.files || []);
+                                setFiles(selectedFiles);
+                              }} 
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
+                            />
+                            <div className="space-y-2 pointer-events-none">
+                              <p className="text-sm font-bold text-gray-600">
+                                {files.length > 0 ? `${files.length} file(s) selected` : `Select multiple ${type} files`}
+                              </p>
+                              <p className="text-xs text-gray-400">Upload different formats/dimensions for different platforms</p>
+                            </div>
                           </div>
-                      </div>
-                  )
+                          {files.length > 0 && (
+                            <div className="space-y-2 max-h-40 overflow-y-auto">
+                              {files.map((f, idx) => (
+                                <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
+                                  <span className="text-xs font-bold text-gray-700 truncate flex-1">{f.name}</span>
+                                  <button
+                                    type="button"
+                                    onClick={() => setFiles(files.filter((_, i) => i !== idx))}
+                                    className="ml-2 text-red-500 hover:text-red-700 text-xs font-black"
+                                  >
+                                    ×
+                                  </button>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                    ) : (
+                        <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center hover:border-blue-400 bg-gray-50/50 transition-colors relative">
+                            <input type="file" required accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : '*/*'} onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                            <div className="space-y-2 pointer-events-none">
+                                <p className="text-sm font-bold text-gray-600">{file ? file.name : `Select ${type} file`}</p>
+                                <p className="text-xs text-gray-400">High quality recommended</p>
+                            </div>
+                        </div>
+                    )}
+                  </>
                 )}
               </div>
             </div>

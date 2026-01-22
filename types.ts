@@ -59,6 +59,9 @@ export interface Asset {
   // Rights
   usageRights?: UsageRights;
   collectionIds?: string[];
+  // Package grouping
+  packageId?: string; // If set, this asset is part of a package
+  packageOrder?: number; // Order within package
 }
 
 export interface SystemConfig {
