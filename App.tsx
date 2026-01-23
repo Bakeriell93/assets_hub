@@ -1075,9 +1075,9 @@ function App() {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}>
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}></div>
             <div className="relative max-w-6xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
-              {/* Header with package navigation */}
+              {/* Header with package navigation - only show in full view */}
               <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
-                {isPackage && (
+                {isPackage && previewViewMode === 'full' && (
                   <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
                     {canGoPrev && (
                       <button
@@ -1116,7 +1116,7 @@ function App() {
 
               {/* Package Grid View or Full View Toggle */}
               {isPackage && (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg">
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg">
                   <button
                     onClick={(e) => { e.stopPropagation(); setPreviewViewMode('grid'); }}
                     className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
@@ -1179,10 +1179,10 @@ function App() {
                               <p className="text-xs text-gray-700 line-clamp-3 text-center">{pkgAsset.content}</p>
                             </div>
                           )}
-                          {/* Download button - always visible */}
+                          {/* Download button - always visible, positioned to avoid overlap */}
                           <button
                             onClick={(e) => handleDownloadAsset(pkgAsset, e)}
-                            className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-100 z-20"
+                            className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-100 z-10"
                             title="Download"
                           >
                             <svg className="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
