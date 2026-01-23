@@ -184,7 +184,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             cr: cr ? parseFloat(cr) : undefined,
             comments: comments || undefined,
             packageId,
-            packageOrder: idx
+            packageOrder: idx,
+            originalFileName: f.name // Store original Windows filename
           } as Omit<Asset, 'id' | 'createdAt'>,
           file: f
         };

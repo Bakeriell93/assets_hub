@@ -491,7 +491,8 @@ export const storageService = {
         carModel: asset.carModel,
         ...(asset.carModels ? { carModels: asset.carModels } : {}),
         objectives: asset.objectives || [],
-        uploadedBy: asset.uploadedBy || 'Anonymous'
+        uploadedBy: asset.uploadedBy || 'Anonymous',
+        ...(file ? { originalFileName: file.name } : {})
       };
 
       // Final filter to remove any undefined values from the payload

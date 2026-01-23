@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { Asset, UserRole } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
+import JSZip from 'jszip';
 
 interface AssetCardProps {
   asset: Asset;
@@ -196,11 +197,24 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       const cleaned = url.split('?')[0] || '';
       const last = cleaned.split('/').pop() || '';
       // Remove timestamp prefix if present (format: timestamp-filename.ext)
-      const withoutTimestamp = last.replace(/^\d+-/, '');
+      // Also handle URL-encoded filenames
+      const decoded = decodeURIComponent(last);
+      const withoutTimestamp = decoded.replace(/^\d+-/, '');
       return withoutTimestamp || 'file';
     } catch {
       return 'file';
     }
+  };
+
+  // Get display filename - prefer originalFileName, fallback to URL extraction
+  const getDisplayFilename = (asset: Asset): string => {
+    if (asset.originalFileName) {
+      return asset.originalFileName;
+    }
+    if (asset.url) {
+      return extractFilenameFromUrl(asset.url);
+    }
+    return 'file';
   };
 
   const convertImageFormat = async (imageUrl: string, format: 'webp' | 'png' | 'jpg'): Promise<Blob> => {
@@ -349,6 +363,56 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     } catch (err) {
       console.error('Failed to download package:', err);
       alert('Some files in the package failed to download');
+    }
+  };
+
+  const handleDownloadAllAsZip = async () => {
+    try {
+      const zip = new JSZip();
+      const fetchUrl = (url: string) => maybeProxyUrl(url);
+
+      // Fetch all files and add to ZIP
+      for (const pkgAsset of packageAssets) {
+        if (!pkgAsset.url) continue;
+
+        try {
+          const fileName = getDisplayFilename(pkgAsset);
+          const url = fetchUrl(pkgAsset.url);
+          
+          // Fetch the file
+          const response = await fetch(url, { method: 'GET' });
+          if (!response.ok) {
+            console.warn(`Failed to fetch ${fileName}:`, response.status);
+            continue;
+          }
+          
+          const blob = await response.blob();
+          zip.file(fileName, blob);
+        } catch (err) {
+          console.error(`Failed to add ${pkgAsset.title} to ZIP:`, err);
+        }
+      }
+
+      // Generate ZIP file
+      const zipBlob = await zip.generateAsync({ type: 'blob' });
+      const zipUrl = URL.createObjectURL(zipBlob);
+      
+      // Download ZIP
+      const a = document.createElement('a');
+      a.href = zipUrl;
+      a.download = `${asset.title || 'package'}-${Date.now()}.zip`;
+      a.rel = 'noopener';
+      document.body.appendChild(a);
+      a.click();
+      
+      // Cleanup
+      setTimeout(() => {
+        document.body.removeChild(a);
+        URL.revokeObjectURL(zipUrl);
+      }, 100);
+    } catch (err) {
+      console.error('Failed to create ZIP:', err);
+      alert('Failed to create ZIP file. Please try downloading files individually.');
     }
   };
 
@@ -617,7 +681,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             </div>
             <div className="space-y-2 max-h-40 overflow-y-auto">
               {packageAssets.map((pkgAsset, idx) => {
-                const fileName = pkgAsset.url ? extractFilenameFromUrl(pkgAsset.url) : 'file';
+                const fileName = getDisplayFilename(pkgAsset);
                 return (
                   <div key={pkgAsset.id} className="flex items-center gap-2 group/item">
                     <span className="text-purple-600 font-black text-[8px] min-w-[18px]">{idx + 1}.</span>
@@ -640,6 +704,24 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                 );
               })}
             </div>
+            {/* Download All as ZIP button */}
+            {isPackage && (
+              <div className="mt-3 pt-3 border-t border-purple-200">
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    handleDownloadAllAsZip();
+                  }}
+                  className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2"
+                  title="Download all package files as ZIP"
+                >
+                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
+                  </svg>
+                  Download All as ZIP
+                </button>
+              </div>
+            )}
           </div>
         )}
       </div>

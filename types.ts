@@ -44,6 +44,7 @@ export interface Asset {
   status: AssetStatus;
   url?: string; 
   content?: string; 
+  originalFileName?: string; // Original filename from Windows upload
   market: Market;
   platform: Platform;
   carModel: CarModel; // Keep for backward compatibility
