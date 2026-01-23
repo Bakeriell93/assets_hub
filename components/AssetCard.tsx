@@ -112,6 +112,11 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     try {
       const u = new URL(url);
       if (isAllowedProxyHost(u)) {
+        // For MOV files, use conversion endpoint for preview/thumbnails
+        const isMov = url.toLowerCase().endsWith('.mov') || url.toLowerCase().endsWith('.qt');
+        if (isMov && asset.type === 'video') {
+          return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
+        }
         return `/api/fetch-image?url=${encodeURIComponent(u.toString())}`;
       }
     } catch {

@@ -6,7 +6,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAFfWS8fD8G1XRvWHXefeUmCjdHY8l7t8s",
   authDomain: "content-b7d4c.firebaseapp.com",
   projectId: "content-b7d4c",
-  storageBucket: "content-b7d4c.firebasestorage.app",
+  storageBucket: "eu13657.firebasestorage.app", // EU bucket for faster uploads
   messagingSenderId: "451578978927",
   appId: "1:451578978927:web:3294a541652f07b944239a",
   measurementId: "G-Z0QF8SYSW2"

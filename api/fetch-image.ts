@@ -129,12 +129,14 @@ export default async function handler(req: any, res: any) {
     const contentLength = upstream.headers.get('content-length') || undefined;
     const contentRange = upstream.headers.get('content-range') || undefined;
     const acceptRanges = upstream.headers.get('accept-ranges') || 'bytes';
-    const arrayBuffer = await upstream.arrayBuffer();
-    const buffer = Buffer.from(arrayBuffer);
-
-    // CDN caching on Vercel:
-    // - Browser: cache for 1 hour
-    // - Vercel Edge: cache for 1 day, SWR for 7 days
+    
+    // For large files (especially videos), stream instead of loading into memory
+    // Check if this is a video or large file (> 10MB)
+    const fileSize = contentLength ? parseInt(contentLength, 10) : 0;
+    const isLargeFile = fileSize > 10 * 1024 * 1024; // 10MB threshold
+    const isVideo = contentType.startsWith('video/');
+    
+    // Set headers first
     res.statusCode = upstream.status;
     Object.entries(withCors({
       'Content-Type': contentType,
@@ -144,8 +146,56 @@ export default async function handler(req: any, res: any) {
       'Cache-Control': 'public, max-age=3600',
       'Vercel-CDN-Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
     })).forEach(([k, v]) => res.setHeader(k, v));
-
-    return res.end(buffer);
+    
+    // For videos and large files, always stream to avoid memory issues
+    const fileSize = contentLength ? parseInt(contentLength, 10) : 0;
+    const isLargeFile = fileSize > 10 * 1024 * 1024; // 10MB threshold
+    const isVideo = contentType.startsWith('video/');
+    
+    // Always stream videos and large files
+    if ((isLargeFile || isVideo) && upstream.body) {
+      const reader = upstream.body.getReader();
+      
+      const pump = async () => {
+        try {
+          while (true) {
+            const { done, value } = await reader.read();
+            if (done) {
+              res.end();
+              return;
+            }
+            // Write chunk to response
+            if (!res.headersSent) {
+              // Headers should already be set, but check just in case
+              res.write(Buffer.from(value));
+            } else {
+              res.write(Buffer.from(value));
+            }
+          }
+        } catch (streamErr: any) {
+          console.error('Streaming error:', streamErr);
+          if (!res.headersSent) {
+            res.statusCode = 500;
+            res.end(`Streaming error: ${streamErr?.message || String(streamErr)}`);
+          } else {
+            res.end();
+          }
+        }
+      };
+      
+      return pump();
+    }
+    
+    // For smaller files, use buffer approach
+    try {
+      const arrayBuffer = await upstream.arrayBuffer();
+      const buffer = Buffer.from(arrayBuffer);
+      return res.end(buffer);
+    } catch (bufferErr: any) {
+      console.error('Buffer approach failed:', bufferErr);
+      res.statusCode = 500;
+      return res.end(`Error: ${bufferErr?.message || String(bufferErr)}`);
+    }
   } catch (err: any) {
     res.statusCode = 500;
     return res.end(`Error: ${err?.message || String(err)}`);

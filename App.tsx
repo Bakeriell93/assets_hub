@@ -997,10 +997,17 @@ function App() {
             )}
             {previewAsset.type === 'video' && previewAsset.url && (() => {
               // Use proxy URL for Firebase Storage videos to avoid CORS issues
+              // For MOV files, use conversion endpoint for preview
               const getVideoUrl = (url: string) => {
                 try {
                   const u = new URL(url);
-                  if (u.hostname === 'firebasestorage.googleapis.com' || u.hostname === 'storage.googleapis.com') {
+                  const isMov = url.toLowerCase().endsWith('.mov') || url.toLowerCase().endsWith('.qt');
+                  
+                  if (u.hostname === 'firebasestorage.googleapis.com' || u.hostname === 'storage.googleapis.com' || u.hostname.includes('firebasestorage.app')) {
+                    // For MOV files in preview, try conversion endpoint
+                    if (isMov) {
+                      return `/api/convert-video?url=${encodeURIComponent(url)}`;
+                    }
                     return `/api/fetch-image?url=${encodeURIComponent(url)}`;
                   }
                 } catch {
