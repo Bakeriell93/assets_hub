@@ -158,6 +158,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         else if (filename.includes('dooh') || filename.includes('display')) assetPlatform = 'DOOH';
         else if (filename.includes('banner')) assetPlatform = 'Banner';
 
+        // Use filename (without extension) as the title
+        const fileTitle = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+
         // Handle car models: if "Other" is selected, use customCarModel
         const processedCarModels = selectedCarModels.length > 0 
           ? selectedCarModels.map(m => m === 'Other' ? (customCarModel || m) : m)
@@ -166,7 +169,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
 
         return {
           asset: {
-            title: `${title} - ${assetPlatform}`,
+            title: fileTitle,
             type,
             market,
             platform: assetPlatform,
