@@ -17,6 +17,7 @@ interface BulkUploadItem {
   market: Market;
   platform: Platform;
   carModel: CarModel;
+  customCarModel?: string;
   objectives: AssetObjective[];
   usageRights: UsageRights;
   uploaderName: string;
@@ -132,7 +133,7 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
           type: item.type,
           market: item.market,
           platform: item.platform,
-          carModel: item.carModel,
+          carModel: item.carModel === 'Other' ? (item.customCarModel || '') : item.carModel,
           objectives: item.objectives,
           usageRights: item.usageRights,
           uploadedBy: item.uploaderName,
@@ -387,14 +388,32 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
                         </label>
                         <select
                           value={item.carModel}
-                          onChange={(e) => updateItem(item.id, { carModel: e.target.value as CarModel })}
+                          onChange={(e) => {
+                            const newModel = e.target.value as CarModel;
+                            updateItem(item.id, { 
+                              carModel: newModel,
+                              customCarModel: newModel !== 'Other' ? undefined : item.customCarModel
+                            });
+                          }}
                           className={inputClasses}
                           disabled={item.isPublished}
                         >
                           {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => (
                             <option key={m} value={m}>{m}</option>
                           ))}
+                          <option value="Other">Other</option>
                         </select>
+                        {item.carModel === 'Other' && (
+                          <input
+                            type="text"
+                            value={item.customCarModel || ''}
+                            onChange={(e) => updateItem(item.id, { customCarModel: e.target.value })}
+                            placeholder="Enter model name"
+                            className={`${inputClasses} mt-2`}
+                            disabled={item.isPublished}
+                            required
+                          />
+                        )}
                       </div>
 
                       <div>

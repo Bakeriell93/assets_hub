@@ -21,6 +21,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [market, setMarket] = useState<Market>(config.markets[0] || MARKETS[0]);
   const [platform, setPlatform] = useState<Platform>(config.platforms[0] || PLATFORMS[0]);
   const [carModel, setCarModel] = useState<CarModel>(config.models[0] || CAR_MODELS[0]);
+  const [customCarModel, setCustomCarModel] = useState<string>('');
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
   const [content, setContent] = useState('');
@@ -42,6 +43,14 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setMarket(editingAsset.market);
       setPlatform(editingAsset.platform);
       setCarModel(editingAsset.carModel);
+      // Check if the model is not in the standard list, treat it as custom
+      const isCustomModel = !(config.models.length > 0 ? config.models : CAR_MODELS).includes(editingAsset.carModel);
+      if (isCustomModel) {
+        setCustomCarModel(editingAsset.carModel);
+        setCarModel('Other' as CarModel);
+      } else {
+        setCustomCarModel('');
+      }
       setSelectedObjectives(editingAsset.objectives || []);
       setSelectedCollectionIds(editingAsset.collectionIds || []);
       setContent(editingAsset.content || '');
@@ -57,6 +66,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setMarket('Global' as Market);
       setPlatform(config.platforms[0] || PLATFORMS[0]);
       setCarModel(config.models[0] || CAR_MODELS[0]);
+      setCustomCarModel('');
       setSelectedObjectives([]);
       setSelectedCollectionIds([]);
       setContent('');
@@ -121,7 +131,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             type,
             market,
             platform: assetPlatform,
-            carModel,
+            carModel: carModel === 'Other' ? customCarModel : carModel,
             usageRights,
             objectives: selectedObjectives,
             ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
@@ -147,7 +157,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       type,
       market,
       platform,
-      carModel,
+      carModel: carModel === 'Other' ? customCarModel : carModel,
       usageRights,
       objectives: selectedObjectives,
       ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
@@ -222,9 +232,20 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Car Model</label>
-                        <select value={carModel} onChange={(e) => setCarModel(e.target.value as CarModel)} className={inputClasses}>
+                        <select value={carModel} onChange={(e) => { setCarModel(e.target.value as CarModel); if (e.target.value !== 'Other') setCustomCarModel(''); }} className={inputClasses}>
                             {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => <option className="text-gray-900 bg-white" key={m} value={m}>{m}</option>)}
+                            <option className="text-gray-900 bg-white" value="Other">Other</option>
                         </select>
+                        {carModel === 'Other' && (
+                          <input
+                            type="text"
+                            value={customCarModel}
+                            onChange={(e) => setCustomCarModel(e.target.value)}
+                            placeholder="Enter model name"
+                            className={`${inputClasses} mt-2`}
+                            required
+                          />
+                        )}
                     </div>
                 </div>
 
