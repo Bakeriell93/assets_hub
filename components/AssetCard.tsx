@@ -30,7 +30,15 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     if (asset.type === 'video' && asset.url && videoRef.current) {
       const video = videoRef.current;
       const videoUrl = maybeProxyUrl(asset.url);
-      const isMov = asset.url.toLowerCase().endsWith('.mov') || asset.url.toLowerCase().endsWith('.qt');
+      let isMov = false;
+      try {
+        const u = new URL(asset.url);
+        const path = u.pathname.toLowerCase();
+        isMov = path.endsWith('.mov') || path.endsWith('.qt');
+      } catch {
+        const lower = asset.url.toLowerCase();
+        isMov = lower.endsWith('.mov') || lower.endsWith('.qt');
+      }
       
       // Set video source
       video.src = videoUrl;
@@ -416,9 +424,21 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                  }}
                >
                  {/* For MOV files, try as MP4 since many are H.264 compatible */}
-                 {(asset.url.toLowerCase().endsWith('.mov') || asset.url.toLowerCase().endsWith('.qt')) && (
-                   <source src={maybeProxyUrl(asset.url)} type="video/mp4" />
-                 )}
+                {(() => {
+                  try {
+                    const u = new URL(asset.url);
+                    const path = u.pathname.toLowerCase();
+                    if (path.endsWith('.mov') || path.endsWith('.qt')) {
+                      return <source src={maybeProxyUrl(asset.url)} type="video/mp4" />;
+                    }
+                  } catch {
+                    const lower = asset.url.toLowerCase();
+                    if (lower.endsWith('.mov') || lower.endsWith('.qt')) {
+                      return <source src={maybeProxyUrl(asset.url)} type="video/mp4" />;
+                    }
+                  }
+                  return null;
+                })()}
                </video>
                <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
                    <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110">
