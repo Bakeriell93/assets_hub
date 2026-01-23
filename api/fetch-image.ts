@@ -63,21 +63,48 @@ export default async function handler(req: any, res: any) {
       const urlPath = parsed.pathname.toLowerCase();
       const extension = urlPath.split('.').pop() || '';
       
-      // Video MIME types
+      // Video MIME types - comprehensive list
       const videoMimeTypes: Record<string, string> = {
+        // MP4 variants (widely supported)
         'mp4': 'video/mp4',
         'm4v': 'video/mp4',
+        'm4a': 'video/mp4', // Sometimes used for video
+        // WebM (open format, good browser support)
         'webm': 'video/webm',
+        // OGG (open format)
         'ogg': 'video/ogg',
         'ogv': 'video/ogg',
-        'mov': 'video/quicktime', // QuickTime format
+        'ogm': 'video/ogg',
+        // QuickTime/MOV (limited browser support, may need download)
+        'mov': 'video/quicktime',
         'qt': 'video/quicktime',
+        // AVI variants (limited browser support)
         'avi': 'video/x-msvideo',
+        'divx': 'video/x-msvideo',
+        // Windows Media (limited support)
         'wmv': 'video/x-ms-wmv',
+        'asf': 'video/x-ms-asf',
+        // Flash Video (deprecated but still seen)
         'flv': 'video/x-flv',
+        'f4v': 'video/x-flv',
+        // Matroska (limited support)
         'mkv': 'video/x-matroska',
+        'mk3d': 'video/x-matroska',
+        'mka': 'video/x-matroska',
+        'mks': 'video/x-matroska',
+        // Mobile formats
         '3gp': 'video/3gpp',
         '3g2': 'video/3gpp2',
+        '3gpp': 'video/3gpp',
+        '3gpp2': 'video/3gpp2',
+        // Other formats
+        'ts': 'video/mp2t', // MPEG transport stream
+        'mts': 'video/mp2t',
+        'm2ts': 'video/mp2t',
+        'vob': 'video/dvd', // DVD video
+        'rm': 'application/vnd.rn-realmedia',
+        'rmvb': 'application/vnd.rn-realmedia-vbr',
+        'swf': 'application/x-shockwave-flash',
       };
       
       // Image MIME types

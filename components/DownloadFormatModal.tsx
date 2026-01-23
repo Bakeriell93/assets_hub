@@ -49,11 +49,17 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
       } else {
         // For videos and design files, always use 'original'
         const formatToUse = (isVideo || isDesignFile) ? 'original' : selectedFormat;
+        console.log('Starting download:', { formatToUse, selectedAssetId, isVideo, isDesignFile });
         await onDownload(formatToUse, selectedAssetId === 'all' ? undefined : selectedAssetId);
+        console.log('Download function completed');
       }
-      onClose();
+      // Close modal after a short delay to allow download to start
+      setTimeout(() => {
+        onClose();
+      }, 300);
     } catch (err) {
       console.error('Download failed:', err);
+      alert('Download failed. Please try again or use the direct link.');
     } finally {
       setIsDownloading(false);
     }

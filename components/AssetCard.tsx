@@ -130,22 +130,55 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
   const handleDownload = async (format: 'original' | 'webp' | 'png' | 'jpg', assetId?: string) => {
     const targetAsset = assetId ? packageAssets.find(a => a.id === assetId) : asset;
-    if (!targetAsset || !targetAsset.url) return;
+    if (!targetAsset || !targetAsset.url) {
+      console.error('No asset or URL found for download');
+      return;
+    }
 
     const filename = guessFilename(targetAsset.url, targetAsset.title || 'asset', format);
     const fetchUrl = maybeProxyUrl(targetAsset.url);
 
     try {
+      // For videos and large files, use direct download link for better reliability
+      if (targetAsset.type === 'video' || targetAsset.type === 'design') {
+        console.log('Downloading video/design file:', filename, fetchUrl);
+        
+        // For videos, use direct download with download attribute
+        // This is more reliable for large files and avoids memory issues
+        const a = document.createElement('a');
+        a.href = fetchUrl;
+        a.download = filename;
+        a.rel = 'noopener';
+        a.style.display = 'none';
+        document.body.appendChild(a);
+        
+        // Trigger download
+        a.click();
+        console.log('Download link clicked for video/design file');
+        
+        // Clean up after a delay
+        setTimeout(() => {
+          document.body.removeChild(a);
+        }, 1000);
+        
+        return;
+      }
+      
+      // For images or if blob download failed
       let blob: Blob;
       
       if (format === 'original') {
         // Download original - single fetch, no conversion
+        console.log('Fetching original file:', fetchUrl);
         const res = await fetch(fetchUrl, { method: 'GET' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         blob = await res.blob();
+        console.log('Blob created, size:', blob.size);
       } else if (targetAsset.type === 'image') {
         // Convert format - fetch once, convert client-side (no extra API calls)
+        console.log('Converting image format:', format);
         blob = await convertImageFormat(targetAsset.url, format);
+        console.log('Image converted, blob size:', blob.size);
       } else {
         // For videos and design files, always download original
         const res = await fetch(fetchUrl, { method: 'GET' });
@@ -160,21 +193,31 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       a.rel = 'noopener';
       document.body.appendChild(a);
       a.click();
-      a.remove();
-      URL.revokeObjectURL(blobUrl);
+      
+      // Clean up after a short delay
+      setTimeout(() => {
+        a.remove();
+        URL.revokeObjectURL(blobUrl);
+      }, 100);
+      
+      console.log('Download triggered successfully');
     } catch (err) {
       console.error('Download failed:', err);
-      // Fallback to direct download
+      // Fallback to direct download link
       try {
+        console.log('Trying direct download fallback:', targetAsset.url);
         const a = document.createElement('a');
         a.href = targetAsset.url;
         a.download = filename;
         a.rel = 'noopener';
+        a.target = '_blank'; // Open in new tab as fallback
         document.body.appendChild(a);
         a.click();
-        a.remove();
+        setTimeout(() => a.remove(), 100);
+        console.log('Direct download fallback triggered');
       } catch (fallbackErr) {
         console.error('Fallback download failed:', fallbackErr);
+        // Last resort: open in new window
         window.open(targetAsset.url, '_blank', 'noopener,noreferrer');
       }
     }

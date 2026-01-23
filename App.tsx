@@ -1,5 +1,7 @@
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import Plyr from 'plyr';
+import 'plyr/dist/plyr.css';
 import Sidebar from './components/Sidebar';
 import AssetCard from './components/AssetCard';
 import AssetFormModal from './components/AssetFormModal';
@@ -16,7 +18,7 @@ type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
 
 const SESSION_STORAGE_KEY = 'byd_assets_hub_session';
 
-// Video Player Component with error handling
+// Video Player Component with Plyr for better format support
 const VideoPlayerComponent: React.FC<{
   videoUrl: string;
   videoFormat: string | null;
@@ -24,6 +26,125 @@ const VideoPlayerComponent: React.FC<{
   originalUrl: string;
 }> = ({ videoUrl, videoFormat, isLikelyUnsupported, originalUrl }) => {
   const [videoError, setVideoError] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+  const playerRef = useRef<Plyr | null>(null);
+  
+  useEffect(() => {
+    if (videoRef.current && !playerRef.current) {
+      // Initialize Plyr player
+      try {
+        playerRef.current = new Plyr(videoRef.current, {
+          controls: [
+            'play-large',
+            'restart',
+            'rewind',
+            'play',
+            'fast-forward',
+            'progress',
+            'current-time',
+            'duration',
+            'mute',
+            'volume',
+            'settings',
+            'pip',
+            'airplay',
+            'fullscreen',
+          ],
+          settings: ['quality', 'speed'],
+          keyboard: { focused: true, global: false },
+          tooltips: { controls: true, seek: true },
+          autoplay: false,
+          clickToPlay: true,
+          hideControls: true,
+          resetOnEnd: false,
+          disableContextMenu: false,
+          loadSprite: false,
+          iconUrl: 'https://cdn.plyr.io/3.7.8/plyr.svg',
+          blankVideo: 'https://cdn.plyr.io/static/blank.mp4',
+        });
+        
+        // Handle Plyr events
+        playerRef.current.on('ready', () => {
+          console.log('Plyr player ready');
+          setVideoError(null);
+        });
+        
+        playerRef.current.on('error', (event) => {
+          console.error('Plyr error:', event);
+          const error = (event.detail as any)?.plyr?.media?.error;
+          if (error) {
+            console.error('Video playback error:', {
+              code: error.code,
+              message: error.message,
+              url: videoUrl,
+              format: videoFormat,
+            });
+            
+            // Show error message for format errors (code 4 = MEDIA_ELEMENT_ERROR)
+            if (error.code === 4 || error.message?.includes('Format') || error.message?.includes('decode') || error.message?.includes('MEDIA_ELEMENT_ERROR')) {
+              setVideoError('format');
+            } else {
+              setVideoError('network');
+            }
+          }
+        });
+        
+        playerRef.current.on('loadeddata', () => {
+          console.log('Video loaded successfully with Plyr');
+          setVideoError(null);
+        });
+      } catch (err) {
+        console.error('Failed to initialize Plyr:', err);
+        // Fallback to native video player
+      }
+    }
+    
+    // Cleanup
+    return () => {
+      if (playerRef.current) {
+        try {
+          playerRef.current.destroy();
+          playerRef.current = null;
+        } catch (err) {
+          console.error('Error destroying Plyr player:', err);
+        }
+      }
+    };
+  }, [videoUrl, videoFormat]);
+  
+  // Generate multiple source elements for better format support
+  const getVideoSources = () => {
+    const sources = [];
+    const ext = originalUrl.toLowerCase().split('.').pop() || '';
+    
+    // Add primary source
+    sources.push({
+      src: videoUrl,
+      type: videoFormat || 'video/mp4',
+    });
+    
+    // For MOV files, try as MP4 (some MOV files are MP4 containers)
+    if (ext === 'mov') {
+      sources.push({
+        src: videoUrl,
+        type: 'video/mp4',
+      });
+    }
+    
+    // For AVI files, try different MIME types
+    if (ext === 'avi') {
+      sources.push({
+        src: videoUrl,
+        type: 'video/x-msvideo',
+      });
+      sources.push({
+        src: videoUrl,
+        type: 'video/avi',
+      });
+    }
+    
+    return sources;
+  };
   
   return (
     <div className="w-full flex items-center justify-center bg-black p-6 relative">
@@ -50,43 +171,16 @@ const VideoPlayerComponent: React.FC<{
         </div>
       )}
       <video 
+        ref={videoRef}
         key={videoUrl}
-        src={videoUrl}
-        controls 
-        className="w-full h-auto max-h-[90vh]" 
+        className="plyr__video-embed w-full h-auto max-h-[90vh]"
         playsInline
         preload="auto"
         crossOrigin="anonymous"
-        onLoadedData={(e) => {
-          console.log('Video loaded successfully:', {
-            duration: e.currentTarget.duration,
-            videoWidth: e.currentTarget.videoWidth,
-            videoHeight: e.currentTarget.videoHeight,
-            format: videoFormat
-          });
-          setVideoError(null);
-        }}
-        onError={(e) => {
-          const video = e.currentTarget;
-          const error = video.error;
-          console.error('Video playback error:', {
-            code: error?.code,
-            message: error?.message,
-            url: videoUrl,
-            format: videoFormat,
-            networkState: video.networkState,
-            readyState: video.readyState
-          });
-          
-          // Show error message for format errors (code 4 = MEDIA_ELEMENT_ERROR)
-          if (error?.code === 4 || error?.message?.includes('Format') || error?.message?.includes('decode') || error?.message?.includes('MEDIA_ELEMENT_ERROR')) {
-            setVideoError('format');
-          } else {
-            setVideoError('network');
-          }
-        }}
       >
-        <source src={videoUrl} type={videoFormat || undefined} />
+        {getVideoSources().map((source, index) => (
+          <source key={index} src={source.src} type={source.type} />
+        ))}
         Your browser does not support the video tag.
         <a href={videoUrl} download className="text-blue-400 underline">Download the video</a> instead.
       </video>
@@ -856,24 +950,50 @@ function App() {
                 return url;
               };
               
-              // Detect video format from URL
+              // Detect video format from URL - comprehensive format support
               const detectVideoFormat = (url: string): string | null => {
                 try {
                   const u = new URL(url);
                   const path = u.pathname.toLowerCase();
                   const ext = path.split('.').pop() || '';
                   const formatMap: Record<string, string> = {
+                    // MP4 variants (widely supported)
                     'mp4': 'video/mp4',
+                    'm4v': 'video/mp4',
+                    'm4a': 'video/mp4',
+                    // WebM (open format, good browser support)
                     'webm': 'video/webm',
+                    // OGG (open format)
                     'ogg': 'video/ogg',
                     'ogv': 'video/ogg',
+                    'ogm': 'video/ogg',
+                    // QuickTime/MOV (limited browser support)
                     'mov': 'video/quicktime',
+                    'qt': 'video/quicktime',
+                    // AVI variants (limited browser support)
                     'avi': 'video/x-msvideo',
+                    'divx': 'video/x-msvideo',
+                    // Windows Media (limited support)
                     'wmv': 'video/x-ms-wmv',
+                    'asf': 'video/x-ms-asf',
+                    // Flash Video (deprecated)
                     'flv': 'video/x-flv',
+                    'f4v': 'video/x-flv',
+                    // Matroska (limited support)
                     'mkv': 'video/x-matroska',
+                    'mk3d': 'video/x-matroska',
+                    'mka': 'video/x-matroska',
+                    'mks': 'video/x-matroska',
+                    // Mobile formats
                     '3gp': 'video/3gpp',
-                    'm4v': 'video/mp4',
+                    '3g2': 'video/3gpp2',
+                    '3gpp': 'video/3gpp',
+                    '3gpp2': 'video/3gpp2',
+                    // Other formats
+                    'ts': 'video/mp2t',
+                    'mts': 'video/mp2t',
+                    'm2ts': 'video/mp2t',
+                    'vob': 'video/dvd',
                   };
                   return formatMap[ext] || null;
                 } catch {
@@ -883,7 +1003,8 @@ function App() {
               
               const videoUrl = getVideoUrl(previewAsset.url);
               const videoFormat = detectVideoFormat(previewAsset.url);
-              const isLikelyUnsupported = previewAsset.url.toLowerCase().match(/\.(mov|avi|wmv|flv|mkv|3gp)$/);
+              // Formats that are likely unsupported by browsers (may need download)
+              const isLikelyUnsupported = previewAsset.url.toLowerCase().match(/\.(mov|avi|wmv|flv|mkv|3gp|3g2|divx|asf|rm|rmvb|vob|ts|mts|m2ts)$/);
               
               return <VideoPlayerComponent 
                 videoUrl={videoUrl} 
