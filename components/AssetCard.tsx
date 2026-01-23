@@ -25,33 +25,81 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
   const canDelete = userRole === 'Editor' || userRole === 'Admin'; // Editor can now delete
 
-  // Generate video thumbnail
+  // Generate video thumbnail - improved for MOV and other formats
   useEffect(() => {
     if (asset.type === 'video' && asset.url && videoRef.current) {
       const video = videoRef.current;
+      const videoUrl = maybeProxyUrl(asset.url);
+      const isMov = asset.url.toLowerCase().endsWith('.mov') || asset.url.toLowerCase().endsWith('.qt');
+      
+      // Set video source
+      video.src = videoUrl;
+      video.preload = 'metadata';
+      video.muted = true; // Muted for thumbnail generation
+      video.playsInline = true;
+      
+      // For MOV files, try multiple type hints
+      if (isMov) {
+        // Try as MP4 first (many MOV files are H.264)
+        video.type = 'video/mp4';
+      }
+      
       const generateThumbnail = () => {
         try {
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth || 640;
-          canvas.height = video.videoHeight || 360;
-          const ctx = canvas.getContext('2d');
-          if (ctx && video.readyState >= 2) {
-            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
-            setVideoThumbnail(thumbnailUrl);
+          if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+            const canvas = document.createElement('canvas');
+            canvas.width = video.videoWidth;
+            canvas.height = video.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+              const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+              setVideoThumbnail(thumbnailUrl);
+              console.log('Video thumbnail generated successfully');
+            }
           }
         } catch (err) {
-          console.warn('Failed to generate video thumbnail (CORS may be blocking):', err);
+          console.warn('Failed to generate video thumbnail:', err);
         }
       };
 
-      video.currentTime = 0.1;
-      video.addEventListener('loadeddata', generateThumbnail, { once: true });
+      // Try to seek to a frame for thumbnail
+      const tryGenerateThumbnail = () => {
+        if (video.readyState >= 2) {
+          try {
+            video.currentTime = 0.5; // Seek to 0.5 seconds
+          } catch (err) {
+            // If seeking fails, try to generate from current frame
+            generateThumbnail();
+          }
+        }
+      };
+
+      video.addEventListener('loadedmetadata', () => {
+        console.log('Video metadata loaded:', {
+          duration: video.duration,
+          width: video.videoWidth,
+          height: video.videoHeight,
+          readyState: video.readyState
+        });
+        tryGenerateThumbnail();
+      }, { once: true });
+      
       video.addEventListener('seeked', generateThumbnail, { once: true });
+      video.addEventListener('loadeddata', generateThumbnail, { once: true });
+      
+      // Fallback: try after a delay
+      const timeoutId = setTimeout(() => {
+        if (!videoThumbnail && video.readyState >= 2) {
+          generateThumbnail();
+        }
+      }, 2000);
       
       return () => {
-        video.removeEventListener('loadeddata', generateThumbnail);
+        video.removeEventListener('loadedmetadata', tryGenerateThumbnail);
         video.removeEventListener('seeked', generateThumbnail);
+        video.removeEventListener('loadeddata', generateThumbnail);
+        clearTimeout(timeoutId);
       };
     }
   }, [asset.type, asset.url]);
@@ -324,11 +372,21 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                  preload="metadata"
                  muted
                  playsInline
-                 crossOrigin="anonymous"
-                 onError={() => {
-                   console.warn('Video thumbnail generation failed - CORS or format issue');
+                 onError={(e) => {
+                   const video = e.currentTarget;
+                   const error = video.error;
+                   console.warn('Video thumbnail generation failed:', {
+                     code: error?.code,
+                     message: error?.message,
+                     url: asset.url
+                   });
                  }}
-               />
+               >
+                 {/* For MOV files, try as MP4 since many are H.264 compatible */}
+                 {(asset.url.toLowerCase().endsWith('.mov') || asset.url.toLowerCase().endsWith('.qt')) && (
+                   <source src={maybeProxyUrl(asset.url)} type="video/mp4" />
+                 )}
+               </video>
                <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
                    <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110">
                         <svg className="w-7 h-7 text-gray-900 ml-1.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>

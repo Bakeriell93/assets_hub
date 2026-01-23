@@ -75,9 +75,9 @@ export default async function handler(req: any, res: any) {
         'ogg': 'video/ogg',
         'ogv': 'video/ogg',
         'ogm': 'video/ogg',
-        // QuickTime/MOV (limited browser support, may need download)
-        'mov': 'video/quicktime',
-        'qt': 'video/quicktime',
+        // QuickTime/MOV - try as MP4 first (many MOV files are H.264/MP4 compatible)
+        'mov': 'video/mp4', // Many MOV files contain H.264 which browsers support as MP4
+        'qt': 'video/mp4',
         // AVI variants (limited browser support)
         'avi': 'video/x-msvideo',
         'divx': 'video/x-msvideo',

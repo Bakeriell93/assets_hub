@@ -31,8 +31,10 @@ const VideoPlayerComponent: React.FC<{
   
   useEffect(() => {
     if (videoRef.current && !playerRef.current) {
-      // Initialize Plyr player
+      // Initialize Plyr player with better MOV support
       try {
+        const isMov = originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt');
+        
         playerRef.current = new Plyr(videoRef.current, {
           controls: [
             'play-large',
@@ -61,41 +63,82 @@ const VideoPlayerComponent: React.FC<{
           loadSprite: false,
           iconUrl: 'https://cdn.plyr.io/3.7.8/plyr.svg',
           blankVideo: 'https://cdn.plyr.io/static/blank.mp4',
+          // For MOV files, be more lenient with format detection
+          ...(isMov ? { 
+            // Try to force MP4 codec handling
+            html5: { 
+              vhs: { 
+                overrideNative: false 
+              },
+              nativeVideoTracks: true,
+              nativeAudioTracks: true,
+              nativeTextTracks: true
+            }
+          } : {})
         });
         
         // Handle Plyr events
         playerRef.current.on('ready', () => {
-          console.log('Plyr player ready');
+          console.log('Plyr player ready for:', originalUrl);
           setVideoError(null);
         });
         
+        // Listen to the underlying video element errors directly
+        if (videoRef.current) {
+          videoRef.current.addEventListener('error', (e) => {
+            const video = e.currentTarget as HTMLVideoElement;
+            const error = video.error;
+            console.error('Video element error:', {
+              code: error?.code,
+              message: error?.message,
+              url: videoUrl,
+              format: videoFormat,
+              networkState: video.networkState,
+              readyState: video.readyState
+            });
+            
+            // For MOV files, try one more time with different approach
+            if (isMov && error?.code === 4) {
+              console.log('MOV file format error, video may still load with different codec');
+              // Don't show error immediately for MOV - give it time
+              setTimeout(() => {
+                if (video.error && video.error.code === 4) {
+                  setVideoError('format');
+                }
+              }, 2000);
+            } else if (error?.code === 4 || error?.message?.includes('Format') || error?.message?.includes('decode') || error?.message?.includes('MEDIA_ELEMENT_ERROR')) {
+              setVideoError('format');
+            } else {
+              setVideoError('network');
+            }
+          }, { once: false });
+        }
+        
         playerRef.current.on('error', (event) => {
-          console.error('Plyr error:', event);
+          console.error('Plyr error event:', event);
           const error = (event.detail as any)?.plyr?.media?.error;
           if (error) {
-            console.error('Video playback error:', {
+            console.error('Plyr video playback error:', {
               code: error.code,
               message: error.message,
               url: videoUrl,
               format: videoFormat,
             });
-            
-            // Show error message for format errors (code 4 = MEDIA_ELEMENT_ERROR)
-            if (error.code === 4 || error.message?.includes('Format') || error.message?.includes('decode') || error.message?.includes('MEDIA_ELEMENT_ERROR')) {
-              setVideoError('format');
-            } else {
-              setVideoError('network');
-            }
           }
         });
         
         playerRef.current.on('loadeddata', () => {
-          console.log('Video loaded successfully with Plyr');
+          console.log('Video loaded successfully with Plyr:', originalUrl);
+          setVideoError(null);
+        });
+        
+        playerRef.current.on('canplay', () => {
+          console.log('Video can play:', originalUrl);
           setVideoError(null);
         });
       } catch (err) {
         console.error('Failed to initialize Plyr:', err);
-        // Fallback to native video player
+        // Fallback to native video player - still try to play
       }
     }
     
@@ -110,24 +153,34 @@ const VideoPlayerComponent: React.FC<{
         }
       }
     };
-  }, [videoUrl, videoFormat]);
+  }, [videoUrl, videoFormat, originalUrl]);
   
   // Generate multiple source elements for better format support
   const getVideoSources = () => {
     const sources = [];
     const ext = originalUrl.toLowerCase().split('.').pop() || '';
     
-    // Add primary source
-    sources.push({
-      src: videoUrl,
-      type: videoFormat || 'video/mp4',
-    });
-    
-    // For MOV files, try as MP4 (some MOV files are MP4 containers)
-    if (ext === 'mov') {
+    // For MOV files, try multiple approaches since many contain H.264
+    if (ext === 'mov' || ext === 'qt') {
+      // Try as MP4 first (many MOV files are H.264/MP4 compatible)
+      sources.push({
+        src: videoUrl,
+        type: 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"', // H.264 + AAC
+      });
       sources.push({
         src: videoUrl,
         type: 'video/mp4',
+      });
+      // Also try as QuickTime
+      sources.push({
+        src: videoUrl,
+        type: 'video/quicktime',
+      });
+    } else {
+      // Add primary source for other formats
+      sources.push({
+        src: videoUrl,
+        type: videoFormat || 'video/mp4',
       });
     }
     
@@ -140,6 +193,11 @@ const VideoPlayerComponent: React.FC<{
       sources.push({
         src: videoUrl,
         type: 'video/avi',
+      });
+      // Try as MP4 in case it's H.264
+      sources.push({
+        src: videoUrl,
+        type: 'video/mp4',
       });
     }
     
@@ -175,8 +233,9 @@ const VideoPlayerComponent: React.FC<{
         key={videoUrl}
         className="plyr__video-embed w-full h-auto max-h-[90vh]"
         playsInline
-        preload="auto"
-        crossOrigin="anonymous"
+        preload="metadata"
+        muted={false}
+        controlsList="nodownload"
       >
         {getVideoSources().map((source, index) => (
           <source key={index} src={source.src} type={source.type} />
@@ -967,9 +1026,9 @@ function App() {
                     'ogg': 'video/ogg',
                     'ogv': 'video/ogg',
                     'ogm': 'video/ogg',
-                    // QuickTime/MOV (limited browser support)
-                    'mov': 'video/quicktime',
-                    'qt': 'video/quicktime',
+                    // QuickTime/MOV - try as MP4 (many MOV files are H.264/MP4 compatible)
+                    'mov': 'video/mp4', // Many MOV files contain H.264 which browsers support as MP4
+                    'qt': 'video/mp4',
                     // AVI variants (limited browser support)
                     'avi': 'video/x-msvideo',
                     'divx': 'video/x-msvideo',
