@@ -1087,15 +1087,19 @@ function App() {
                 }
               };
               
-              // Simple video player - use proxy for MOV to force correct Content-Type
+              // Simple video player - use transcode proxy for MOV when configured
               const isMov = previewAsset.url.toLowerCase().endsWith('.mov') || previewAsset.url.toLowerCase().endsWith('.qt');
+              const transcodeBase = import.meta.env.VITE_TRANSCODE_URL as string | undefined;
               let videoUrl = previewAsset.url;
               
-              // For MOV files, use proxy to force video/mp4 Content-Type header
+              // For MOV files, use transcode service if configured, otherwise fallback to proxy
               if (isMov) {
                 try {
                   const u = new URL(previewAsset.url);
-                  if (u.hostname.includes('firebasestorage') || u.hostname.includes('storage.googleapis')) {
+                  if (transcodeBase) {
+                    const base = transcodeBase.replace(/\/$/, '');
+                    videoUrl = `${base}/?url=${encodeURIComponent(previewAsset.url)}`;
+                  } else if (u.hostname.includes('firebasestorage') || u.hostname.includes('storage.googleapis')) {
                     videoUrl = `/api/convert-video?url=${encodeURIComponent(previewAsset.url)}`;
                   }
                 } catch {}

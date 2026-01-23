@@ -17,7 +17,8 @@ async function remuxVideo(req: any, res: any) {
     return;
   }
 
-  const videoUrl = req.query?.url || req.url?.split('?url=')[1]?.split('&')[0];
+  const requestUrl = new URL(req.url || '/', 'http://localhost');
+  const videoUrl = requestUrl.searchParams.get('url');
   if (!videoUrl) {
     res.status(400).send('Missing url parameter');
     return;
@@ -53,7 +54,11 @@ async function remuxVideo(req: any, res: any) {
     await new Promise<void>((resolve, reject) => {
       const ffmpeg = spawn('ffmpeg', [
         '-i', tempInput,
-        '-c', 'copy',
+        '-c:v', 'libx264',
+        '-preset', 'veryfast',
+        '-crf', '23',
+        '-c:a', 'aac',
+        '-b:a', '128k',
         '-movflags', '+faststart',
         '-f', 'mp4',
         '-y',

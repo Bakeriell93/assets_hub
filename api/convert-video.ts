@@ -57,6 +57,14 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
     const isMov = parsed.pathname.toLowerCase().endsWith('.mov') || parsed.pathname.toLowerCase().endsWith('.qt');
     
     if (isMov) {
+      const transcodeBase = process.env.TRANSCODE_URL;
+      if (transcodeBase) {
+        const base = transcodeBase.replace(/\/$/, '');
+        const target = `${base}/?url=${encodeURIComponent(parsed.toString())}`;
+        res.statusCode = 302;
+        res.setHeader('Location', target);
+        return res.end();
+      }
       // For MOV files, stream with proper headers
       // Note: Full remuxing (moving moov atom) requires FFmpeg which isn't available
       // in Vercel serverless by default. For production remuxing, use:
