@@ -35,6 +35,12 @@ const VideoPlayerComponent: React.FC<{
       try {
         const isMov = originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt');
         
+        // Configure video element for better MOV streaming
+        if (videoRef.current && isMov) {
+          videoRef.current.preload = 'auto'; // Preload entire video for MOV files
+          videoRef.current.load(); // Force load
+        }
+        
         playerRef.current = new Plyr(videoRef.current, {
           controls: [
             'play-large',
@@ -63,9 +69,8 @@ const VideoPlayerComponent: React.FC<{
           loadSprite: false,
           iconUrl: 'https://cdn.plyr.io/3.7.8/plyr.svg',
           blankVideo: 'https://cdn.plyr.io/static/blank.mp4',
-          // For MOV files, be more lenient with format detection
+          // Better configuration for MOV files with moov-at-end
           ...(isMov ? { 
-            // Try to force MP4 codec handling
             html5: { 
               vhs: { 
                 overrideNative: false 
@@ -73,7 +78,11 @@ const VideoPlayerComponent: React.FC<{
               nativeVideoTracks: true,
               nativeAudioTracks: true,
               nativeTextTracks: true
-            }
+            },
+            // Force aggressive buffering for MOV
+            seekTime: 5,
+            volume: 1,
+            muted: false
           } : {})
         });
         
@@ -233,9 +242,10 @@ const VideoPlayerComponent: React.FC<{
         key={videoUrl}
         className="plyr__video-embed w-full h-auto max-h-[90vh]"
         playsInline
-        preload="metadata"
+        preload={originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') ? 'auto' : 'metadata'}
         muted={false}
         controlsList="nodownload"
+        crossOrigin="anonymous"
       >
         {getVideoSources().map((source, index) => (
           <source key={index} src={source.src} type={source.type} />
