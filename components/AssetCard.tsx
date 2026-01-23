@@ -306,6 +306,15 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     setIsConfirmingDelete(true);
   };
 
+  const handlePreview = (e?: React.MouseEvent) => {
+    if (e) e.stopPropagation();
+    if (asset.type === 'video' && asset.url) {
+      window.open(asset.url, '_blank', 'noopener,noreferrer');
+      return;
+    }
+    onPreview(asset);
+  };
+
   const confirmDelete = (e: React.MouseEvent) => {
     e.stopPropagation();
     onDelete(asset.id);
@@ -315,7 +324,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   return (
     <div 
       className={`group bg-white rounded-[32px] border-2 overflow-hidden transition-all duration-500 flex flex-col h-full relative cursor-pointer ${isHighPerformer ? 'border-blue-500 shadow-blue-100 shadow-2xl' : 'border-transparent hover:border-blue-200 shadow-xl shadow-gray-100 hover:shadow-2xl'}`}
-      onClick={() => onPreview(asset)}
+      onClick={(e) => handlePreview(e)}
     >
       {isPackage && (
         <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-purple-600 text-white text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg flex items-center gap-1.5">
@@ -435,7 +444,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                 </button>
               )}
               <button 
-                onClick={(e) => { e.stopPropagation(); onPreview(asset); }}
+                onClick={(e) => handlePreview(e)}
                 className="bg-gray-900 px-4 py-2.5 rounded-2xl text-white hover:bg-black transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-1.5 whitespace-nowrap"
               >
                 Preview
