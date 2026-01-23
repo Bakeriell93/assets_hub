@@ -45,7 +45,8 @@ const Sidebar: React.FC<SidebarProps> = ({
         <div className="mb-10">
           <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Markets</h3>
           <div className="space-y-1">
-            <button onClick={() => onSelectMarket('All')} className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${selectedMarket === 'All' ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>Global</button>
+            <button onClick={() => onSelectMarket('All')} className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${selectedMarket === 'All' ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>All Markets</button>
+            <button onClick={() => onSelectMarket('Global')} className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${selectedMarket === 'Global' ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>Global</button>
             {config.markets.map(m => (
               <button key={m} onClick={() => onSelectMarket(m)} className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${selectedMarket === m ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>{m}</button>
             ))}

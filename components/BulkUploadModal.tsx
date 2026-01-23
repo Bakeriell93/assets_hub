@@ -59,7 +59,7 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
         preview,
         title: file.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
         type,
-        market: config.markets[0] || MARKETS[0],
+        market: 'Global' as Market,
         platform: config.platforms[0] || PLATFORMS[0],
         carModel: config.models[0] || CAR_MODELS[0],
         objectives: [],
@@ -358,6 +358,7 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
                             className={inputClasses}
                             disabled={item.isPublished}
                           >
+                            <option value="Global">Global</option>
                             {(config.markets.length > 0 ? config.markets : MARKETS).map(m => (
                               <option key={m} value={m}>{m}</option>
                             ))}

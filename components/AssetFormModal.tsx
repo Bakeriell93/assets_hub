@@ -54,7 +54,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setTitle('');
       setUploaderName('');
       setType('image');
-      setMarket(config.markets[0] || MARKETS[0]);
+      setMarket('Global' as Market);
       setPlatform(config.platforms[0] || PLATFORMS[0]);
       setCarModel(config.models[0] || CAR_MODELS[0]);
       setSelectedObjectives([]);
@@ -207,6 +207,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Market</label>
                         <select value={market} onChange={(e) => setMarket(e.target.value as Market)} className={inputClasses}>
+                            <option className="text-gray-900 bg-white" value="Global">Global</option>
                             {(config.markets.length > 0 ? config.markets : MARKETS).map(m => <option className="text-gray-900 bg-white" key={m} value={m}>{m}</option>)}
                         </select>
                     </div>
