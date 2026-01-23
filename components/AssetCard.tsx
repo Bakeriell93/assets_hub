@@ -261,7 +261,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                )}
                <video 
                  ref={videoRef}
-                 src={asset.url} 
+                 src={maybeProxyUrl(asset.url)} 
                  className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
                  preload="metadata"
                  muted

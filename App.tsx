@@ -601,51 +601,55 @@ function App() {
             {previewAsset.type === 'image' && previewAsset.url && (
               <img src={previewAsset.url} alt={previewAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
             )}
-            {previewAsset.type === 'video' && previewAsset.url && (
-              <div className="w-full flex items-center justify-center bg-black p-6">
-                <video 
-                  key={previewAsset.url}
-                  src={previewAsset.url} 
-                  controls 
-                  className="w-full h-auto max-h-[90vh]" 
-                  playsInline
-                  preload="auto"
-                  onLoadedData={(e) => {
-                    console.log('Video loaded:', {
-                      url: previewAsset.url,
-                      duration: e.currentTarget.duration,
-                      videoWidth: e.currentTarget.videoWidth,
-                      videoHeight: e.currentTarget.videoHeight
-                    });
-                  }}
-                  onError={(e) => {
-                    const video = e.currentTarget;
-                    const error = video.error;
-                    console.error('Video playback error:', {
-                      code: error?.code,
-                      message: error?.message,
-                      url: previewAsset.url,
-                      networkState: video.networkState,
-                      readyState: video.readyState
-                    });
-                    
-                    // Show error message to user
-                    const errorMsg = document.createElement('div');
-                    errorMsg.className = 'absolute inset-0 flex items-center justify-center bg-red-900/80 text-white p-4';
-                    errorMsg.innerHTML = `
-                      <div class="text-center">
-                        <p class="font-bold mb-2">Video playback failed</p>
-                        <p class="text-sm">Error: ${error?.message || 'Unknown error'}</p>
-                        <p class="text-xs mt-2 opacity-75">URL: ${previewAsset.url.substring(0, 50)}...</p>
-                      </div>
-                    `;
-                    video.parentElement?.appendChild(errorMsg);
-                  }}
-                >
-                  Your browser does not support the video tag.
-                </video>
-              </div>
-            )}
+            {previewAsset.type === 'video' && previewAsset.url && (() => {
+              // Use proxy URL for Firebase Storage videos to avoid CORS issues
+              const getVideoUrl = (url: string) => {
+                try {
+                  const u = new URL(url);
+                  if (u.hostname === 'firebasestorage.googleapis.com' || u.hostname === 'storage.googleapis.com') {
+                    return `/api/fetch-image?url=${encodeURIComponent(url)}`;
+                  }
+                } catch {
+                  // Not a valid URL, return as-is
+                }
+                return url;
+              };
+              
+              const videoUrl = getVideoUrl(previewAsset.url);
+              
+              return (
+                <div className="w-full flex items-center justify-center bg-black p-6">
+                  <video 
+                    key={videoUrl}
+                    src={videoUrl} 
+                    controls 
+                    className="w-full h-auto max-h-[90vh]" 
+                    playsInline
+                    preload="auto"
+                    onLoadedData={(e) => {
+                      console.log('Video loaded successfully:', {
+                        duration: e.currentTarget.duration,
+                        videoWidth: e.currentTarget.videoWidth,
+                        videoHeight: e.currentTarget.videoHeight
+                      });
+                    }}
+                    onError={(e) => {
+                      const video = e.currentTarget;
+                      const error = video.error;
+                      console.error('Video playback error:', {
+                        code: error?.code,
+                        message: error?.message,
+                        url: videoUrl,
+                        networkState: video.networkState,
+                        readyState: video.readyState
+                      });
+                    }}
+                  >
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              );
+            })()}
             {previewAsset.type === 'text' && (
               <div className="p-12 max-h-[90vh] overflow-y-auto">
                 <h2 className="text-3xl font-black text-gray-900 mb-4">{previewAsset.title}</h2>
