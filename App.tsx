@@ -1009,7 +1009,8 @@ function App() {
               const getVideoUrl = (url: string) => {
                 try {
                   const u = new URL(url);
-                  const isMov = url.toLowerCase().endsWith('.mov') || url.toLowerCase().endsWith('.qt');
+                  const path = u.pathname.toLowerCase();
+                  const isMov = path.endsWith('.mov') || path.endsWith('.qt');
                   if (isAllowedProxyHost(u)) {
                     // For MOV files in preview, try conversion endpoint
                     if (isMov) {

@@ -7,6 +7,9 @@
 const ALLOWED_HOSTS = new Set([
   'firebasestorage.googleapis.com',
   'storage.googleapis.com',
+  // Allow Firebase Storage bucket hostnames
+  'eu13657.firebasestorage.app',
+  'content-b7d4c.firebasestorage.app',
 ]);
 
 function withCors(headers: Record<string, string>) {
@@ -40,7 +43,10 @@ export default async function handler(req: any, res: any) {
       return res.end('Invalid url');
     }
 
-    if (!ALLOWED_HOSTS.has(parsed.hostname)) {
+    const isAllowedHost = ALLOWED_HOSTS.has(parsed.hostname) ||
+      parsed.hostname.endsWith('.firebasestorage.app') ||
+      parsed.hostname.endsWith('.appspot.com');
+    if (!isAllowedHost) {
       res.statusCode = 403;
       return res.end('Host not allowed');
     }
@@ -129,12 +135,6 @@ export default async function handler(req: any, res: any) {
     const contentLength = upstream.headers.get('content-length') || undefined;
     const contentRange = upstream.headers.get('content-range') || undefined;
     const acceptRanges = upstream.headers.get('accept-ranges') || 'bytes';
-    
-    // For large files (especially videos), stream instead of loading into memory
-    // Check if this is a video or large file (> 10MB)
-    const fileSize = contentLength ? parseInt(contentLength, 10) : 0;
-    const isLargeFile = fileSize > 10 * 1024 * 1024; // 10MB threshold
-    const isVideo = contentType.startsWith('video/');
     
     // Set headers first
     res.statusCode = upstream.status;

@@ -124,6 +124,13 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
         alert(`Please provide uploader name for "${item.file.name}"`);
         return;
       }
+      if (item.type === 'video') {
+        const fileName = item.file.name.toLowerCase();
+        if (item.file.type === 'video/quicktime' || fileName.endsWith('.mov') || fileName.endsWith('.qt')) {
+          alert(`"${item.file.name}" is a QuickTime MOV file and may not play in browsers. Please convert to MP4 (H.264) before uploading.`);
+          return;
+        }
+      }
     }
 
     setIsUploading(true);

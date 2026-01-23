@@ -32,6 +32,13 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSave, conf
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    if (file && type === 'video') {
+      const fileName = file.name.toLowerCase();
+      if (file.type === 'video/quicktime' || fileName.endsWith('.mov') || fileName.endsWith('.qt')) {
+        alert('QuickTime MOV files (like ProRes) may not play in browsers. Please convert to MP4 (H.264) before uploading for reliable playback.');
+        return;
+      }
+    }
     
     // Fixed: The 'status' property is now omitted from this call as it's added by storageService.addAsset
     onSave({
