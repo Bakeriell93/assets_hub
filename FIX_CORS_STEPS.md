@@ -61,10 +61,33 @@ That's it! No downloads, no installations - just use the browser!
 
 ## ✅ After completing both steps:
 
-1. **Refresh your app** (hard refresh: Ctrl+Shift+R or Cmd+Shift+R)
-2. **Try uploading again**
+1. **Wait 2-3 minutes** - CORS changes can take a few minutes to propagate globally
+2. **Hard refresh your browser** (Ctrl+Shift+R or Cmd+Shift+R)
+3. **Clear browser cache** (or use incognito mode)
+4. **Try uploading again**
 
 The CORS errors should be gone!
+
+## ⚠️ Still Getting CORS Errors?
+
+If you're still seeing CORS errors after waiting:
+
+1. **Verify CORS is actually set** (run in Cloud Shell):
+   ```bash
+   gsutil cors get gs://eu13657
+   ```
+   You should see the CORS config with `"origin": ["*"]`
+
+2. **Try setting CORS again** (sometimes it needs to be reapplied):
+   ```bash
+   gsutil cors set cors.json gs://eu13657
+   ```
+
+3. **Check if Storage Rules are published**:
+   - Go back to Firebase Console → Storage → Rules
+   - Make sure you clicked "Publish" (not just "Save")
+
+4. **Wait longer** - Sometimes CORS can take 5-10 minutes to fully propagate
 
 ---
 
