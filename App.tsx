@@ -31,9 +31,9 @@ const VideoPlayerComponent: React.FC<{
   
   useEffect(() => {
     if (videoRef.current && !playerRef.current) {
-      // Initialize Plyr player with better MOV support
+      // Initialize Plyr player with better MOV/APCN support
       try {
-        const isMov = originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt');
+        const isMov = originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn');
         
         // Configure video element for better MOV streaming
         if (videoRef.current && isMov) {
@@ -242,7 +242,7 @@ const VideoPlayerComponent: React.FC<{
         key={videoUrl}
         className="plyr__video-embed w-full h-auto max-h-[90vh]"
         playsInline
-        preload={originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') ? 'auto' : 'metadata'}
+        preload={originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn') ? 'auto' : 'metadata'}
         muted={false}
         controlsList="nodownload"
         crossOrigin="anonymous"
@@ -1020,7 +1020,7 @@ function App() {
                 try {
                   const u = new URL(url);
                   const path = u.pathname.toLowerCase();
-                  const isMov = path.endsWith('.mov') || path.endsWith('.qt');
+                  const isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
                   if (isAllowedProxyHost(u)) {
                     // For MOV files in preview, try conversion endpoint
                     if (isMov) {

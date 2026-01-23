@@ -42,10 +42,10 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       try {
         const u = new URL(asset.url);
         const path = u.pathname.toLowerCase();
-        isMov = path.endsWith('.mov') || path.endsWith('.qt');
+        isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
       } catch {
         const lower = asset.url.toLowerCase();
-        isMov = lower.endsWith('.mov') || lower.endsWith('.qt');
+        isMov = lower.endsWith('.mov') || lower.endsWith('.qt') || lower.endsWith('.apcn');
       }
       
       // Set video source
@@ -143,7 +143,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       const u = new URL(url);
       if (!isAllowedProxyHost(u)) return url;
       const path = u.pathname.toLowerCase();
-      const isMov = path.endsWith('.mov') || path.endsWith('.qt');
+      const isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
       if (isMov) {
         return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
       }
@@ -157,9 +157,9 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     try {
       const u = new URL(url);
       if (!isAllowedProxyHost(u)) return url;
-      // For MOV files, use conversion endpoint for preview/thumbnails
+      // For MOV/APCN files, use conversion endpoint for preview/thumbnails
       const path = u.pathname.toLowerCase();
-      const isMov = path.endsWith('.mov') || path.endsWith('.qt');
+      const isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
       if (isMov && asset.type === 'video') {
         return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
       }
@@ -440,17 +440,17 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                    });
                  }}
                >
-                 {/* For MOV files, try as MP4 since many are H.264 compatible */}
+                 {/* For MOV/APCN files, try as MP4 since many are H.264 compatible */}
                 {(() => {
                   try {
                     const u = new URL(asset.url);
                     const path = u.pathname.toLowerCase();
-                    if (path.endsWith('.mov') || path.endsWith('.qt')) {
+                    if (path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn')) {
                       return <source src={getThumbnailVideoUrl(asset.url)} type="video/mp4" />;
                     }
                   } catch {
                     const lower = asset.url.toLowerCase();
-                    if (lower.endsWith('.mov') || lower.endsWith('.qt')) {
+                    if (lower.endsWith('.mov') || lower.endsWith('.qt') || lower.endsWith('.apcn')) {
                       return <source src={getThumbnailVideoUrl(asset.url)} type="video/mp4" />;
                     }
                   }

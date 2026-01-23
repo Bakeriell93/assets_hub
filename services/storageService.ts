@@ -401,11 +401,11 @@ export const storageService = {
             const storageRef = ref(storage, `content/${Date.now()}-${sanitizedFileName}`);
             
             // Upload with metadata to preserve content type (important for videos)
-            // For MOV files, force video/mp4 so browsers can play them
+            // For MOV/APCN files, force video/mp4 so browsers can play them
             let contentType = file.type || 'application/octet-stream';
             const fileNameLower = file.name.toLowerCase();
-            if (fileNameLower.endsWith('.mov') || fileNameLower.endsWith('.qt') || file.type === 'video/quicktime') {
-              contentType = 'video/mp4'; // Force MP4 MIME type for MOV files
+            if (fileNameLower.endsWith('.mov') || fileNameLower.endsWith('.qt') || fileNameLower.endsWith('.apcn') || file.type === 'video/quicktime') {
+              contentType = 'video/mp4'; // Force MP4 MIME type for MOV/APCN files
             }
             
             const metadata = {

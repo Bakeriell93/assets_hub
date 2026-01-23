@@ -54,7 +54,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       return res.end('Host not allowed');
     }
     
-    const isMov = parsed.pathname.toLowerCase().endsWith('.mov') || parsed.pathname.toLowerCase().endsWith('.qt');
+    const isMov = parsed.pathname.toLowerCase().endsWith('.mov') || parsed.pathname.toLowerCase().endsWith('.qt') || parsed.pathname.toLowerCase().endsWith('.apcn');
     
     if (isMov) {
       const transcodeBase = process.env.TRANSCODE_URL;
