@@ -996,19 +996,28 @@ function App() {
               <img src={previewAsset.url} alt={previewAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
             )}
             {previewAsset.type === 'video' && previewAsset.url && (() => {
-              // Use proxy URL for Firebase Storage videos to avoid CORS issues
-              // For MOV files, use conversion endpoint for preview
+              // Use proxy only when needed (e.g., MOV conversion)
+              const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
+              const isAllowedProxyHost = (u: URL) => {
+                return (
+                  u.hostname === 'firebasestorage.googleapis.com' ||
+                  u.hostname === 'storage.googleapis.com' ||
+                  u.hostname.endsWith('.firebasestorage.app') ||
+                  u.hostname.endsWith('.appspot.com')
+                );
+              };
               const getVideoUrl = (url: string) => {
                 try {
                   const u = new URL(url);
                   const isMov = url.toLowerCase().endsWith('.mov') || url.toLowerCase().endsWith('.qt');
-                  
-                  if (u.hostname === 'firebasestorage.googleapis.com' || u.hostname === 'storage.googleapis.com' || u.hostname.includes('firebasestorage.app')) {
+                  if (isAllowedProxyHost(u)) {
                     // For MOV files in preview, try conversion endpoint
                     if (isMov) {
                       return `/api/convert-video?url=${encodeURIComponent(url)}`;
                     }
-                    return `/api/fetch-image?url=${encodeURIComponent(url)}`;
+                    if (useStorageProxy) {
+                      return `/api/fetch-image?url=${encodeURIComponent(url)}`;
+                    }
                   }
                 } catch {
                   // Not a valid URL, return as-is

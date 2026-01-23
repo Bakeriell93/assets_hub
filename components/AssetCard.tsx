@@ -104,19 +104,27 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     }
   }, [asset.type, asset.url]);
 
+  const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
+
   const isAllowedProxyHost = (u: URL) => {
-    return u.hostname === 'firebasestorage.googleapis.com' || u.hostname === 'storage.googleapis.com';
+    return (
+      u.hostname === 'firebasestorage.googleapis.com' ||
+      u.hostname === 'storage.googleapis.com' ||
+      u.hostname.endsWith('.firebasestorage.app') ||
+      u.hostname.endsWith('.appspot.com')
+    );
   };
 
   const maybeProxyUrl = (url: string) => {
     try {
       const u = new URL(url);
-      if (isAllowedProxyHost(u)) {
-        // For MOV files, use conversion endpoint for preview/thumbnails
-        const isMov = url.toLowerCase().endsWith('.mov') || url.toLowerCase().endsWith('.qt');
-        if (isMov && asset.type === 'video') {
-          return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
-        }
+      if (!isAllowedProxyHost(u)) return url;
+      // For MOV files, use conversion endpoint for preview/thumbnails
+      const isMov = url.toLowerCase().endsWith('.mov') || url.toLowerCase().endsWith('.qt');
+      if (isMov && asset.type === 'video') {
+        return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
+      }
+      if (useStorageProxy) {
         return `/api/fetch-image?url=${encodeURIComponent(u.toString())}`;
       }
     } catch {

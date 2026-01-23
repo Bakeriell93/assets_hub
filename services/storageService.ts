@@ -409,41 +409,50 @@ export const storageService = {
               }
             };
             
-            // Use uploadBytesResumable for progress tracking
-            const uploadTask = uploadBytesResumable(storageRef, file, metadata);
-            
-            // Track upload progress
-            await new Promise<void>((resolve, reject) => {
-              uploadTask.on('state_changed', 
-                (snapshot) => {
-                  // Calculate progress percentage
-                  const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
-                  if (onProgress) {
-                    // Cap at 90% until we get the download URL
-                    onProgress(Math.min(90, progress));
+            const useResumable = file.size >= 5 * 1024 * 1024;
+            let uploadedRef = storageRef;
+            if (useResumable) {
+              // Use uploadBytesResumable for large files with progress tracking
+              const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+              
+              // Track upload progress
+              await new Promise<void>((resolve, reject) => {
+                uploadTask.on('state_changed', 
+                  (snapshot) => {
+                    // Calculate progress percentage
+                    const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                    if (onProgress) {
+                      onProgress(progress);
+                    }
+                  },
+                  (error) => {
+                    console.error('Upload error:', error);
+                    reject(error);
+                  },
+                  async () => {
+                    // Upload completed successfully
+                    const snapshot = await uploadTask;
+                    uploadedRef = snapshot.ref;
+                    publicUrl = await getDownloadURL(snapshot.ref);
+                    if (onProgress) onProgress(100);
+                    resolve();
                   }
-                },
-                (error) => {
-                  console.error('Upload error:', error);
-                  reject(error);
-                },
-                async () => {
-                  // Upload completed successfully
-                  if (onProgress) onProgress(95);
-                  const snapshot = await uploadTask;
-                  publicUrl = await getDownloadURL(snapshot.ref);
-                  if (onProgress) onProgress(100);
-                  resolve();
-                }
-              );
-            });
+                );
+              });
+            } else {
+              // Small files: faster direct upload, no resumable overhead
+              const snapshot = await uploadBytes(storageRef, file, metadata);
+              uploadedRef = snapshot.ref;
+              publicUrl = await getDownloadURL(snapshot.ref);
+              if (onProgress) onProgress(100);
+            }
             
             console.log('File uploaded successfully:', {
               type: file.type,
               size: file.size,
               fileName: file.name,
               url: publicUrl.substring(0, 100) + '...',
-              storagePath: uploadTask.snapshot.ref.fullPath
+              storagePath: uploadedRef.fullPath
             });
           } catch (uploadError) {
             console.error('Firebase Storage upload failed:', uploadError);
