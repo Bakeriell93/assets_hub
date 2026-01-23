@@ -2,7 +2,7 @@
 
 ## ⚠️ You need to do TWO things:
 
-### 1. Update Firebase Storage Rules (REQUIRED)
+### 1. Update Firebase Storage Rules (REQUIRED - 2 minutes)
 
 1. Go to: https://console.firebase.google.com/project/content-b7d4c/storage
 2. Make sure you're viewing the bucket: **eu13657**
@@ -17,35 +17,45 @@
    ```
 6. Click **Publish**
 
-### 2. Set CORS Configuration (REQUIRED)
+### 2. Set CORS Configuration (REQUIRED - Easiest Method)
 
-You have two options:
+#### 🚀 EASIEST: Use Google Cloud Shell (No Installation Needed!)
 
-#### Option A: Using Command Line (Recommended)
+1. **Go to Google Cloud Shell** (browser-based, no install):
+   - Open: https://shell.cloud.google.com/
+   - It opens in your browser - no installation needed!
 
-1. **Install Google Cloud SDK** (if not installed):
-   - Download: https://cloud.google.com/sdk/docs/install
-   - Or: `npm install -g @google-cloud/storage`
-
-2. **Open Terminal/Command Prompt** and run:
+2. **Run these commands** (copy-paste one by one):
    ```bash
-   gcloud auth login
    gcloud config set project content-b7d4c
+   gcloud auth login
+   ```
+
+3. **Create the CORS file**:
+   ```bash
+   cat > cors.json << 'EOF'
+   [
+     {
+       "origin": ["*"],
+       "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+       "responseHeader": ["Content-Type", "Authorization", "Content-Length", "Content-Range", "Accept-Ranges"],
+       "maxAgeSeconds": 3600
+     }
+   ]
+   EOF
+   ```
+
+4. **Set CORS**:
+   ```bash
    gsutil cors set cors.json gs://eu13657
    ```
 
-3. **Verify it worked**:
+5. **Verify it worked**:
    ```bash
    gsutil cors get gs://eu13657
    ```
-   You should see the CORS configuration.
 
-#### Option B: Using Firebase Console (if available)
-
-1. Go to Firebase Console → Storage
-2. Click on bucket **eu13657**
-3. Look for **CORS** or **Permissions** settings
-4. Add the configuration from `cors.json` file
+That's it! No downloads, no installations - just use the browser!
 
 ---
 
