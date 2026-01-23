@@ -190,6 +190,19 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     return safeBase.endsWith(ext) ? safeBase : `${safeBase}${ext}`;
   };
 
+  // Extract original filename from URL for package list display
+  const extractFilenameFromUrl = (url: string): string => {
+    try {
+      const cleaned = url.split('?')[0] || '';
+      const last = cleaned.split('/').pop() || '';
+      // Remove timestamp prefix if present (format: timestamp-filename.ext)
+      const withoutTimestamp = last.replace(/^\d+-/, '');
+      return withoutTimestamp || 'file';
+    } catch {
+      return 'file';
+    }
+  };
+
   const convertImageFormat = async (imageUrl: string, format: 'webp' | 'png' | 'jpg'): Promise<Blob> => {
     return new Promise((resolve, reject) => {
       const img = new Image();
@@ -597,18 +610,35 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         {/* Package Info - Show below card content */}
         {isPackage && (
           <div className="mt-3 pt-3 border-t-2 border-purple-200 bg-purple-50/50 px-6 pb-4 -mx-6 -mb-6 rounded-b-[32px]">
-            <div className="flex items-center justify-between mb-2">
+            <div className="flex items-center justify-between mb-3">
               <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest">
                 {packageAssets.length} {packageAssets.length === 1 ? 'Asset' : 'Assets'} in Package
               </span>
             </div>
-            <div className="space-y-1.5 max-h-32 overflow-y-auto">
-              {packageAssets.map((pkgAsset, idx) => (
-                <div key={pkgAsset.id} className="flex items-start gap-2 text-[9px]">
-                  <span className="text-purple-600 font-black min-w-[20px]">{idx + 1}.</span>
-                  <span className="text-gray-700 font-bold truncate flex-1">{pkgAsset.title}</span>
-                </div>
-              ))}
+            <div className="space-y-2 max-h-40 overflow-y-auto">
+              {packageAssets.map((pkgAsset, idx) => {
+                const fileName = pkgAsset.url ? extractFilenameFromUrl(pkgAsset.url) : 'file';
+                return (
+                  <div key={pkgAsset.id} className="flex items-center gap-2 group/item">
+                    <span className="text-purple-600 font-black text-[8px] min-w-[18px]">{idx + 1}.</span>
+                    <span className="text-gray-700 font-medium text-[8px] truncate flex-1" title={fileName}>
+                      {fileName}
+                    </span>
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleDownload('original', pkgAsset.id);
+                      }}
+                      className="opacity-0 group-hover/item:opacity-100 p-1.5 bg-purple-100 hover:bg-purple-200 rounded-lg transition-all flex-shrink-0"
+                      title="Download"
+                    >
+                      <svg className="w-3 h-3 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                      </svg>
+                    </button>
+                  </div>
+                );
+              })}
             </div>
           </div>
         )}
