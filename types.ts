@@ -46,7 +46,8 @@ export interface Asset {
   content?: string; 
   market: Market;
   platform: Platform;
-  carModel: CarModel;
+  carModel: CarModel; // Keep for backward compatibility
+  carModels?: CarModel[]; // New: support multiple models
   objectives: AssetObjective[];
   createdAt: number;
   uploadedBy: string;

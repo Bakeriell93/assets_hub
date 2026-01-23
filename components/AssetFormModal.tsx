@@ -21,6 +21,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [market, setMarket] = useState<Market>(config.markets[0] || MARKETS[0]);
   const [platform, setPlatform] = useState<Platform>(config.platforms[0] || PLATFORMS[0]);
   const [carModel, setCarModel] = useState<CarModel>(config.models[0] || CAR_MODELS[0]);
+  const [selectedCarModels, setSelectedCarModels] = useState<CarModel[]>([]);
   const [customCarModel, setCustomCarModel] = useState<string>('');
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [selectedCollectionIds, setSelectedCollectionIds] = useState<string[]>([]);
@@ -42,14 +43,23 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setType(editingAsset.type);
       setMarket(editingAsset.market);
       setPlatform(editingAsset.platform);
-      setCarModel(editingAsset.carModel);
-      // Check if the model is not in the standard list, treat it as custom
-      const isCustomModel = !(config.models.length > 0 ? config.models : CAR_MODELS).includes(editingAsset.carModel);
-      if (isCustomModel) {
-        setCustomCarModel(editingAsset.carModel);
-        setCarModel('Other' as CarModel);
-      } else {
+      // Support both old (carModel) and new (carModels) format
+      if (editingAsset.carModels && editingAsset.carModels.length > 0) {
+        setSelectedCarModels(editingAsset.carModels);
+        setCarModel(config.models[0] || CAR_MODELS[0]);
         setCustomCarModel('');
+      } else {
+        setCarModel(editingAsset.carModel);
+        // Check if the model is not in the standard list, treat it as custom
+        const isCustomModel = !(config.models.length > 0 ? config.models : CAR_MODELS).includes(editingAsset.carModel);
+        if (isCustomModel) {
+          setCustomCarModel(editingAsset.carModel);
+          setCarModel('Other' as CarModel);
+          setSelectedCarModels([]);
+        } else {
+          setCustomCarModel('');
+          setSelectedCarModels([editingAsset.carModel]);
+        }
       }
       setSelectedObjectives(editingAsset.objectives || []);
       setSelectedCollectionIds(editingAsset.collectionIds || []);
@@ -66,6 +76,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setMarket('Global' as Market);
       setPlatform(config.platforms[0] || PLATFORMS[0]);
       setCarModel(config.models[0] || CAR_MODELS[0]);
+      setSelectedCarModels([]);
       setCustomCarModel('');
       setSelectedObjectives([]);
       setSelectedCollectionIds([]);
@@ -95,10 +106,20 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     );
   };
 
+  const toggleCarModel = (model: CarModel) => {
+    setSelectedCarModels(prev =>
+      prev.includes(model) ? prev.filter(m => m !== model) : [...prev, model]
+    );
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     if (selectedObjectives.length === 0) {
       alert("Please select at least one campaign objective.");
+      return;
+    }
+    if (selectedCarModels.length === 0) {
+      alert("Please select at least one car model.");
       return;
     }
 
@@ -131,7 +152,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             type,
             market,
             platform: assetPlatform,
-            carModel: carModel === 'Other' ? customCarModel : carModel,
+            carModel: selectedCarModels.length > 0 ? selectedCarModels[0] : (carModel === 'Other' ? customCarModel : carModel),
+            carModels: selectedCarModels.length > 0 ? selectedCarModels : undefined,
             usageRights,
             objectives: selectedObjectives,
             ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
@@ -231,20 +253,25 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                         </select>
                     </div>
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Car Model</label>
-                        <select value={carModel} onChange={(e) => { setCarModel(e.target.value as CarModel); if (e.target.value !== 'Other') setCustomCarModel(''); }} className={inputClasses}>
-                            {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => <option className="text-gray-900 bg-white" key={m} value={m}>{m}</option>)}
-                            <option className="text-gray-900 bg-white" value="Other">Other</option>
-                        </select>
-                        {carModel === 'Other' && (
-                          <input
-                            type="text"
-                            value={customCarModel}
-                            onChange={(e) => setCustomCarModel(e.target.value)}
-                            placeholder="Enter model name"
-                            className={`${inputClasses} mt-2`}
-                            required
-                          />
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Car Models (Select all that apply)</label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                            {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => (
+                                <button
+                                    key={m}
+                                    type="button"
+                                    onClick={() => toggleCarModel(m)}
+                                    className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
+                                        selectedCarModels.includes(m)
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    {m}
+                                </button>
+                            ))}
+                        </div>
+                        {selectedCarModels.length === 0 && (
+                            <p className="text-[10px] text-gray-400 font-bold mt-2 ml-1">Please select at least one model</p>
                         )}
                     </div>
                 </div>

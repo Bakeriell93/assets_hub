@@ -540,8 +540,12 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             <span className="px-2 py-1 rounded-lg bg-blue-50 text-[10px] font-black text-blue-600 uppercase tracking-tight">{asset.platform}</span>
         </div>
 
-        <h3 className="text-lg font-black text-gray-900 line-clamp-1 mb-1 tracking-tight">{asset.title}</h3>
-        <p className="text-[11px] text-blue-500/60 font-black uppercase mb-3 tracking-widest">{asset.carModel}</p>
+        <h3 className="text-sm font-bold text-gray-900 mb-1.5 tracking-tight leading-tight break-words">{asset.title}</h3>
+        <div className="flex flex-wrap gap-1.5 mb-3">
+          {(asset.carModels && asset.carModels.length > 0 ? asset.carModels : [asset.carModel]).map((model, idx) => (
+            <span key={idx} className="text-[10px] text-blue-500/60 font-black uppercase tracking-widest">{model}</span>
+          ))}
+        </div>
         
         {/* Objectives */}
         {asset.objectives && asset.objectives.length > 0 && (

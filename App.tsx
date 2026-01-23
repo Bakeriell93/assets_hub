@@ -362,6 +362,7 @@ function App() {
           market: data.market,
           platform: data.platform,
           carModel: data.carModel,
+          ...(data.carModels ? { carModels: data.carModels } : {}),
           objectives: data.objectives,
           usageRights: data.usageRights,
           uploadedBy: data.uploadedBy,
@@ -386,7 +387,7 @@ function App() {
       }
       
       // Validate required fields for new asset
-      if (!data.title || !data.market || !data.platform || !data.carModel) {
+      if (!data.title || !data.market || !data.platform || (!data.carModel && (!data.carModels || data.carModels.length === 0))) {
         alert('Please fill in all required fields (Title, Market, Platform, Car Model)');
         return;
       }
@@ -491,6 +492,7 @@ function App() {
       a.market,
       a.platform,
       a.carModel,
+      ...(a.carModels ? { carModels: a.carModels } : {}),
       ...(a.objectives || []),
       a.uploadedBy,
       a.usageRights,
@@ -512,7 +514,9 @@ function App() {
     }
     
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
-    const modelMatch = selectedModel === 'All' || a.carModel === selectedModel;
+    const modelMatch = selectedModel === 'All' || 
+      a.carModel === selectedModel || 
+      (a.carModels && a.carModels.includes(selectedModel));
     const pMatch = selectedPlatform === 'All' || a.platform === selectedPlatform;
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).includes(activeCollectionId);
@@ -722,7 +726,9 @@ function App() {
                         <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.45em] mb-8">Engagement + Count by Model</h3>
                         <div className="space-y-7">
                            {config.models.map(m => {
-                              const modelAssets = assets.filter(a => a.carModel === m);
+                              const modelAssets = assets.filter(a => 
+                                a.carModel === m || (a.carModels && a.carModels.includes(m))
+                              );
                               const modelImageCount = modelAssets.filter(a => a.type === 'image').length;
                               const avgCtr = modelAssets.length ? modelAssets.reduce((sum, a) => sum + (a.ctr || 0), 0) / modelAssets.length : 0;
                               return (
@@ -773,7 +779,9 @@ function App() {
                       <h3 className="text-[11px] font-black text-gray-400 uppercase tracking-[0.45em] mb-8">Content Type Mix (per Model)</h3>
                       <div className="space-y-5">
                         {config.models.map(m => {
-                          const modelAssets = assets.filter(a => a.carModel === m);
+                          const modelAssets = assets.filter(a => 
+                            a.carModel === m || (a.carModels && a.carModels.includes(m))
+                          );
                           const img = modelAssets.filter(a => a.type === 'image').length;
                           const vid = modelAssets.filter(a => a.type === 'video').length;
                           const txt = modelAssets.filter(a => a.type === 'text').length;
@@ -1124,7 +1132,9 @@ function App() {
               <div className="flex flex-wrap gap-2 mb-3">
                 <span className="px-3 py-1 rounded-lg bg-gray-200 text-[10px] font-black text-gray-700 uppercase">{previewAsset.market}</span>
                 <span className="px-3 py-1 rounded-lg bg-blue-100 text-[10px] font-black text-blue-700 uppercase">{previewAsset.platform}</span>
-                <span className="px-3 py-1 rounded-lg bg-purple-100 text-[10px] font-black text-purple-700 uppercase">{previewAsset.carModel}</span>
+                {(previewAsset.carModels && previewAsset.carModels.length > 0 ? previewAsset.carModels : [previewAsset.carModel]).map((model, idx) => (
+                  <span key={idx} className="px-3 py-1 rounded-lg bg-purple-100 text-[10px] font-black text-purple-700 uppercase">{model}</span>
+                ))}
               </div>
               {previewAsset.objectives && previewAsset.objectives.length > 0 && (
                 <div className="flex flex-wrap gap-2 mb-3">

@@ -19,6 +19,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSave, conf
   const [market, setMarket] = useState<Market>(config.markets[0] || MARKETS[0]);
   const [platform, setPlatform] = useState<Platform>(config.platforms[0] || PLATFORMS[0]);
   const [carModel, setCarModel] = useState<CarModel>(config.models[0] || CAR_MODELS[0]);
+  const [selectedCarModels, setSelectedCarModels] = useState<CarModel[]>([]);
   const [content, setContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
   
@@ -30,8 +31,19 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSave, conf
   
   if (!isOpen) return null;
 
+  const toggleCarModel = (model: CarModel) => {
+    setSelectedCarModels(prev =>
+      prev.includes(model) ? prev.filter(m => m !== model) : [...prev, model]
+    );
+  };
+
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
+    
+    if (selectedCarModels.length === 0) {
+      alert("Please select at least one car model.");
+      return;
+    }
     
     // Fixed: The 'status' property is now omitted from this call as it's added by storageService.addAsset
     onSave({
@@ -39,7 +51,8 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSave, conf
       type,
       market,
       platform,
-      carModel,
+      carModel: selectedCarModels[0],
+      carModels: selectedCarModels,
       objectives: [], // Empty array provided as default for simple upload
       content: type === 'text' ? content : undefined,
       uploadedBy: uploaderName || 'Anonymous',
@@ -54,6 +67,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSave, conf
     setUploaderName('');
     setContent('');
     setFile(null);
+    setSelectedCarModels([]);
     setCtr('');
     setCpl('');
     setCr('');
@@ -143,14 +157,26 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSave, conf
                         </select>
                     </div>
                     <div>
-                        <label className="block text-sm font-medium text-gray-700 mb-1">Car Model</label>
-                        <select
-                            value={carModel}
-                            onChange={(e) => setCarModel(e.target.value as CarModel)}
-                            className="w-full rounded-lg border-gray-300 border p-2.5 focus:ring-2 focus:ring-blue-500 focus:border-transparent outline-none"
-                        >
-                            {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => <option key={m} value={m}>{m}</option>)}
-                        </select>
+                        <label className="block text-sm font-medium text-gray-700 mb-1">Car Models (Select all that apply)</label>
+                        <div className="flex flex-wrap gap-2 mt-1">
+                            {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => (
+                                <button
+                                    key={m}
+                                    type="button"
+                                    onClick={() => toggleCarModel(m)}
+                                    className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
+                                        selectedCarModels.includes(m)
+                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
+                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
+                                    }`}
+                                >
+                                    {m}
+                                </button>
+                            ))}
+                        </div>
+                        {selectedCarModels.length === 0 && (
+                            <p className="text-[10px] text-gray-400 font-bold mt-2">Please select at least one model</p>
+                        )}
                     </div>
                 </div>
 

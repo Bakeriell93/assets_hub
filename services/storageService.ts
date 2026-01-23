@@ -489,6 +489,7 @@ export const storageService = {
         market: asset.market,
         platform: asset.platform,
         carModel: asset.carModel,
+        ...(asset.carModels ? { carModels: asset.carModels } : {}),
         objectives: asset.objectives || [],
         uploadedBy: asset.uploadedBy || 'Anonymous'
       };
