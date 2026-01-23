@@ -541,6 +541,34 @@ function App() {
     }
   }, []);
 
+  // Load previewed assets cache from localStorage on mount
+  useEffect(() => {
+    const loadCache = () => {
+      const cache = new Map<string, { url: string; timestamp: number }>();
+      try {
+        // Load all preview image caches
+        for (let i = 0; i < localStorage.length; i++) {
+          const key = localStorage.key(i);
+          if (key && key.startsWith('preview_img_')) {
+            try {
+              const data = JSON.parse(localStorage.getItem(key) || '{}');
+              if (data.url && data.timestamp) {
+                const assetId = key.replace('preview_img_', '');
+                cache.set(assetId, { url: data.url, timestamp: data.timestamp });
+              }
+            } catch {
+              // Skip invalid entries
+            }
+          }
+        }
+        setPreviewedAssetsCache(cache);
+      } catch (e) {
+        console.warn('Failed to load preview cache:', e);
+      }
+    };
+    loadCache();
+  }, []);
+
   useEffect(() => {
     if (isLoggedIn) {
       const unsubAssets = storageService.subscribeToAssets(setAssets);
