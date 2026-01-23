@@ -424,6 +424,7 @@ function App() {
   // Modals
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
+  const [editingPackageAssets, setEditingPackageAssets] = useState<Asset[]>([]);
   const [isAIModalOpen, setIsAIModalOpen] = useState(false);
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
@@ -838,7 +839,13 @@ function App() {
                           setPreviewPackageAssets(packageAssets || [asset]);
                           setCurrentPreviewIndex(0);
                         }}
-                        onEdit={(a) => { setEditingAsset(a); setIsAssetModalOpen(true); }}
+                        onEdit={(a) => { 
+                          setEditingAsset(a);
+                          // Get package assets if this is part of a package
+                          const pkgAssets = a.packageId ? (packageMap.get(a.packageId) || [a]) : [a];
+                          setEditingPackageAssets(pkgAssets);
+                          setIsAssetModalOpen(true); 
+                        }}
                         onDelete={storageService.deleteAsset}
                         onRestore={storageService.restoreAsset}
                         isTrashView={viewMode === 'trash'}
@@ -1054,7 +1061,13 @@ function App() {
                           setPreviewPackageAssets(packageAssets || [asset]);
                           setCurrentPreviewIndex(0);
                         }}
-                            onEdit={(a) => { setEditingAsset(a); setIsAssetModalOpen(true); }}
+                            onEdit={(a) => { 
+                          setEditingAsset(a);
+                          // Get package assets if this is part of a package
+                          const pkgAssets = a.packageId ? (packageMap.get(a.packageId) || [a]) : [a];
+                          setEditingPackageAssets(pkgAssets);
+                          setIsAssetModalOpen(true); 
+                        }}
                             onDelete={storageService.deleteAsset}
                             onRestore={storageService.restoreAsset}
                             isTrashView={true}
@@ -1083,10 +1096,11 @@ function App() {
 
       <AssetFormModal 
         isOpen={isAssetModalOpen} 
-        onClose={() => { setIsAssetModalOpen(false); setEditingAsset(null); }} 
+        onClose={() => { setIsAssetModalOpen(false); setEditingAsset(null); setEditingPackageAssets([]); }} 
         onSave={handleSaveAsset}
         onSavePackage={handleSavePackage}
         editingAsset={editingAsset}
+        editingPackageAssets={editingPackageAssets}
         config={config}
         collections={collections}
       />

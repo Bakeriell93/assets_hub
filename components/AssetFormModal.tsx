@@ -1,6 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { Asset, CAR_MODELS, CarModel, Collection, MARKETS, Market, PLATFORMS, Platform, AssetType, USAGE_RIGHTS, UsageRights, OBJECTIVES, AssetObjective, SystemConfig } from '../types';
+import { storageService } from '../services/storageService';
 
 // Fixed: Added config to props interface to match App.tsx usage
 interface AssetFormModalProps {
@@ -9,11 +10,12 @@ interface AssetFormModalProps {
   onSave: (asset: Omit<Asset, 'id' | 'createdAt'> | Partial<Asset>, file?: File) => void;
   onSavePackage?: (assets: Array<{ asset: Omit<Asset, 'id' | 'createdAt'>; file?: File }>) => void;
   editingAsset?: Asset | null;
+  editingPackageAssets?: Asset[]; // All assets in the package being edited
   config: SystemConfig;
   collections: Collection[];
 }
 
-const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave, onSavePackage, editingAsset, config, collections }) => {
+const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave, onSavePackage, editingAsset, editingPackageAssets = [], config, collections }) => {
   const [title, setTitle] = useState('');
   const [uploaderName, setUploaderName] = useState('');
   const [type, setType] = useState<AssetType>('image');
@@ -29,6 +31,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [file, setFile] = useState<File | null>(null);
   const [files, setFiles] = useState<File[]>([]);
   const [fileTitles, setFileTitles] = useState<Record<number, string>>({}); // Store custom titles for each file
+  const [packageAssetTitles, setPackageAssetTitles] = useState<Record<string, string>>({}); // Store custom titles for package assets when editing
   const [isPackageMode, setIsPackageMode] = useState(false);
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
   const [isCarModelsDropdownOpen, setIsCarModelsDropdownOpen] = useState(false);
@@ -71,6 +74,17 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setCpl(editingAsset.cpl?.toString() || '');
       setComments(editingAsset.comments || '');
       setUsageRights(editingAsset.usageRights || USAGE_RIGHTS[0]);
+      
+      // If editing a package, initialize package asset titles
+      if (editingPackageAssets.length > 1) {
+        const titles: Record<string, string> = {};
+        editingPackageAssets.forEach(asset => {
+          titles[asset.id] = asset.title;
+        });
+        setPackageAssetTitles(titles);
+      } else {
+        setPackageAssetTitles({});
+      }
     } else {
       setTitle('');
       setUploaderName('');
@@ -91,6 +105,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setFile(null);
       setFiles([]);
       setFileTitles({});
+      setPackageAssetTitles({});
       setIsPackageMode(false);
       setIsCarModelsDropdownOpen(false);
     }
@@ -450,6 +465,33 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                         </div>
                     </div>
                 </div>
+
+                {/* Show package asset name editor when editing a package */}
+                {editingAsset && editingPackageAssets.length > 1 && (
+                  <div className="space-y-3 mb-6">
+                    <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Edit Package Asset Names</p>
+                    <div className="space-y-2 max-h-60 overflow-y-auto">
+                      {editingPackageAssets.map((pkgAsset) => (
+                        <div key={pkgAsset.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                          <div className="flex items-center justify-between mb-2">
+                            <span className="text-[10px] font-bold text-gray-500 truncate flex-1" title={pkgAsset.originalFileName || pkgAsset.url || 'file'}>
+                              {pkgAsset.originalFileName || (pkgAsset.url ? pkgAsset.url.split('/').pop()?.split('?')[0] : 'file')}
+                            </span>
+                          </div>
+                          <input
+                            type="text"
+                            value={packageAssetTitles[pkgAsset.id] || pkgAsset.title}
+                            onChange={(e) => {
+                              setPackageAssetTitles({ ...packageAssetTitles, [pkgAsset.id]: e.target.value });
+                            }}
+                            placeholder="Enter custom name..."
+                            className="w-full px-3 py-2 text-xs font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                )}
 
                 {!editingAsset && (
                   <>
