@@ -30,6 +30,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [files, setFiles] = useState<File[]>([]);
   const [isPackageMode, setIsPackageMode] = useState(false);
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
+  const [isCarModelsDropdownOpen, setIsCarModelsDropdownOpen] = useState(false);
   
   const [ctr, setCtr] = useState<string>('');
   const [cpl, setCpl] = useState<string>('');
@@ -89,8 +90,16 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setFile(null);
       setFiles([]);
       setIsPackageMode(false);
+      setIsCarModelsDropdownOpen(false);
     }
   }, [editingAsset, isOpen, config]);
+
+  // Close dropdown when modal closes
+  useEffect(() => {
+    if (!isOpen) {
+      setIsCarModelsDropdownOpen(false);
+    }
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
@@ -270,24 +279,96 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Car Models (Select all that apply)</label>
-                        <div className="flex flex-wrap gap-2 mt-1">
-                            {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => (
-                                <button
-                                    key={m}
-                                    type="button"
-                                    onClick={() => toggleCarModel(m)}
-                                    className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
-                                        selectedCarModels.includes(m)
-                                        ? 'bg-blue-600 text-white shadow-lg shadow-blue-200'
-                                        : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                                    }`}
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => setIsCarModelsDropdownOpen(!isCarModelsDropdownOpen)}
+                                className={`w-full rounded-xl border-gray-300 border-2 p-3 focus:border-blue-500 bg-white text-gray-900 outline-none transition-all font-medium shadow-sm cursor-pointer text-left flex items-center justify-between ${
+                                    selectedCarModels.length === 0 ? 'text-gray-400' : ''
+                                }`}
+                            >
+                                <span>
+                                    {selectedCarModels.length === 0 
+                                        ? 'Select car models...' 
+                                        : selectedCarModels.length === 1 
+                                            ? (selectedCarModels[0] === 'Other' ? customCarModel || 'Other' : selectedCarModels[0])
+                                            : `${selectedCarModels.length} models selected`}
+                                </span>
+                                <svg 
+                                    className={`w-5 h-5 text-gray-400 transition-transform ${isCarModelsDropdownOpen ? 'transform rotate-180' : ''}`} 
+                                    fill="none" 
+                                    stroke="currentColor" 
+                                    viewBox="0 0 24 24"
                                 >
-                                    {m}
-                                </button>
-                            ))}
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                                </svg>
+                            </button>
+                            {isCarModelsDropdownOpen && (
+                                <>
+                                    <div
+                                        className="fixed inset-0 z-40"
+                                        onClick={() => setIsCarModelsDropdownOpen(false)}
+                                    />
+                                    <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto">
+                                        <div className="p-2 space-y-1">
+                                            {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => (
+                                                <label
+                                                    key={m}
+                                                    className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                                                    onClick={(e) => e.stopPropagation()}
+                                                >
+                                                    <input
+                                                        type="checkbox"
+                                                        checked={selectedCarModels.includes(m)}
+                                                        onChange={() => toggleCarModel(m)}
+                                                        className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                    />
+                                                    <span className="text-sm font-bold text-gray-900 uppercase tracking-wider">{m}</span>
+                                                </label>
+                                            ))}
+                                            <label 
+                                                className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"
+                                                onClick={(e) => e.stopPropagation()}
+                                            >
+                                                <input
+                                                    type="checkbox"
+                                                    checked={selectedCarModels.includes('Other' as CarModel)}
+                                                    onChange={() => toggleCarModel('Other' as CarModel)}
+                                                    className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500 cursor-pointer"
+                                                />
+                                                <span className="text-sm font-bold text-gray-900 uppercase tracking-wider">Other</span>
+                                            </label>
+                                            {selectedCarModels.includes('Other' as CarModel) && (
+                                                <div className="px-3 pb-2" onClick={(e) => e.stopPropagation()}>
+                                                    <input
+                                                        type="text"
+                                                        value={customCarModel}
+                                                        onChange={(e) => setCustomCarModel(e.target.value)}
+                                                        placeholder="Enter custom model name"
+                                                        className="w-full rounded-lg border-gray-300 border-2 p-2.5 text-sm font-medium outline-none focus:border-blue-500 bg-gray-50"
+                                                        onClick={(e) => e.stopPropagation()}
+                                                    />
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </>
+                            )}
                         </div>
                         {selectedCarModels.length === 0 && (
                             <p className="text-[10px] text-gray-400 font-bold mt-2 ml-1">Please select at least one model</p>
+                        )}
+                        {selectedCarModels.length > 0 && (
+                            <div className="flex flex-wrap gap-2 mt-2">
+                                {selectedCarModels.map((m, idx) => (
+                                    <span
+                                        key={`${m}-${idx}`}
+                                        className="px-3 py-1 rounded-full text-xs font-black uppercase tracking-widest bg-blue-100 text-blue-700 border border-blue-200"
+                                    >
+                                        {m === 'Other' ? customCarModel || 'Other' : m}
+                                    </span>
+                                ))}
+                            </div>
                         )}
                     </div>
                 </div>
