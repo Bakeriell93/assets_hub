@@ -292,6 +292,7 @@ function App() {
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
   const [previewPackageAssets, setPreviewPackageAssets] = useState<Asset[]>([]);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
+  const [previewViewMode, setPreviewViewMode] = useState<'grid' | 'full'>('grid');
   
   // Upload Progress
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -1013,6 +1014,62 @@ function App() {
         const canGoPrev = isPackage && currentPreviewIndex > 0;
         const canGoNext = isPackage && currentPreviewIndex < previewPackageAssets.length - 1;
 
+        // Download function for preview modal
+        const handleDownloadAsset = async (asset: Asset, e?: React.MouseEvent) => {
+          if (e) e.stopPropagation();
+          if (!asset.url) {
+            alert('No file URL available for download');
+            return;
+          }
+
+          try {
+            const filename = asset.title || 'asset';
+            const urlParts = asset.url.split('.');
+            const ext = urlParts.length > 1 ? urlParts[urlParts.length - 1].split('?')[0] : 'jpg';
+            const downloadFilename = `${filename}.${ext}`;
+
+            // For videos and large files, use direct download
+            if (asset.type === 'video' || asset.type === 'design') {
+              const a = document.createElement('a');
+              a.href = asset.url;
+              a.download = downloadFilename;
+              a.rel = 'noopener';
+              a.style.display = 'none';
+              document.body.appendChild(a);
+              a.click();
+              setTimeout(() => document.body.removeChild(a), 1000);
+              return;
+            }
+
+            // For images, fetch and download
+            const res = await fetch(asset.url, { method: 'GET' });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const blob = await res.blob();
+            const blobUrl = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = blobUrl;
+            a.download = downloadFilename;
+            a.rel = 'noopener';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => {
+              a.remove();
+              URL.revokeObjectURL(blobUrl);
+            }, 100);
+          } catch (err) {
+            console.error('Download failed:', err);
+            // Fallback to direct download
+            const a = document.createElement('a');
+            a.href = asset.url;
+            a.download = asset.title || 'asset';
+            a.target = '_blank';
+            document.body.appendChild(a);
+            a.click();
+            setTimeout(() => a.remove(), 100);
+          }
+        };
+
+
         return (
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); }}>
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); }}></div>
@@ -1049,41 +1106,112 @@ function App() {
                   </div>
                 )}
                 <button 
-                  onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); }}
+                  onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}
                   className="p-3 bg-white/90 hover:bg-white rounded-full transition-all shadow-lg ml-auto"
                 >
                   <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
 
-              {/* Package asset list buttons */}
+              {/* Package Grid View or Full View Toggle */}
               {isPackage && (
-                <div className="absolute bottom-20 left-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg max-h-32 overflow-y-auto">
-                  <div className="flex flex-wrap gap-2">
-                    {previewPackageAssets.map((pkgAsset, idx) => (
-                      <button
-                        key={pkgAsset.id}
-                        onClick={(e) => { e.stopPropagation(); setCurrentPreviewIndex(idx); }}
-                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
-                          idx === currentPreviewIndex
-                            ? 'bg-blue-600 text-white shadow-md'
-                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                        }`}
-                        title={pkgAsset.title}
-                      >
-                        <span className="truncate max-w-[120px] block">{pkgAsset.title}</span>
-                      </button>
-                    ))}
-                  </div>
+                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-10 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPreviewViewMode('grid'); }}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
+                      previewViewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Grid
+                  </button>
+                  <button
+                    onClick={(e) => { e.stopPropagation(); setPreviewViewMode('full'); }}
+                    className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
+                      previewViewMode === 'full' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                    }`}
+                  >
+                    Full
+                  </button>
                 </div>
               )}
               
               {/* Asset Preview Content */}
               <div className="flex-1 overflow-y-auto">
-                {currentAsset.type === 'image' && currentAsset.url && (
-                  <img src={currentAsset.url} alt={currentAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
-                )}
-                {currentAsset.type === 'video' && currentAsset.url && (() => {
+                {isPackage && previewViewMode === 'grid' ? (
+                  <div className="p-6">
+                    <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
+                      {previewPackageAssets.map((pkgAsset, idx) => (
+                        <div
+                          key={pkgAsset.id}
+                          className="relative group bg-gray-100 rounded-2xl overflow-hidden aspect-square cursor-pointer hover:shadow-xl transition-all"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setCurrentPreviewIndex(idx);
+                            setPreviewViewMode('full');
+                          }}
+                        >
+                          {pkgAsset.type === 'image' && pkgAsset.url && (
+                            <img 
+                              src={pkgAsset.url} 
+                              alt={pkgAsset.title} 
+                              className="w-full h-full object-cover"
+                            />
+                          )}
+                          {pkgAsset.type === 'video' && pkgAsset.url && (
+                            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
+                              <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+                                <path d="M8 5v14l11-7z" />
+                              </svg>
+                            </div>
+                          )}
+                          {pkgAsset.type === 'design' && (
+                            <div className="w-full h-full bg-orange-50 flex items-center justify-center">
+                              <svg className="w-12 h-12 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                            </div>
+                          )}
+                          {pkgAsset.type === 'text' && (
+                            <div className="w-full h-full bg-blue-50 flex items-center justify-center p-4">
+                              <p className="text-xs text-gray-700 line-clamp-3 text-center">{pkgAsset.content}</p>
+                            </div>
+                          )}
+                          {/* Download button - always visible */}
+                          <button
+                            onClick={(e) => handleDownloadAsset(pkgAsset, e)}
+                            className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-100 z-20"
+                            title="Download"
+                          >
+                            <svg className="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                            </svg>
+                          </button>
+                          {/* Title overlay */}
+                          <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/70 to-transparent p-3">
+                            <p className="text-[10px] font-bold text-white truncate">{pkgAsset.title}</p>
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    {currentAsset.type === 'image' && currentAsset.url && (
+                      <div className="relative">
+                        <img src={currentAsset.url} alt={currentAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
+                        {/* Download button for full view */}
+                        <button
+                          onClick={(e) => handleDownloadAsset(currentAsset, e)}
+                          className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all z-20"
+                          title="Download"
+                        >
+                          <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                    {currentAsset.type === 'video' && currentAsset.url && (() => {
               // Use proxy only when needed (e.g., MOV conversion)
               const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
               const isAllowedProxyHost = (u: URL) => {
@@ -1170,7 +1298,7 @@ function App() {
               const videoUrl = currentAsset.url;
               
               return (
-                <div className="w-full flex items-center justify-center bg-black p-6">
+                <div className="relative w-full flex items-center justify-center bg-black p-6">
                   <video 
                     controls 
                     style={{ width: '100%' }} 
@@ -1182,20 +1310,52 @@ function App() {
                     <source src={videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.
                   </video>
+                  {/* Download button for video */}
+                  <button
+                    onClick={(e) => handleDownloadAsset(currentAsset, e)}
+                    className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all z-20"
+                    title="Download"
+                  >
+                    <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                    </svg>
+                  </button>
                 </div>
               );
             })()}
-                {currentAsset.type === 'text' && (
-                  <div className="p-12 max-h-[90vh] overflow-y-auto">
-                    <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
-                    <p className="text-lg text-gray-700 whitespace-pre-wrap">{currentAsset.content}</p>
-                  </div>
-                )}
-                {currentAsset.type === 'design' && (
-                  <div className="p-12 text-center">
-                    <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
-                    <p className="text-gray-600">Design file - download to view</p>
-                  </div>
+                    {currentAsset.type === 'text' && (
+                      <div className="relative p-12 max-h-[90vh] overflow-y-auto">
+                        <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
+                        <p className="text-lg text-gray-700 whitespace-pre-wrap">{currentAsset.content}</p>
+                        {/* Download button for text */}
+                        <button
+                          onClick={(e) => handleDownloadAsset(currentAsset, e)}
+                          className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all"
+                          title="Download"
+                        >
+                          <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                    {currentAsset.type === 'design' && (
+                      <div className="relative p-12 text-center">
+                        <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
+                        <p className="text-gray-600">Design file - download to view</p>
+                        {/* Download button for design */}
+                        <button
+                          onClick={(e) => handleDownloadAsset(currentAsset, e)}
+                          className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all"
+                          title="Download"
+                        >
+                          <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                          </svg>
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
               
