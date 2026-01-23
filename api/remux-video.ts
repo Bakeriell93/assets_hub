@@ -84,7 +84,8 @@ async function remuxVideo(req: any, res: any) {
     });
 
     res.set('Content-Type', 'video/mp4');
-    res.set('Cache-Control', 'public, max-age=3600');
+    res.set('Cache-Control', 'public, max-age=3600, stale-while-revalidate=86400');
+    // Note: Vercel-CDN-Cache-Control not applicable for Cloud Run service
     
     const outputStream = createReadStream(tempOutput);
     await pipeline(outputStream, res);

@@ -1,6 +1,14 @@
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { createHash } from 'crypto';
 
 export default async function handler(req: VercelRequest, res: VercelResponse) {
+  if (req.method === 'OPTIONS') {
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    res.setHeader('Access-Control-Allow-Methods', 'GET, OPTIONS');
+    res.setHeader('Access-Control-Allow-Headers', 'If-None-Match');
+    return res.status(204).end();
+  }
+
   if (req.method !== 'GET') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -82,12 +90,35 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       location = ip !== 'unknown' ? `IP: ${ip}` : 'Unknown Location';
     }
 
-    return res.status(200).json({ ip, location });
+    // Create response data (minimal - only necessary fields)
+    const responseData = { ip, location };
+    
+    // Generate ETag from response content for conditional requests
+    const etag = createHash('md5').update(JSON.stringify(responseData)).digest('hex');
+    const ifNoneMatch = req.headers['if-none-match'];
+    
+    // Support conditional requests (If-None-Match / ETag)
+    if (ifNoneMatch === `"${etag}"` || ifNoneMatch === etag) {
+      res.setHeader('ETag', `"${etag}"`);
+      res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+      res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+      return res.status(304).end();
+    }
+
+    // Set caching headers to reduce Fast Origin Transfer
+    // Cache for 5 minutes (IP location doesn't change frequently)
+    res.setHeader('Content-Type', 'application/json');
+    res.setHeader('ETag', `"${etag}"`);
+    res.setHeader('Cache-Control', 'public, max-age=300, stale-while-revalidate=600');
+    res.setHeader('Vercel-CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=600');
+    res.setHeader('Access-Control-Allow-Origin', '*');
+    
+    return res.status(200).json(responseData);
   } catch (error) {
     console.error('IP info error:', error);
-    return res.status(500).json({ 
-      ip: 'unknown', 
-      location: 'Unknown Location' 
-    });
+    // Minimal error response
+    const errorResponse = { ip: 'unknown', location: 'Unknown Location' };
+    res.setHeader('Cache-Control', 'public, max-age=60'); // Short cache for errors
+    return res.status(500).json(errorResponse);
   }
 }
