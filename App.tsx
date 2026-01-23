@@ -36,8 +36,9 @@ const VideoPlayerComponent: React.FC<{
         const isMov = originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn');
         
         // Configure video element for better MOV streaming
+        // Use 'metadata' instead of 'auto' to reduce bandwidth - only load metadata, not full video
         if (videoRef.current && isMov) {
-          videoRef.current.preload = 'auto'; // Preload entire video for MOV files
+          videoRef.current.preload = 'metadata'; // Only preload metadata, not entire video
           videoRef.current.load(); // Force load
         }
         
@@ -1155,6 +1156,8 @@ function App() {
                               src={pkgAsset.url} 
                               alt={pkgAsset.title} 
                               className="w-full h-full object-cover"
+                              loading="lazy"
+                              decoding="async"
                             />
                           )}
                           {pkgAsset.type === 'video' && pkgAsset.url && (
@@ -1198,7 +1201,13 @@ function App() {
                   <>
                     {currentAsset.type === 'image' && currentAsset.url && (
                       <div className="relative">
-                        <img src={currentAsset.url} alt={currentAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
+                        <img 
+                          src={currentAsset.url} 
+                          alt={currentAsset.title} 
+                          className="w-full h-auto max-h-[90vh] object-contain" 
+                          loading="eager"
+                          decoding="async"
+                        />
                         {/* Download button for full view */}
                         <button
                           onClick={(e) => handleDownloadAsset(currentAsset, e)}

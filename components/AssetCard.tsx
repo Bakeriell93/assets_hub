@@ -409,12 +409,24 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       {/* Visual Preview */}
       <div className="relative h-56 bg-gray-50 flex items-center justify-center overflow-hidden">
         {asset.type === 'image' && asset.url && (
-          <img src={asset.url} alt={asset.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
+          <img 
+            src={asset.url} 
+            alt={asset.title} 
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+            loading="lazy"
+            decoding="async"
+          />
         )}
         {asset.type === 'video' && asset.url && (
             <div className="relative w-full h-full bg-gray-900">
                {videoThumbnail ? (
-                 <img src={videoThumbnail} alt={asset.title} className="w-full h-full object-cover" />
+                 <img 
+                   src={videoThumbnail} 
+                   alt={asset.title} 
+                   className="w-full h-full object-cover" 
+                   loading="lazy"
+                   decoding="async"
+                 />
                ) : (
                  <div className="w-full h-full flex items-center justify-center bg-gray-800">
                    <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
