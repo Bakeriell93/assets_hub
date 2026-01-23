@@ -29,7 +29,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   useEffect(() => {
     if (asset.type === 'video' && asset.url && videoRef.current) {
       const video = videoRef.current;
-      const videoUrl = maybeProxyUrl(asset.url);
+      const videoUrl = getThumbnailVideoUrl(asset.url);
       let isMov = false;
       try {
         const u = new URL(asset.url);
@@ -42,6 +42,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       
       // Set video source
       video.src = videoUrl;
+      video.crossOrigin = 'anonymous';
       video.preload = 'metadata';
       video.muted = true; // Muted for thumbnail generation
       video.playsInline = true;
@@ -121,6 +122,21 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       u.hostname.endsWith('.firebasestorage.app') ||
       u.hostname.endsWith('.appspot.com')
     );
+  };
+
+  const getThumbnailVideoUrl = (url: string) => {
+    try {
+      const u = new URL(url);
+      if (!isAllowedProxyHost(u)) return url;
+      const path = u.pathname.toLowerCase();
+      const isMov = path.endsWith('.mov') || path.endsWith('.qt');
+      if (isMov) {
+        return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
+      }
+      return `/api/fetch-image?url=${encodeURIComponent(u.toString())}`;
+    } catch {
+      return url;
+    }
   };
 
   const maybeProxyUrl = (url: string) => {
@@ -406,13 +422,14 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                    </div>
                  </div>
                )}
-               <video 
-                 ref={videoRef}
-                 src={maybeProxyUrl(asset.url)} 
+              <video 
+                ref={videoRef}
+                src={getThumbnailVideoUrl(asset.url)} 
                  className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
                  preload="metadata"
                  muted
                  playsInline
+                crossOrigin="anonymous"
                  onError={(e) => {
                    const video = e.currentTarget;
                    const error = video.error;
@@ -429,12 +446,12 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                     const u = new URL(asset.url);
                     const path = u.pathname.toLowerCase();
                     if (path.endsWith('.mov') || path.endsWith('.qt')) {
-                      return <source src={maybeProxyUrl(asset.url)} type="video/mp4" />;
+                      return <source src={getThumbnailVideoUrl(asset.url)} type="video/mp4" />;
                     }
                   } catch {
                     const lower = asset.url.toLowerCase();
                     if (lower.endsWith('.mov') || lower.endsWith('.qt')) {
-                      return <source src={maybeProxyUrl(asset.url)} type="video/mp4" />;
+                      return <source src={getThumbnailVideoUrl(asset.url)} type="video/mp4" />;
                     }
                   }
                   return null;
