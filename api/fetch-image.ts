@@ -55,7 +55,50 @@ export default async function handler(req: any, res: any) {
       return res.end(`Upstream fetch failed: ${upstream.status}`);
     }
 
-    const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+    // Detect content type from URL if not provided or if it's generic
+    let contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+    
+    // If content type is generic or missing, detect from file extension
+    if (contentType === 'application/octet-stream' || !contentType.includes('/')) {
+      const urlPath = parsed.pathname.toLowerCase();
+      const extension = urlPath.split('.').pop() || '';
+      
+      // Video MIME types
+      const videoMimeTypes: Record<string, string> = {
+        'mp4': 'video/mp4',
+        'm4v': 'video/mp4',
+        'webm': 'video/webm',
+        'ogg': 'video/ogg',
+        'ogv': 'video/ogg',
+        'mov': 'video/quicktime', // QuickTime format
+        'qt': 'video/quicktime',
+        'avi': 'video/x-msvideo',
+        'wmv': 'video/x-ms-wmv',
+        'flv': 'video/x-flv',
+        'mkv': 'video/x-matroska',
+        '3gp': 'video/3gpp',
+        '3g2': 'video/3gpp2',
+      };
+      
+      // Image MIME types
+      const imageMimeTypes: Record<string, string> = {
+        'jpg': 'image/jpeg',
+        'jpeg': 'image/jpeg',
+        'png': 'image/png',
+        'gif': 'image/gif',
+        'webp': 'image/webp',
+        'svg': 'image/svg+xml',
+        'bmp': 'image/bmp',
+        'ico': 'image/x-icon',
+      };
+      
+      if (videoMimeTypes[extension]) {
+        contentType = videoMimeTypes[extension];
+      } else if (imageMimeTypes[extension]) {
+        contentType = imageMimeTypes[extension];
+      }
+    }
+    
     const contentLength = upstream.headers.get('content-length') || undefined;
     const contentRange = upstream.headers.get('content-range') || undefined;
     const acceptRanges = upstream.headers.get('accept-ranges') || 'bytes';

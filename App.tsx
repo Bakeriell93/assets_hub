@@ -12,9 +12,87 @@ import { authService } from './services/authService';
 import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, MARKETS, CAR_MODELS, PLATFORMS } from './types';
 
 type SortOption = 'newest' | 'ctr' | 'cr' | 'cpl';
-type ViewMode = 'repository' | 'analytics' | 'collections';
+type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
 
 const SESSION_STORAGE_KEY = 'byd_assets_hub_session';
+
+// Video Player Component with error handling
+const VideoPlayerComponent: React.FC<{
+  videoUrl: string;
+  videoFormat: string | null;
+  isLikelyUnsupported: boolean;
+  originalUrl: string;
+}> = ({ videoUrl, videoFormat, isLikelyUnsupported, originalUrl }) => {
+  const [videoError, setVideoError] = useState<string | null>(null);
+  
+  return (
+    <div className="w-full flex items-center justify-center bg-black p-6 relative">
+      {videoError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 p-8 text-center">
+          <div className="max-w-md">
+            <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+            </svg>
+            <h3 className="text-xl font-black text-white mb-2 uppercase tracking-wider">Video Format Not Supported</h3>
+            <p className="text-sm text-gray-300 mb-4">
+              {isLikelyUnsupported 
+                ? 'This video format (.mov, .avi, etc.) is not natively supported by your browser. Please download the file to view it.'
+                : 'Your browser cannot play this video format. Please try downloading the file.'}
+            </p>
+            <a
+              href={videoUrl}
+              download
+              className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-blue-700 transition-all"
+            >
+              Download Video
+            </a>
+          </div>
+        </div>
+      )}
+      <video 
+        key={videoUrl}
+        src={videoUrl}
+        controls 
+        className="w-full h-auto max-h-[90vh]" 
+        playsInline
+        preload="auto"
+        crossOrigin="anonymous"
+        onLoadedData={(e) => {
+          console.log('Video loaded successfully:', {
+            duration: e.currentTarget.duration,
+            videoWidth: e.currentTarget.videoWidth,
+            videoHeight: e.currentTarget.videoHeight,
+            format: videoFormat
+          });
+          setVideoError(null);
+        }}
+        onError={(e) => {
+          const video = e.currentTarget;
+          const error = video.error;
+          console.error('Video playback error:', {
+            code: error?.code,
+            message: error?.message,
+            url: videoUrl,
+            format: videoFormat,
+            networkState: video.networkState,
+            readyState: video.readyState
+          });
+          
+          // Show error message for format errors (code 4 = MEDIA_ELEMENT_ERROR)
+          if (error?.code === 4 || error?.message?.includes('Format') || error?.message?.includes('decode') || error?.message?.includes('MEDIA_ELEMENT_ERROR')) {
+            setVideoError('format');
+          } else {
+            setVideoError('network');
+          }
+        }}
+      >
+        <source src={videoUrl} type={videoFormat || undefined} />
+        Your browser does not support the video tag.
+        <a href={videoUrl} download className="text-blue-400 underline">Download the video</a> instead.
+      </video>
+    </div>
+  );
+};
 
 function App() {
   const [currentUser, setCurrentUser] = useState<User | null>(null);
@@ -49,6 +127,10 @@ function App() {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
+  
+  // Upload Progress
+  const [uploadProgress, setUploadProgress] = useState<number | null>(null);
+  const [uploadStatus, setUploadStatus] = useState<string>('');
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -72,7 +154,19 @@ function App() {
       const unsubUsers = storageService.subscribeToUsers(setUsers);
       const unsubCollections = storageService.subscribeToCollections(setCollections);
       
-      return () => { unsubAssets(); unsubConfig(); unsubUsers(); unsubCollections(); };
+      // Run cleanup on mount and set up periodic cleanup (every hour)
+      storageService.cleanupDeletedAssets();
+      const cleanupInterval = setInterval(() => {
+        storageService.cleanupDeletedAssets();
+      }, 60 * 60 * 1000); // Every hour
+      
+      return () => { 
+        unsubAssets(); 
+        unsubConfig(); 
+        unsubUsers(); 
+        unsubCollections();
+        clearInterval(cleanupInterval);
+      };
     }
   }, [isLoggedIn]);
 
@@ -139,10 +233,27 @@ function App() {
         return;
       }
       
-      await storageService.addAsset(data, file);
-      setIsAssetModalOpen(false);
+      // Show progress bar
+      setUploadProgress(0);
+      setUploadStatus('Uploading asset...');
+      
+      await storageService.addAsset(data, file, (progress) => {
+        setUploadProgress(progress);
+      });
+      
+      setUploadProgress(100);
+      setUploadStatus('Upload complete!');
+      
+      // Close modal and reset progress after a brief delay
+      setTimeout(() => {
+        setIsAssetModalOpen(false);
+        setUploadProgress(null);
+        setUploadStatus('');
+      }, 500);
     } catch (error: any) {
       console.error('Failed to save asset:', error);
+      setUploadProgress(null);
+      setUploadStatus('');
       alert(`Failed to upload asset: ${error.message || 'Unknown error'}`);
       // Don't close modal on error so user can retry
     }
@@ -155,14 +266,36 @@ function App() {
         return;
       }
 
+      // Show progress bar
+      setUploadProgress(0);
+      setUploadStatus(`Uploading package (0/${packageAssets.length})...`);
+
       // Upload all assets in the package
-      for (const { asset, file } of packageAssets) {
-        await storageService.addAsset(asset, file);
+      for (let i = 0; i < packageAssets.length; i++) {
+        const { asset, file } = packageAssets[i];
+        const assetProgress = (i / packageAssets.length) * 100;
+        
+        await storageService.addAsset(asset, file, (progress) => {
+          // Calculate overall progress: previous assets + current asset progress
+          const overallProgress = assetProgress + (progress / packageAssets.length);
+          setUploadProgress(overallProgress);
+          setUploadStatus(`Uploading package (${i + 1}/${packageAssets.length}): ${asset.title || 'Asset'}`);
+        });
       }
 
-      setIsAssetModalOpen(false);
+      setUploadProgress(100);
+      setUploadStatus('Package upload complete!');
+
+      // Close modal and reset progress after a brief delay
+      setTimeout(() => {
+        setIsAssetModalOpen(false);
+        setUploadProgress(null);
+        setUploadStatus('');
+      }, 500);
     } catch (error: any) {
       console.error('Failed to save package:', error);
+      setUploadProgress(null);
+      setUploadStatus('');
       alert(`Failed to upload package: ${error.message || 'Unknown error'}`);
     }
   };
@@ -208,6 +341,13 @@ function App() {
   };
 
   const filteredAssets = assets.filter(a => {
+    // In trash view, only show deleted assets. In other views, exclude deleted assets.
+    if (viewMode === 'trash') {
+      if (!a.deletedAt) return false; // Not deleted, don't show in trash
+    } else {
+      if (a.deletedAt) return false; // Deleted, don't show in main views
+    }
+    
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || a.carModel === selectedModel;
     const pMatch = selectedPlatform === 'All' || a.platform === selectedPlatform;
@@ -244,6 +384,11 @@ function App() {
   const sortedAssets = [
     ...packageGroups.map(g => g.representative),
     ...standaloneAssets.sort((a, b) => {
+      // In trash view, sort by deletedAt (most recently deleted first)
+      if (viewMode === 'trash') {
+        return (b.deletedAt || 0) - (a.deletedAt || 0);
+      }
+      // In other views, use normal sorting
       if (sortBy === 'ctr') return (b.ctr || 0) - (a.ctr || 0);
       if (sortBy === 'cr') return (b.cr || 0) - (a.cr || 0);
       if (sortBy === 'cpl') return (a.cpl || 999) - (b.cpl || 999);
@@ -276,7 +421,8 @@ function App() {
                  {[
                    { id: 'repository', label: 'HUB' },
                    { id: 'analytics', label: 'ANALYTICS' },
-                   { id: 'collections', label: 'PROJECTS' }
+                   { id: 'collections', label: 'PROJECTS' },
+                   { id: 'trash', label: 'TRASH' }
                  ].map(v => (
                    <button 
                     key={v.id}
@@ -382,6 +528,8 @@ function App() {
                         onPreview={setPreviewAsset}
                         onEdit={(a) => { setEditingAsset(a); setIsAssetModalOpen(true); }}
                         onDelete={storageService.deleteAsset}
+                        onRestore={storageService.restoreAsset}
+                        isTrashView={viewMode === 'trash'}
                       />
                     );
                   })}
@@ -553,6 +701,62 @@ function App() {
                 </div>
               </div>
             )}
+
+            {viewMode === 'trash' && (
+              <div className="space-y-16 animate-in zoom-in-95 duration-500">
+                <div className="flex items-center justify-between">
+                  <div>
+                    <h2 className="text-6xl font-black text-gray-900 tracking-tighter uppercase leading-none">TRASH</h2>
+                    <p className="text-[12px] font-black text-gray-400 mt-4 uppercase tracking-[0.4em]">Deleted Assets (Auto-deleted after 3 days)</p>
+                  </div>
+                  <div className="text-right">
+                    <p className="text-7xl font-black text-red-600 leading-none tracking-tighter">
+                      {assets.filter(a => a.deletedAt).length}
+                    </p>
+                    <p className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mt-3">Deleted Items</p>
+                  </div>
+                </div>
+
+                {filteredAssets.length > 0 ? (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
+                    {sortedAssets.map(asset => {
+                      const packageAssets = asset.packageId 
+                        ? packageMap.get(asset.packageId) || [asset]
+                        : [asset];
+                      const daysUntilPermanent = asset.deletedAt 
+                        ? Math.ceil((3 * 24 * 60 * 60 * 1000 - (Date.now() - asset.deletedAt)) / (24 * 60 * 60 * 1000))
+                        : 0;
+                      
+                      return (
+                        <div key={asset.id} className="relative">
+                          <AssetCard 
+                            asset={asset}
+                            packageAssets={packageAssets}
+                            userRole={currentUser?.role!}
+                            onPreview={setPreviewAsset}
+                            onEdit={(a) => { setEditingAsset(a); setIsAssetModalOpen(true); }}
+                            onDelete={storageService.deleteAsset}
+                            onRestore={storageService.restoreAsset}
+                            isTrashView={true}
+                          />
+                          {daysUntilPermanent > 0 && (
+                            <div className="absolute bottom-4 left-4 right-4 bg-red-50 border-2 border-red-200 rounded-xl p-2 text-center">
+                              <p className="text-[10px] font-black text-red-600 uppercase tracking-widest">
+                                Auto-deletes in {daysUntilPermanent} day{daysUntilPermanent !== 1 ? 's' : ''}
+                              </p>
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                ) : (
+                  <div className="py-48 text-center border-4 border-dashed border-gray-100 rounded-[64px] bg-gray-50/30">
+                    <p className="text-sm font-black text-gray-300 uppercase tracking-[0.6em]">TRASH IS EMPTY</p>
+                  </div>
+                )}
+              </div>
+            )}
           </div>
         </main>
       </div>
@@ -582,7 +786,44 @@ function App() {
         isOpen={isBulkUploadOpen}
         onClose={() => setIsBulkUploadOpen(false)}
         config={config}
+        onProgress={(progress, status) => {
+          setUploadProgress(progress);
+          setUploadStatus(status);
+          if (progress === 0 && !status) {
+            // Reset after delay
+            setTimeout(() => {
+              setUploadProgress(null);
+              setUploadStatus('');
+            }, 500);
+          }
+        }}
       />
+      
+      {/* Upload Progress Bar */}
+      {uploadProgress !== null && (
+        <div className="fixed inset-0 z-[300] flex items-center justify-center p-6">
+          <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={(e) => e.stopPropagation()}></div>
+          <div className="relative w-full max-w-md bg-white rounded-3xl shadow-2xl p-8 space-y-6" onClick={(e) => e.stopPropagation()}>
+            <div className="space-y-4">
+              <h3 className="text-2xl font-black text-gray-900 tracking-tight">Uploading Asset</h3>
+              {uploadStatus && (
+                <p className="text-sm font-bold text-gray-600">{uploadStatus}</p>
+              )}
+              <div className="w-full bg-gray-200 rounded-full h-3 overflow-hidden">
+                <div 
+                  className="h-full bg-blue-600 rounded-full transition-all duration-300 ease-out"
+                  style={{ width: `${uploadProgress}%` }}
+                >
+                  <div className="h-full w-full bg-gradient-to-r from-blue-500 to-blue-600 animate-pulse"></div>
+                </div>
+              </div>
+              <p className="text-xs font-black text-gray-400 text-center uppercase tracking-widest">
+                {Math.round(uploadProgress)}% Complete
+              </p>
+            </div>
+          </div>
+        </div>
+      )}
       
       {/* Preview Modal */}
       {previewAsset && (
@@ -615,40 +856,41 @@ function App() {
                 return url;
               };
               
-              const videoUrl = getVideoUrl(previewAsset.url);
+              // Detect video format from URL
+              const detectVideoFormat = (url: string): string | null => {
+                try {
+                  const u = new URL(url);
+                  const path = u.pathname.toLowerCase();
+                  const ext = path.split('.').pop() || '';
+                  const formatMap: Record<string, string> = {
+                    'mp4': 'video/mp4',
+                    'webm': 'video/webm',
+                    'ogg': 'video/ogg',
+                    'ogv': 'video/ogg',
+                    'mov': 'video/quicktime',
+                    'avi': 'video/x-msvideo',
+                    'wmv': 'video/x-ms-wmv',
+                    'flv': 'video/x-flv',
+                    'mkv': 'video/x-matroska',
+                    '3gp': 'video/3gpp',
+                    'm4v': 'video/mp4',
+                  };
+                  return formatMap[ext] || null;
+                } catch {
+                  return null;
+                }
+              };
               
-              return (
-                <div className="w-full flex items-center justify-center bg-black p-6">
-                  <video 
-                    key={videoUrl}
-                    src={videoUrl} 
-                    controls 
-                    className="w-full h-auto max-h-[90vh]" 
-                    playsInline
-                    preload="auto"
-                    onLoadedData={(e) => {
-                      console.log('Video loaded successfully:', {
-                        duration: e.currentTarget.duration,
-                        videoWidth: e.currentTarget.videoWidth,
-                        videoHeight: e.currentTarget.videoHeight
-                      });
-                    }}
-                    onError={(e) => {
-                      const video = e.currentTarget;
-                      const error = video.error;
-                      console.error('Video playback error:', {
-                        code: error?.code,
-                        message: error?.message,
-                        url: videoUrl,
-                        networkState: video.networkState,
-                        readyState: video.readyState
-                      });
-                    }}
-                  >
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
-              );
+              const videoUrl = getVideoUrl(previewAsset.url);
+              const videoFormat = detectVideoFormat(previewAsset.url);
+              const isLikelyUnsupported = previewAsset.url.toLowerCase().match(/\.(mov|avi|wmv|flv|mkv|3gp)$/);
+              
+              return <VideoPlayerComponent 
+                videoUrl={videoUrl} 
+                videoFormat={videoFormat} 
+                isLikelyUnsupported={!!isLikelyUnsupported}
+                originalUrl={previewAsset.url}
+              />;
             })()}
             {previewAsset.type === 'text' && (
               <div className="p-12 max-h-[90vh] overflow-y-auto">

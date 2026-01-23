@@ -10,9 +10,11 @@ interface AssetCardProps {
   onPreview: (asset: Asset) => void;
   onEdit: (asset: Asset) => void;
   onDelete: (id: string) => void;
+  onRestore?: (id: string) => void;
+  isTrashView?: boolean;
 }
 
-const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, onPreview, onEdit, onDelete }) => {
+const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, onPreview, onEdit, onDelete, onRestore, isTrashView = false }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
@@ -21,6 +23,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const isHighPerformer = (asset.ctr && asset.ctr > 2) || (asset.cr && asset.cr > 1.5);
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
+  const canDelete = userRole === 'Editor' || userRole === 'Admin'; // Editor can now delete
 
   // Generate video thumbnail
   useEffect(() => {
@@ -222,20 +225,32 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         </div>
       )}
 
-      {isAdmin && !isConfirmingDelete && (
+      {canDelete && !isConfirmingDelete && !isTrashView && (
         <button 
           onClick={handleDelete}
           className="absolute top-4 right-4 z-20 p-2.5 bg-red-50 text-red-600 rounded-2xl opacity-0 group-hover:opacity-100 transition-all hover:bg-red-600 hover:text-white hover:scale-110 shadow-lg"
-          title="Archive Asset"
+          title="Move to Trash"
         >
           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+        </button>
+      )}
+      
+      {isTrashView && onRestore && (
+        <button 
+          onClick={(e) => { e.stopPropagation(); onRestore(asset.id); }}
+          className="absolute top-4 right-4 z-20 p-2.5 bg-green-50 text-green-600 rounded-2xl opacity-0 group-hover:opacity-100 transition-all hover:bg-green-600 hover:text-white hover:scale-110 shadow-lg"
+          title="Restore Asset"
+        >
+          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M4 4v5h.582m15.356 2A8.001 8.001 0 004.582 9m0 0H9m11 11v-5h-.581m0 0a8.003 8.003 0 01-15.357-2m15.357 2H15" /></svg>
         </button>
       )}
 
       {/* Confirmation Overlay for Sandbox compatibility */}
       {isConfirmingDelete && (
         <div className="absolute inset-0 z-40 bg-red-600/95 flex flex-col items-center justify-center p-6 text-center animate-in fade-in duration-200" onClick={e => e.stopPropagation()}>
-            <p className="text-white text-xs font-black uppercase tracking-[0.2em] mb-4">Permanent Deletion?</p>
+            <p className="text-white text-xs font-black uppercase tracking-[0.2em] mb-4">
+              {isTrashView ? 'Permanent Deletion?' : 'Move to Trash?'}
+            </p>
             <div className="flex gap-3">
                 <button onClick={confirmDelete} className="px-5 py-2.5 bg-white text-red-600 rounded-xl text-[10px] font-black uppercase tracking-widest shadow-xl">Confirm</button>
                 <button onClick={(e) => { e.stopPropagation(); setIsConfirmingDelete(false); }} className="px-5 py-2.5 bg-red-800 text-white rounded-xl text-[10px] font-black uppercase tracking-widest">Cancel</button>

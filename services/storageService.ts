@@ -26,7 +26,7 @@ import {
   where, 
   limit
 } from "firebase/firestore";
-import { ref, uploadBytes, getDownloadURL } from "firebase/storage";
+import { ref, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
 import { Asset, AssetStatus, Market, CarModel, Platform, User, SystemConfig, MARKETS, CAR_MODELS, PLATFORMS, Collection } from '../types';
 
 const ASSETS_COLLECTION = 'assets';
@@ -381,7 +381,7 @@ export const storageService = {
     }
   },
 
-  addAsset: async (asset: Omit<Asset, 'id' | 'createdAt' | 'size' | 'status'>, file?: File): Promise<void> => {
+  addAsset: async (asset: Omit<Asset, 'id' | 'createdAt' | 'size' | 'status'>, file?: File, onProgress?: (progress: number) => void): Promise<void> => {
     let publicUrl = asset.url;
     let size = 0;
 
@@ -391,7 +391,9 @@ export const storageService = {
 
         if (!isCloudEnabled || !storage) {
           // Local fallback: store file as data URL (works in AI Studio too)
+          if (onProgress) onProgress(50); // Simulate progress
           publicUrl = await fileToDataUrl(file);
+          if (onProgress) onProgress(100);
         } else {
           try {
             // Preserve original filename for videos and other files
@@ -407,25 +409,54 @@ export const storageService = {
               }
             };
             
-            const snapshot = await uploadBytes(storageRef, file, metadata);
-            publicUrl = await getDownloadURL(snapshot.ref);
+            // Use uploadBytesResumable for progress tracking
+            const uploadTask = uploadBytesResumable(storageRef, file, metadata);
+            
+            // Track upload progress
+            await new Promise<void>((resolve, reject) => {
+              uploadTask.on('state_changed', 
+                (snapshot) => {
+                  // Calculate progress percentage
+                  const progress = (snapshot.bytesTransferred / snapshot.totalBytes) * 100;
+                  if (onProgress) {
+                    // Cap at 90% until we get the download URL
+                    onProgress(Math.min(90, progress));
+                  }
+                },
+                (error) => {
+                  console.error('Upload error:', error);
+                  reject(error);
+                },
+                async () => {
+                  // Upload completed successfully
+                  if (onProgress) onProgress(95);
+                  const snapshot = await uploadTask;
+                  publicUrl = await getDownloadURL(snapshot.ref);
+                  if (onProgress) onProgress(100);
+                  resolve();
+                }
+              );
+            });
             
             console.log('File uploaded successfully:', {
               type: file.type,
               size: file.size,
               fileName: file.name,
               url: publicUrl.substring(0, 100) + '...',
-              storagePath: snapshot.ref.fullPath
+              storagePath: uploadTask.snapshot.ref.fullPath
             });
           } catch (uploadError) {
             console.error('Firebase Storage upload failed:', uploadError);
             // Fallback to data URL if Firebase Storage fails
+            if (onProgress) onProgress(50);
             publicUrl = await fileToDataUrl(file);
+            if (onProgress) onProgress(100);
             console.warn('Using data URL fallback for asset');
           }
         }
       } else if (asset.content) {
         size = new Blob([asset.content]).size;
+        if (onProgress) onProgress(100);
       }
 
       // Filter out undefined values (Firestore doesn't allow undefined)
@@ -490,20 +521,269 @@ export const storageService = {
     }
   },
 
+  // Helper function to extract storage path from Firebase Storage URL
+  extractStoragePath: (url: string): string | null => {
+    try {
+      const u = new URL(url);
+      if (u.hostname === 'firebasestorage.googleapis.com' || u.hostname === 'storage.googleapis.com') {
+        // URL format: https://firebasestorage.googleapis.com/v0/b/BUCKET/o/PATH%2FTO%2FFILE?alt=media&token=...
+        const pathMatch = u.pathname.match(/\/o\/(.+)/);
+        if (pathMatch) {
+          return decodeURIComponent(pathMatch[1]);
+        }
+      }
+    } catch {
+      // Not a Firebase Storage URL (could be data URL or other)
+    }
+    return null;
+  },
+
+  // Helper function to delete a file from Storage
+  deleteFileFromStorage: async (url: string, assetId: string): Promise<void> => {
+    if (!url || !storage) return;
+    
+    const storagePath = storageService.extractStoragePath(url);
+    if (storagePath) {
+      try {
+        const fileRef = ref(storage, storagePath);
+        await deleteObject(fileRef);
+        console.log(`File deleted from Storage: ${storagePath} (asset: ${assetId})`);
+      } catch (storageError: any) {
+        // If file doesn't exist in storage (already deleted or never existed), log but don't fail
+        if (storageError.code !== 'storage/object-not-found') {
+          console.warn(`Failed to delete file from Storage (asset: ${assetId}):`, storageError);
+        }
+      }
+    }
+  },
+
+  // Soft delete - moves asset to trash (sets deletedAt timestamp)
   deleteAsset: async (id: string): Promise<void> => {
+    try {
+      const now = Date.now();
+      
+      if (!isCloudEnabled) {
+        const existing = readLS<Asset[]>(LS_KEYS.assets, []);
+        const updated = existing.map(a => 
+          a.id === id ? { ...a, deletedAt: now } : a
+        );
+        writeLS(LS_KEYS.assets, updated);
+        await storageService.logSecurityEvent(`Asset Moved to Trash (local): ${id}`, 'low');
+        return;
+      }
+
+      // Get the asset to check for package
+      const assetRef = doc(db!, ASSETS_COLLECTION, id);
+      const assetSnap = await getDoc(assetRef);
+      
+      if (!assetSnap.exists()) {
+        throw new Error('Asset not found');
+      }
+
+      const asset = { id: assetSnap.id, ...assetSnap.data() } as Asset;
+      const packageId = asset.packageId;
+
+      // If this is part of a package, move all package assets to trash
+      if (packageId) {
+        const packageQuery = query(
+          collection(db!, ASSETS_COLLECTION),
+          where('packageId', '==', packageId)
+        );
+        const packageSnapshot = await getDocs(packageQuery);
+        
+        // Filter out already deleted assets
+        const nonDeletedDocs = packageSnapshot.docs.filter(docSnap => !docSnap.data().deletedAt);
+        
+        // Soft delete all package assets
+        const updatePromises = nonDeletedDocs.map(docSnap => 
+          updateDoc(docSnap.ref, { deletedAt: now })
+        );
+        
+        await Promise.all(updatePromises);
+        await storageService.logSecurityEvent(`Package Moved to Trash: ${packageId} (${nonDeletedDocs.length} assets)`, 'low');
+      } else {
+        // Single asset - soft delete
+        await updateDoc(assetRef, { deletedAt: now });
+        await storageService.logSecurityEvent(`Asset Moved to Trash: ${id}`, 'low');
+      }
+    } catch (error) {
+      handleError('deleteAsset', error);
+      throw error;
+    }
+  },
+
+  // Restore asset from trash (removes deletedAt)
+  restoreAsset: async (id: string): Promise<void> => {
+    try {
+      if (!isCloudEnabled) {
+        const existing = readLS<Asset[]>(LS_KEYS.assets, []);
+        const updated = existing.map(a => 
+          a.id === id ? { ...a, deletedAt: undefined } : a
+        );
+        writeLS(LS_KEYS.assets, updated);
+        await storageService.logSecurityEvent(`Asset Restored (local): ${id}`, 'low');
+        return;
+      }
+
+      // Get the asset to check for package
+      const assetRef = doc(db!, ASSETS_COLLECTION, id);
+      const assetSnap = await getDoc(assetRef);
+      
+      if (!assetSnap.exists()) {
+        throw new Error('Asset not found');
+      }
+
+      const asset = { id: assetSnap.id, ...assetSnap.data() } as Asset;
+      const packageId = asset.packageId;
+
+      // If this is part of a package, restore all package assets
+      if (packageId) {
+        const packageQuery = query(
+          collection(db!, ASSETS_COLLECTION),
+          where('packageId', '==', packageId)
+        );
+        const packageSnapshot = await getDocs(packageQuery);
+        
+        // Restore all package assets (only those that are deleted)
+        const deletedDocs = packageSnapshot.docs.filter(docSnap => docSnap.data().deletedAt);
+        const updatePromises = deletedDocs.map(docSnap => {
+          const updateData: any = { deletedAt: null };
+          return updateDoc(docSnap.ref, updateData);
+        });
+        
+        await Promise.all(updatePromises);
+        await storageService.logSecurityEvent(`Package Restored: ${packageId}`, 'low');
+      } else {
+        // Single asset - restore
+        await updateDoc(assetRef, { deletedAt: null });
+        await storageService.logSecurityEvent(`Asset Restored: ${id}`, 'low');
+      }
+    } catch (error) {
+      handleError('restoreAsset', error);
+      throw error;
+    }
+  },
+
+  // Permanently delete asset (removes from Storage and Firestore)
+  permanentlyDeleteAsset: async (id: string): Promise<void> => {
     try {
       if (!isCloudEnabled) {
         const existing = readLS<Asset[]>(LS_KEYS.assets, []);
         writeLS(LS_KEYS.assets, existing.filter(a => a.id !== id));
-        await storageService.logSecurityEvent(`Asset Deleted (local): ${id}`, 'medium');
+        await storageService.logSecurityEvent(`Asset Permanently Deleted (local): ${id}`, 'medium');
         return;
       }
 
-      await deleteDoc(doc(db!, ASSETS_COLLECTION, id));
-      await storageService.logSecurityEvent(`Asset Deleted: ${id}`, 'medium');
+      // First, get the asset to retrieve its URL and check for package
+      const assetRef = doc(db!, ASSETS_COLLECTION, id);
+      const assetSnap = await getDoc(assetRef);
+      
+      if (!assetSnap.exists()) {
+        throw new Error('Asset not found');
+      }
+
+      const asset = { id: assetSnap.id, ...assetSnap.data() } as Asset;
+      const packageId = asset.packageId;
+
+      // If this is part of a package, permanently delete all package assets
+      if (packageId) {
+        const packageQuery = query(
+          collection(db!, ASSETS_COLLECTION),
+          where('packageId', '==', packageId)
+        );
+        const packageSnapshot = await getDocs(packageQuery);
+        
+        // Permanently delete all package assets from Storage and Firestore
+        const deletePromises = packageSnapshot.docs.map(async (docSnap) => {
+          const pkgAsset = { id: docSnap.id, ...docSnap.data() } as Asset;
+          
+          // Delete file from Storage
+          await storageService.deleteFileFromStorage(pkgAsset.url, pkgAsset.id);
+          
+          // Delete Firestore document
+          return deleteDoc(docSnap.ref);
+        });
+        
+        await Promise.all(deletePromises);
+        await storageService.logSecurityEvent(`Package Permanently Deleted: ${packageId} (${packageSnapshot.docs.length} assets)`, 'medium');
+      } else {
+        // Single asset - delete file from Storage first, then Firestore document
+        await storageService.deleteFileFromStorage(asset.url, asset.id);
+        await deleteDoc(assetRef);
+        await storageService.logSecurityEvent(`Asset Permanently Deleted: ${id}`, 'medium');
+      }
     } catch (error) {
-      handleError('deleteAsset', error);
+      handleError('permanentlyDeleteAsset', error);
       throw error;
+    }
+  },
+
+  // Cleanup deleted assets older than 3 days (auto-permanent delete)
+  cleanupDeletedAssets: async (): Promise<void> => {
+    try {
+      const threeDaysAgo = Date.now() - (3 * 24 * 60 * 60 * 1000); // 3 days in milliseconds
+      
+      if (!isCloudEnabled) {
+        const existing = readLS<Asset[]>(LS_KEYS.assets, []);
+        const toDelete = existing.filter(a => a.deletedAt && a.deletedAt < threeDaysAgo);
+        const remaining = existing.filter(a => !a.deletedAt || a.deletedAt >= threeDaysAgo);
+        writeLS(LS_KEYS.assets, remaining);
+        
+        if (toDelete.length > 0) {
+          console.log(`Auto-deleted ${toDelete.length} assets from trash (local)`);
+          await storageService.logSecurityEvent(`Auto-cleanup: ${toDelete.length} assets permanently deleted`, 'low');
+        }
+        return;
+      }
+
+      // Find all assets (we'll filter by deletedAt in code since Firestore can't query null efficiently)
+      const allAssetsQuery = query(collection(db!, ASSETS_COLLECTION));
+      const snapshot = await getDocs(allAssetsQuery);
+      
+      const assetsToDelete: Asset[] = [];
+      snapshot.forEach((docSnap) => {
+        const asset = { id: docSnap.id, ...docSnap.data() } as Asset;
+        if (asset.deletedAt && asset.deletedAt < threeDaysAgo) {
+          assetsToDelete.push(asset);
+        }
+      });
+
+      if (assetsToDelete.length === 0) {
+        return; // Nothing to clean up
+      }
+
+      // Group by packageId to avoid duplicate package deletions
+      const packageIds = new Set<string>();
+      const standaloneAssets: Asset[] = [];
+
+      assetsToDelete.forEach(asset => {
+        if (asset.packageId) {
+          packageIds.add(asset.packageId);
+        } else {
+          standaloneAssets.push(asset);
+        }
+      });
+
+      // Permanently delete standalone assets
+      for (const asset of standaloneAssets) {
+        await storageService.permanentlyDeleteAsset(asset.id);
+      }
+
+      // Permanently delete packages (one call per package will delete all assets in it)
+      for (const packageId of packageIds) {
+        const packageAssets = assetsToDelete.filter(a => a.packageId === packageId);
+        if (packageAssets.length > 0) {
+          // Delete the first asset in the package, which will delete the whole package
+          await storageService.permanentlyDeleteAsset(packageAssets[0].id);
+        }
+      }
+
+      console.log(`Auto-deleted ${assetsToDelete.length} assets from trash`);
+      await storageService.logSecurityEvent(`Auto-cleanup: ${assetsToDelete.length} assets permanently deleted`, 'low');
+    } catch (error) {
+      handleError('cleanupDeletedAssets', error);
+      // Don't throw - this is a background cleanup task
+      console.error('Cleanup error (non-fatal):', error);
     }
   },
 

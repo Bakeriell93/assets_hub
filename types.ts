@@ -62,6 +62,8 @@ export interface Asset {
   // Package grouping
   packageId?: string; // If set, this asset is part of a package
   packageOrder?: number; // Order within package
+  // Soft delete (trash)
+  deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
 }
 
 export interface SystemConfig {

@@ -6,6 +6,7 @@ interface BulkUploadModalProps {
   isOpen: boolean;
   onClose: () => void;
   config: SystemConfig;
+  onProgress?: (progress: number, status: string) => void;
 }
 
 interface BulkUploadItem {
@@ -29,7 +30,7 @@ interface BulkUploadItem {
   isPublished: boolean;
 }
 
-const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, config }) => {
+const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, config, onProgress }) => {
   const [items, setItems] = useState<BulkUploadItem[]>([]);
   const [isUploading, setIsUploading] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -126,8 +127,14 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
     }
 
     setIsUploading(true);
+    if (onProgress) {
+      onProgress(0, `Starting upload of ${unpublished.length} asset(s)...`);
+    }
     try {
-      for (const item of unpublished) {
+      for (let i = 0; i < unpublished.length; i++) {
+        const item = unpublished[i];
+        const assetProgress = (i / unpublished.length) * 100;
+        
         const assetData = {
           title: item.title,
           type: item.type,
@@ -145,12 +152,23 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
           ...(item.type === 'text' && item.content ? { content: item.content } : {})
         };
 
-        await storageService.addAsset(assetData, item.type === 'text' ? undefined : item.file);
+        await storageService.addAsset(assetData, item.type === 'text' ? undefined : item.file, (progress) => {
+          if (onProgress) {
+            const overallProgress = assetProgress + (progress / unpublished.length);
+            onProgress(overallProgress, `Uploading ${i + 1}/${unpublished.length}: ${item.title}`);
+          }
+        });
         updateItem(item.id, { isPublished: true });
+      }
+      if (onProgress) {
+        onProgress(100, 'Upload complete!');
       }
       alert(`Successfully published ${unpublished.length} asset(s)!`);
     } catch (error: any) {
       console.error('Bulk upload error:', error);
+      if (onProgress) {
+        onProgress(0, '');
+      }
       alert(`Failed to publish some assets: ${error.message || 'Unknown error'}`);
     } finally {
       setIsUploading(false);
@@ -172,6 +190,9 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
     }
 
     setIsUploading(true);
+    if (onProgress) {
+      onProgress(0, `Uploading ${item.title}...`);
+    }
     try {
       const assetData = {
         title: item.title,
@@ -190,10 +211,21 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
         ...(item.type === 'text' && item.content ? { content: item.content } : {})
       };
 
-      await storageService.addAsset(assetData, item.type === 'text' ? undefined : item.file);
+      await storageService.addAsset(assetData, item.type === 'text' ? undefined : item.file, (progress) => {
+        if (onProgress) {
+          onProgress(progress, `Uploading ${item.title}...`);
+        }
+      });
+      if (onProgress) {
+        onProgress(100, 'Upload complete!');
+        setTimeout(() => onProgress(0, ''), 500);
+      }
       updateItem(item.id, { isPublished: true });
     } catch (error: any) {
       console.error('Publish error:', error);
+      if (onProgress) {
+        onProgress(0, '');
+      }
       alert(`Failed to publish: ${error.message || 'Unknown error'}`);
     } finally {
       setIsUploading(false);
