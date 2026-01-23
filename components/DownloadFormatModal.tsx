@@ -38,6 +38,8 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
 
   const originalFormat = detectOriginalFormat(asset.url);
   const isDesignFile = asset.type === 'design' || ['psd', 'ai', 'eps', 'svg'].includes(originalFormat);
+  const isVideo = asset.type === 'video';
+  const isImage = asset.type === 'image' && !isDesignFile;
 
   const handleDownload = async () => {
     setIsDownloading(true);
@@ -45,7 +47,9 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
       if (selectedAssetId === 'all' && onDownloadAll) {
         await onDownloadAll();
       } else {
-        await onDownload(selectedFormat, selectedAssetId === 'all' ? undefined : selectedAssetId);
+        // For videos and design files, always use 'original'
+        const formatToUse = (isVideo || isDesignFile) ? 'original' : selectedFormat;
+        await onDownload(formatToUse, selectedAssetId === 'all' ? undefined : selectedAssetId);
       }
       onClose();
     } catch (err) {
@@ -56,10 +60,10 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
   };
 
   const formatOptions: Array<{ value: 'original' | 'webp' | 'png' | 'jpg'; label: string; available: boolean }> = [
-    { value: 'original', label: `Original (${originalFormat.toUpperCase()})`, available: true },
-    { value: 'webp', label: 'WebP', available: asset.type === 'image' && !isDesignFile },
-    { value: 'png', label: 'PNG', available: asset.type === 'image' && !isDesignFile },
-    { value: 'jpg', label: 'JPG', available: asset.type === 'image' && !isDesignFile },
+    { value: 'original', label: isVideo ? 'Original Video' : isDesignFile ? `Original (${originalFormat.toUpperCase()})` : `Original (${originalFormat.toUpperCase()})`, available: true },
+    { value: 'webp', label: 'WebP', available: isImage },
+    { value: 'png', label: 'PNG', available: isImage },
+    { value: 'jpg', label: 'JPG', available: isImage },
   ];
 
   return (
@@ -133,17 +137,15 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
 
         {!isPackage && (
           <div className="space-y-3">
-            {formatOptions.map((option) => (
+            {formatOptions.filter(opt => opt.available).map((option) => (
               <button
                 key={option.value}
-                onClick={() => option.available && setSelectedFormat(option.value)}
-                disabled={!option.available || isDownloading}
+                onClick={() => setSelectedFormat(option.value)}
+                disabled={isDownloading}
                 className={`w-full p-4 rounded-2xl border-2 transition-all text-left ${
                   selectedFormat === option.value
                     ? 'border-blue-600 bg-blue-50 text-blue-900'
-                    : option.available
-                    ? 'border-gray-200 bg-white text-gray-900 hover:border-blue-300 hover:bg-gray-50'
-                    : 'border-gray-100 bg-gray-50 text-gray-400 cursor-not-allowed opacity-60'
+                    : 'border-gray-200 bg-white text-gray-900 hover:border-blue-300 hover:bg-gray-50'
                 }`}
               >
                 <div className="flex items-center justify-between">

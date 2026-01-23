@@ -107,9 +107,14 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         const res = await fetch(fetchUrl, { method: 'GET' });
         if (!res.ok) throw new Error(`HTTP ${res.status}`);
         blob = await res.blob();
-      } else {
+      } else if (targetAsset.type === 'image') {
         // Convert format - fetch once, convert client-side (no extra API calls)
         blob = await convertImageFormat(targetAsset.url, format);
+      } else {
+        // For videos and design files, always download original
+        const res = await fetch(fetchUrl, { method: 'GET' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        blob = await res.blob();
       }
 
       const blobUrl = URL.createObjectURL(blob);
@@ -211,10 +216,25 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
           <img src={asset.url} alt={asset.title} className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" />
         )}
         {asset.type === 'video' && asset.url && (
-            <div className="relative w-full h-full">
-               <img src={asset.url} alt={asset.title} className="w-full h-full object-cover opacity-90" />
-               <div className="absolute inset-0 flex items-center justify-center bg-black/10">
-                   <div className="w-14 h-14 bg-white rounded-full flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110">
+            <div className="relative w-full h-full bg-gray-900">
+               <video 
+                 src={asset.url} 
+                 className="w-full h-full object-cover"
+                 preload="metadata"
+                 muted
+                 playsInline
+                 onLoadedMetadata={(e) => {
+                   // Seek to 0.1 seconds to show a frame as thumbnail
+                   const video = e.currentTarget;
+                   video.currentTime = 0.1;
+                 }}
+                 onError={(e) => {
+                   // Fallback if video fails to load
+                   console.warn('Video preview failed, showing placeholder');
+                 }}
+               />
+               <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+                   <div className="w-14 h-14 bg-white/90 rounded-full flex items-center justify-center shadow-2xl transition-transform group-hover:scale-110">
                         <svg className="w-7 h-7 text-gray-900 ml-1.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
                    </div>
                </div>
@@ -254,7 +274,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
               </button>
             </div>
 
-            {asset.type === 'image' && asset.url && (
+            {(asset.type === 'image' || asset.type === 'video' || asset.type === 'design') && asset.url && (
               <div className="flex flex-wrap items-center justify-center gap-2" onClick={(e) => e.stopPropagation()}>
                 <button
                   onClick={(e) => { e.stopPropagation(); setIsDownloadModalOpen(true); }}

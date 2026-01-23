@@ -602,7 +602,9 @@ function App() {
               <img src={previewAsset.url} alt={previewAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
             )}
             {previewAsset.type === 'video' && previewAsset.url && (
-              <video src={previewAsset.url} controls className="w-full h-auto max-h-[90vh]" />
+              <video src={previewAsset.url} controls className="w-full h-auto max-h-[90vh]" playsInline>
+                Your browser does not support the video tag.
+              </video>
             )}
             {previewAsset.type === 'text' && (
               <div className="p-12 max-h-[90vh] overflow-y-auto">
