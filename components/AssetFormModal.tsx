@@ -219,6 +219,70 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       : (carModel === 'Other' ? [customCarModel || carModel] : [carModel]);
     const primaryCarModel = processedCarModels[0] || (carModel === 'Other' ? customCarModel : carModel);
 
+    // Editing should UPDATE, not create a new asset.
+    if (editingAsset) {
+      // If editing a package, update all package assets with new titles
+      if (editingPackageAssets.length > 1) {
+        // Update all package assets
+        for (const pkgAsset of editingPackageAssets) {
+          const newTitle = packageAssetTitles[pkgAsset.id] || pkgAsset.title;
+          const updates: Partial<Asset> = {
+            title: newTitle,
+            // Preserve other fields
+            type: pkgAsset.type,
+            market,
+            platform,
+            carModel: primaryCarModel,
+            ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
+            objectives: selectedObjectives,
+            usageRights,
+            uploadedBy: uploaderName || 'Anonymous',
+            ctr: ctr ? parseFloat(ctr) : undefined,
+            cpl: cpl ? parseFloat(cpl) : undefined,
+            cr: cr ? parseFloat(cr) : undefined,
+            comments: comments || undefined,
+            content: pkgAsset.content,
+            url: pkgAsset.url,
+            size: pkgAsset.size,
+            status: pkgAsset.status,
+            createdAt: pkgAsset.createdAt,
+            ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+          };
+          await storageService.updateAsset(pkgAsset.id, updates);
+        }
+        onClose();
+        return;
+      }
+      
+      // Regular single asset edit
+      const updates: Partial<Asset> = {
+        title,
+        type,
+        market,
+        platform,
+        carModel: primaryCarModel,
+        ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
+        objectives: selectedObjectives,
+        usageRights,
+        uploadedBy: uploaderName || 'Anonymous',
+        ctr: ctr ? parseFloat(ctr) : undefined,
+        cpl: cpl ? parseFloat(cpl) : undefined,
+        cr: cr ? parseFloat(cr) : undefined,
+        comments: comments || undefined,
+        content: content || undefined,
+        // Preserve these fields from original asset
+        url: editingAsset.url,
+        size: editingAsset.size,
+        status: editingAsset.status,
+        createdAt: editingAsset.createdAt,
+        // Only include collectionIds if it's provided and not undefined
+        ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+      };
+      
+      onSave(updates, file || undefined);
+      return;
+    }
+
     const data = {
       title,
       type,
