@@ -65,12 +65,19 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       // - Or pre-process files before upload
       
       const rangeHeader = req.headers?.range as string | undefined;
+      
+      // Fetch with Range support for video streaming
+      const fetchHeaders: HeadersInit = {};
+      if (rangeHeader) {
+        fetchHeaders['Range'] = rangeHeader;
+      }
+      
       const upstream = await fetch(parsed.toString(), {
         redirect: 'follow',
-        headers: rangeHeader ? { Range: rangeHeader } : undefined,
+        headers: fetchHeaders,
       });
       
-      if (!upstream.ok) {
+      if (!upstream.ok && upstream.status !== 206) {
         res.statusCode = 502;
         return res.end(`Upstream fetch failed: ${upstream.status}`);
       }
@@ -81,7 +88,7 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       // ALWAYS force video/mp4 Content-Type for MOV files (regardless of what Firebase sends)
       // This is the key fix - browsers reject video/quicktime but accept video/mp4 for H.264 MOV files
-      res.statusCode = upstream.status;
+      res.statusCode = upstream.status; // Preserve 206 for partial content
       Object.entries(withCors({
         'Content-Type': 'video/mp4', // Force MP4 - this is what makes it work!
         ...(contentLength ? { 'Content-Length': contentLength } : {}),

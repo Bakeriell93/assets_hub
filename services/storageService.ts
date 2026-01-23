@@ -397,14 +397,14 @@ export const storageService = {
         } else {
           try {
             // Preserve original filename for videos and other files
-            const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
-            const storageRef = ref(storage, `content/${Date.now()}-${fileName}`);
+            const sanitizedFileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const storageRef = ref(storage, `content/${Date.now()}-${sanitizedFileName}`);
             
             // Upload with metadata to preserve content type (important for videos)
             // For MOV files, force video/mp4 so browsers can play them
             let contentType = file.type || 'application/octet-stream';
-            const fileName = file.name.toLowerCase();
-            if (fileName.endsWith('.mov') || fileName.endsWith('.qt') || file.type === 'video/quicktime') {
+            const fileNameLower = file.name.toLowerCase();
+            if (fileNameLower.endsWith('.mov') || fileNameLower.endsWith('.qt') || file.type === 'video/quicktime') {
               contentType = 'video/mp4'; // Force MP4 MIME type for MOV files
             }
             

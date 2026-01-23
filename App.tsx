@@ -1109,10 +1109,22 @@ function App() {
                     controls 
                     style={{ width: '100%' }} 
                     controlsList="nodownload" 
-                    preload="auto"
+                    preload="metadata"
                     playsInline
                     className="max-h-[90vh]"
                     crossOrigin="anonymous"
+                    onError={(e) => {
+                      const video = e.currentTarget;
+                      console.error('Video error:', {
+                        code: video.error?.code,
+                        message: video.error?.message,
+                        networkState: video.networkState,
+                        readyState: video.readyState,
+                        src: videoUrl
+                      });
+                    }}
+                    onLoadStart={() => console.log('Video load started:', videoUrl)}
+                    onCanPlay={() => console.log('Video can play:', videoUrl)}
                   >
                     <source src={videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.
