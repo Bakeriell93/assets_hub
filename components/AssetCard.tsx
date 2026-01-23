@@ -309,8 +309,18 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const handlePreview = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
     if (asset.type === 'video' && asset.url) {
-      window.open(asset.url, '_blank', 'noopener,noreferrer');
-      return;
+      try {
+        const u = new URL(asset.url);
+        const path = u.pathname.toLowerCase();
+        const isMov = path.endsWith('.mov') || path.endsWith('.qt');
+        if (isMov) {
+          const playUrl = `/api/convert-video?url=${encodeURIComponent(asset.url)}`;
+          window.open(playUrl, '_blank', 'noopener,noreferrer');
+          return;
+        }
+      } catch {
+        // fall through to preview
+      }
     }
     onPreview(asset);
   };
