@@ -28,6 +28,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [content, setContent] = useState('');
   const [file, setFile] = useState<File | null>(null);
   const [files, setFiles] = useState<File[]>([]);
+  const [fileTitles, setFileTitles] = useState<Record<number, string>>({}); // Store custom titles for each file
   const [isPackageMode, setIsPackageMode] = useState(false);
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
   const [isCarModelsDropdownOpen, setIsCarModelsDropdownOpen] = useState(false);
@@ -89,6 +90,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setUsageRights(USAGE_RIGHTS[0]);
       setFile(null);
       setFiles([]);
+      setFileTitles({});
       setIsPackageMode(false);
       setIsCarModelsDropdownOpen(false);
     }
@@ -158,8 +160,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         else if (filename.includes('dooh') || filename.includes('display')) assetPlatform = 'DOOH';
         else if (filename.includes('banner')) assetPlatform = 'Banner';
 
-        // Use filename (without extension) as the title
-        const fileTitle = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        // Use custom title if provided, otherwise use filename (without extension)
+        const fileTitle = fileTitles[idx] || f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
 
         // Handle car models: if "Other" is selected, use customCarModel
         const processedCarModels = selectedCarModels.length > 0 
@@ -461,6 +463,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               setIsPackageMode(e.target.checked);
                               setFile(null);
                               setFiles([]);
+                              setFileTitles({});
                             }}
                             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
@@ -486,6 +489,12 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               onChange={(e) => {
                                 const selectedFiles = Array.from(e.target.files || []);
                                 setFiles(selectedFiles);
+                                // Initialize titles with default (filename without extension)
+                                const initialTitles: Record<number, string> = {};
+                                selectedFiles.forEach((f, idx) => {
+                                  initialTitles[idx] = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                                });
+                                setFileTitles(initialTitles);
                               }} 
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
                             />
@@ -497,19 +506,51 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                             </div>
                           </div>
                           {files.length > 0 && (
-                            <div className="space-y-2 max-h-40 overflow-y-auto">
-                              {files.map((f, idx) => (
-                                <div key={idx} className="flex items-center justify-between p-2 bg-gray-50 rounded-lg">
-                                  <span className="text-xs font-bold text-gray-700 truncate flex-1">{f.name}</span>
-                                  <button
-                                    type="button"
-                                    onClick={() => setFiles(files.filter((_, i) => i !== idx))}
-                                    className="ml-2 text-red-500 hover:text-red-700 text-xs font-black"
-                                  >
-                                    ×
-                                  </button>
-                                </div>
-                              ))}
+                            <div className="space-y-3">
+                              <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Customize Names (Optional)</p>
+                              <div className="space-y-2 max-h-60 overflow-y-auto">
+                                {files.map((f, idx) => (
+                                  <div key={idx} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                                    <div className="flex items-center justify-between mb-2">
+                                      <span className="text-[10px] font-bold text-gray-500 truncate flex-1" title={f.name}>
+                                        {f.name}
+                                      </span>
+                                      <button
+                                        type="button"
+                                        onClick={() => {
+                                          const newFiles = files.filter((_, i) => i !== idx);
+                                          setFiles(newFiles);
+                                          const newTitles = { ...fileTitles };
+                                          delete newTitles[idx];
+                                          // Reindex remaining titles
+                                          const reindexed: Record<number, string> = {};
+                                          Object.keys(newTitles).forEach(oldIdx => {
+                                            const oldIndex = parseInt(oldIdx);
+                                            if (oldIndex > idx) {
+                                              reindexed[oldIndex - 1] = newTitles[oldIndex];
+                                            } else {
+                                              reindexed[oldIndex] = newTitles[oldIndex];
+                                            }
+                                          });
+                                          setFileTitles(reindexed);
+                                        }}
+                                        className="ml-2 text-red-500 hover:text-red-700 text-xs font-black"
+                                      >
+                                        ×
+                                      </button>
+                                    </div>
+                                    <input
+                                      type="text"
+                                      value={fileTitles[idx] || f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ')}
+                                      onChange={(e) => {
+                                        setFileTitles({ ...fileTitles, [idx]: e.target.value });
+                                      }}
+                                      placeholder="Enter custom name..."
+                                      className="w-full px-3 py-2 text-xs font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
                             </div>
                           )}
                         </div>

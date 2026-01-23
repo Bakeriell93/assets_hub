@@ -1250,10 +1250,23 @@ function App() {
                   <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
               </div>
+              
+              {/* Download button for full view - positioned at top-left when in full view to avoid overlap */}
+              {isPackage && previewViewMode === 'full' && (
+                <button
+                  onClick={(e) => handleDownloadAsset(currentAsset, e)}
+                  className="absolute top-16 left-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all z-20"
+                  title="Download"
+                >
+                  <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                  </svg>
+                </button>
+              )}
 
-              {/* Package Grid View or Full View Toggle */}
+              {/* Package Grid View or Full View Toggle - Moved to top-right to avoid overlap */}
               {isPackage && (
-                <div className="absolute top-4 left-1/2 transform -translate-x-1/2 z-30 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg">
+                <div className="absolute top-4 right-4 z-30 flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg">
                   <button
                     onClick={(e) => { e.stopPropagation(); setPreviewViewMode('grid'); }}
                     className={`px-4 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
@@ -1312,10 +1325,10 @@ function App() {
                               <p className="text-xs text-gray-700 line-clamp-3 text-center">{pkgAsset.content}</p>
                             </div>
                           )}
-                          {/* Download button - always visible, positioned to avoid overlap */}
+                          {/* Download button - always visible, positioned top-left to avoid overlap with Grid/Full toggle */}
                           <button
                             onClick={(e) => handleDownloadAsset(pkgAsset, e)}
-                            className="absolute top-2 right-2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-100 z-10"
+                            className="absolute top-2 left-2 p-2 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all opacity-100 z-10"
                             title="Download"
                           >
                             <svg className="w-4 h-4 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -1341,16 +1354,6 @@ function App() {
                           loading="eager"
                           decoding="async"
                         />
-                        {/* Download button for full view */}
-                        <button
-                          onClick={(e) => handleDownloadAsset(currentAsset, e)}
-                          className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all z-20"
-                          title="Download"
-                        >
-                          <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </button>
                       </div>
                     )}
                     {currentAsset.type === 'video' && currentAsset.url && (() => {
@@ -1452,16 +1455,6 @@ function App() {
                     <source src={videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.
                   </video>
-                  {/* Download button for video */}
-                  <button
-                    onClick={(e) => handleDownloadAsset(currentAsset, e)}
-                    className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all z-20"
-                    title="Download"
-                  >
-                    <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                    </svg>
-                  </button>
                 </div>
               );
             })()}
@@ -1469,32 +1462,12 @@ function App() {
                       <div className="relative p-12 max-h-[90vh] overflow-y-auto">
                         <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
                         <p className="text-lg text-gray-700 whitespace-pre-wrap">{currentAsset.content}</p>
-                        {/* Download button for text */}
-                        <button
-                          onClick={(e) => handleDownloadAsset(currentAsset, e)}
-                          className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all"
-                          title="Download"
-                        >
-                          <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </button>
                       </div>
                     )}
                     {currentAsset.type === 'design' && (
                       <div className="relative p-12 text-center">
                         <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
                         <p className="text-gray-600">Design file - download to view</p>
-                        {/* Download button for design */}
-                        <button
-                          onClick={(e) => handleDownloadAsset(currentAsset, e)}
-                          className="absolute top-4 right-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all"
-                          title="Download"
-                        >
-                          <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                          </svg>
-                        </button>
                       </div>
                     )}
                   </>
