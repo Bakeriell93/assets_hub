@@ -3,6 +3,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { Asset, UserRole } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
 import JSZip from 'jszip';
+import { storageService } from '../services/storageService';
 
 interface AssetCardProps {
   asset: Asset;
@@ -194,11 +195,21 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   // Extract original filename from URL for package list display
   const extractFilenameFromUrl = (url: string): string => {
     try {
+      // Try to extract Firebase Storage path first (handles URL encoding properly)
+      const storagePath = storageService.extractStoragePath(url);
+      if (storagePath) {
+        // Remove "content/" prefix if present
+        const withoutPrefix = storagePath.replace(/^content\//, '');
+        // Remove timestamp prefix (format: timestamp-filename.ext)
+        const withoutTimestamp = withoutPrefix.replace(/^\d+-/, '');
+        return withoutTimestamp || 'file';
+      }
+      
+      // Fallback: try to extract from URL directly
       const cleaned = url.split('?')[0] || '';
       const last = cleaned.split('/').pop() || '';
-      // Remove timestamp prefix if present (format: timestamp-filename.ext)
-      // Also handle URL-encoded filenames
       const decoded = decodeURIComponent(last);
+      // Remove timestamp prefix if present
       const withoutTimestamp = decoded.replace(/^\d+-/, '');
       return withoutTimestamp || 'file';
     } catch {
