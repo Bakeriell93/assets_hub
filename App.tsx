@@ -1087,17 +1087,25 @@ function App() {
                 }
               };
               
-              const videoUrl = getVideoUrl(previewAsset.url);
-              const videoFormat = detectVideoFormat(previewAsset.url);
-              // Formats that are likely unsupported by browsers (may need download)
-              const isLikelyUnsupported = previewAsset.url.toLowerCase().match(/\.(mov|avi|wmv|flv|mkv|3gp|3g2|divx|asf|rm|rmvb|vob|ts|mts|m2ts)$/);
+              // Simple video player like the reference website
+              const isMov = previewAsset.url.toLowerCase().endsWith('.mov') || previewAsset.url.toLowerCase().endsWith('.qt');
+              const videoUrl = isMov ? previewAsset.url : getVideoUrl(previewAsset.url);
               
-              return <VideoPlayerComponent 
-                videoUrl={videoUrl} 
-                videoFormat={videoFormat} 
-                isLikelyUnsupported={!!isLikelyUnsupported}
-                originalUrl={previewAsset.url}
-              />;
+              return (
+                <div className="w-full flex items-center justify-center bg-black p-6">
+                  <video 
+                    controls 
+                    style={{ width: '100%' }} 
+                    controlsList="nodownload" 
+                    preload="metadata" 
+                    playsInline
+                    className="max-h-[90vh]"
+                  >
+                    <source src={videoUrl} type={isMov ? 'video/mp4' : detectVideoFormat(previewAsset.url) || 'video/mp4'} />
+                    Your browser does not support the video tag.
+                  </video>
+                </div>
+              );
             })()}
             {previewAsset.type === 'text' && (
               <div className="p-12 max-h-[90vh] overflow-y-auto">

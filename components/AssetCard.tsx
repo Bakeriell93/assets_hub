@@ -25,9 +25,17 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
   const canDelete = userRole === 'Editor' || userRole === 'Admin'; // Editor can now delete
 
-  // Generate video thumbnail - improved for MOV and other formats
+  // Generate video thumbnail - cached in localStorage
   useEffect(() => {
     if (asset.type === 'video' && asset.url && videoRef.current) {
+      // Check cache first
+      const cacheKey = `video_thumb_${asset.url}`;
+      const cached = localStorage.getItem(cacheKey);
+      if (cached) {
+        setVideoThumbnail(cached);
+        return;
+      }
+      
       const video = videoRef.current;
       const videoUrl = getThumbnailVideoUrl(asset.url);
       let isMov = false;
@@ -64,7 +72,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
               ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
               setVideoThumbnail(thumbnailUrl);
-              console.log('Video thumbnail generated successfully');
+              // Save to cache
+              try {
+                localStorage.setItem(cacheKey, thumbnailUrl);
+              } catch (e) {
+                console.warn('Failed to cache thumbnail:', e);
+              }
+              console.log('Video thumbnail generated and cached');
             }
           }
         } catch (err) {
