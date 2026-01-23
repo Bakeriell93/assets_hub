@@ -18,6 +18,94 @@ type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
 
 const SESSION_STORAGE_KEY = 'byd_assets_hub_session';
 
+// Cached Image Preview Component - loads full image on preview and caches it
+const CachedImagePreview: React.FC<{ 
+  asset: Asset; 
+  previewedAssetsCache: Map<string, { url: string; timestamp: number }>;
+  setPreviewedAssetsCache: React.Dispatch<React.SetStateAction<Map<string, { url: string; timestamp: number }>>>;
+}> = ({ asset, previewedAssetsCache, setPreviewedAssetsCache }) => {
+  const [imageUrl, setImageUrl] = useState<string | null>(null);
+  const [isLoading, setIsLoading] = useState(true);
+
+  useEffect(() => {
+    const cacheKey = `preview_img_${asset.id}`;
+    
+    // Check localStorage cache first
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      try {
+        const cacheData = JSON.parse(cached);
+        // Check if asset has been updated since cache
+        if (cacheData.timestamp === asset.createdAt && cacheData.url) {
+          setImageUrl(cacheData.url);
+          setIsLoading(false);
+          // Update in-memory cache
+          setPreviewedAssetsCache(prev => new Map(prev).set(asset.id, { url: cacheData.url, timestamp: asset.createdAt }));
+          return;
+        }
+      } catch {
+        // Invalid cache, continue to load
+      }
+    }
+
+    // Check in-memory cache
+    const memCached = previewedAssetsCache.get(asset.id);
+    if (memCached && memCached.timestamp === asset.createdAt) {
+      setImageUrl(memCached.url);
+      setIsLoading(false);
+      return;
+    }
+
+    // Load full image
+    if (asset.url) {
+      // Preload the image
+      const img = new Image();
+      img.onload = () => {
+        setImageUrl(asset.url!);
+        setIsLoading(false);
+        
+        // Cache in localStorage
+        try {
+          localStorage.setItem(cacheKey, JSON.stringify({
+            url: asset.url,
+            timestamp: asset.createdAt
+          }));
+        } catch (e) {
+          console.warn('Failed to cache preview image:', e);
+        }
+        
+        // Cache in memory
+        setPreviewedAssetsCache(prev => new Map(prev).set(asset.id, { url: asset.url!, timestamp: asset.createdAt }));
+      };
+      img.onerror = () => {
+        setImageUrl(asset.url!);
+        setIsLoading(false);
+      };
+      img.src = asset.url;
+    }
+  }, [asset.id, asset.url, asset.createdAt, previewedAssetsCache, setPreviewedAssetsCache]);
+
+  if (isLoading) {
+    return (
+      <div className="relative w-full h-[90vh] flex items-center justify-center bg-gray-100">
+        <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+      </div>
+    );
+  }
+
+  return (
+    <div className="relative">
+      <img 
+        src={imageUrl || asset.url} 
+        alt={asset.title} 
+        className="w-full h-auto max-h-[90vh] object-contain" 
+        loading="eager"
+        decoding="async"
+      />
+    </div>
+  );
+};
+
 // Video Thumbnail Component for grid view
 const VideoThumbnail: React.FC<{ videoUrl: string; title: string }> = ({ videoUrl, title }) => {
   const [thumbnail, setThumbnail] = useState<string | null>(null);
@@ -429,6 +517,7 @@ function App() {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
+  const [previewedAssetsCache, setPreviewedAssetsCache] = useState<Map<string, { url: string; timestamp: number }>>(new Map());
   const [previewPackageAssets, setPreviewPackageAssets] = useState<Asset[]>([]);
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [previewViewMode, setPreviewViewMode] = useState<'grid' | 'full'>('grid');
@@ -1360,15 +1449,11 @@ function App() {
                 ) : (
                   <>
                     {currentAsset.type === 'image' && currentAsset.url && (
-                      <div className="relative">
-                        <img 
-                          src={currentAsset.url} 
-                          alt={currentAsset.title} 
-                          className="w-full h-auto max-h-[90vh] object-contain" 
-                          loading="eager"
-                          decoding="async"
-                        />
-                      </div>
+                      <CachedImagePreview 
+                        asset={currentAsset}
+                        previewedAssetsCache={previewedAssetsCache}
+                        setPreviewedAssetsCache={setPreviewedAssetsCache}
+                      />
                     )}
                     {currentAsset.type === 'video' && currentAsset.url && (() => {
               // Use proxy only when needed (e.g., MOV conversion)

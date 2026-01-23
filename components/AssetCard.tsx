@@ -5,6 +5,138 @@ import DownloadFormatModal from './DownloadFormatModal';
 import JSZip from 'jszip';
 import { storageService } from '../services/storageService';
 
+// Image Thumbnail Component - only loads thumbnail, full image on preview
+const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdatedAt: number; title: string }> = ({ imageUrl, assetId, assetUpdatedAt, title }) => {
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
+  const [isLoaded, setIsLoaded] = useState(false);
+
+  useEffect(() => {
+    // Check cache first
+    const cacheKey = `img_thumb_${assetId}`;
+    const cacheData = localStorage.getItem(cacheKey);
+    
+    if (cacheData) {
+      try {
+        const cached = JSON.parse(cacheData);
+        // Check if asset has been updated since cache
+        if (cached.updatedAt === assetUpdatedAt && cached.thumbnail) {
+          setThumbnailUrl(cached.thumbnail);
+          setIsLoaded(true);
+          return;
+        }
+      } catch {
+        // Invalid cache, continue to generate
+      }
+    }
+
+    // Generate thumbnail using fetch-image API with size parameter
+    // Use a small size for thumbnail (300px width should be enough for card display)
+    const getThumbnailUrl = () => {
+      try {
+        const u = new URL(imageUrl);
+        const isAllowed = u.hostname === 'firebasestorage.googleapis.com' ||
+          u.hostname === 'storage.googleapis.com' ||
+          u.hostname.endsWith('.firebasestorage.app') ||
+          u.hostname.endsWith('.appspot.com');
+        
+        if (isAllowed) {
+          // Use fetch-image API which can handle thumbnails
+          return `/api/fetch-image?url=${encodeURIComponent(imageUrl)}`;
+        }
+        return imageUrl;
+      } catch {
+        return imageUrl;
+      }
+    };
+
+    const thumbUrl = getThumbnailUrl();
+    
+    // Create a small image to generate thumbnail
+    const img = new Image();
+    img.crossOrigin = 'anonymous';
+    
+    img.onload = () => {
+      try {
+        // Create canvas to generate thumbnail
+        const canvas = document.createElement('canvas');
+        const maxSize = 300; // Max width/height for thumbnail
+        let width = img.width;
+        let height = img.height;
+        
+        // Calculate thumbnail dimensions maintaining aspect ratio
+        if (width > height) {
+          if (width > maxSize) {
+            height = (height * maxSize) / width;
+            width = maxSize;
+          }
+        } else {
+          if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+        }
+        
+        canvas.width = width;
+        canvas.height = height;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
+          const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+          setThumbnailUrl(thumbnail);
+          setIsLoaded(true);
+          
+          // Cache the thumbnail
+          try {
+            localStorage.setItem(cacheKey, JSON.stringify({
+              thumbnail,
+              updatedAt: assetUpdatedAt
+            }));
+          } catch (e) {
+            console.warn('Failed to cache thumbnail:', e);
+          }
+        } else {
+          // Fallback to original URL if canvas fails
+          setThumbnailUrl(thumbUrl);
+          setIsLoaded(true);
+        }
+      } catch (err) {
+        console.warn('Thumbnail generation failed:', err);
+        // Fallback to original URL
+        setThumbnailUrl(thumbUrl);
+        setIsLoaded(true);
+      }
+    };
+    
+    img.onerror = () => {
+      // Fallback to original URL on error
+      setThumbnailUrl(thumbUrl);
+      setIsLoaded(true);
+    };
+    
+    img.src = thumbUrl;
+  }, [imageUrl, assetId, assetUpdatedAt]);
+
+  if (!isLoaded) {
+    return (
+      <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center">
+        <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+        </svg>
+      </div>
+    );
+  }
+
+  return (
+    <img 
+      src={thumbnailUrl || imageUrl} 
+      alt={title} 
+      className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
+      loading="lazy"
+      decoding="async"
+    />
+  );
+};
+
 interface AssetCardProps {
   asset: Asset;
   packageAssets?: Asset[]; // All assets in the package (if this is a package)
@@ -510,12 +642,11 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       {/* Visual Preview */}
       <div className="relative h-56 bg-gray-50 flex items-center justify-center overflow-hidden">
         {asset.type === 'image' && asset.url && (
-          <img 
-            src={asset.url} 
-            alt={asset.title} 
-            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-            loading="lazy"
-            decoding="async"
+          <ImageThumbnail 
+            imageUrl={asset.url}
+            assetId={asset.id}
+            assetUpdatedAt={asset.createdAt}
+            title={asset.title}
           />
         )}
         {asset.type === 'video' && asset.url && (
