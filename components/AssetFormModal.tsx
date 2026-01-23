@@ -305,6 +305,21 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     onClose();
   };
 
+  const getCleanFilename = (asset: Asset): string => {
+    if (asset.originalFileName) return asset.originalFileName;
+    if (!asset.url) return 'file';
+    try {
+      // Prefer decoded Firebase storage path if possible: "content/123-name.ext"
+      const storagePath = storageService.extractStoragePath(asset.url);
+      const raw = storagePath ? storagePath.split('/').pop() || '' : (asset.url.split('?')[0] || '').split('/').pop() || '';
+      const decoded = decodeURIComponent(raw);
+      // Strip timestamp prefix used in uploads: "123456789-name.ext"
+      return (decoded.replace(/^\d+-/, '') || decoded || 'file').trim();
+    } catch {
+      return 'file';
+    }
+  };
+
   const inputClasses = "w-full rounded-xl border-gray-300 border-2 p-3 focus:border-blue-500 bg-white text-gray-900 outline-none transition-all font-medium shadow-sm cursor-pointer";
 
   return (
@@ -538,8 +553,11 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                       {editingPackageAssets.map((pkgAsset) => (
                         <div key={pkgAsset.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
                           <div className="flex items-center justify-between mb-2">
-                            <span className="text-[10px] font-bold text-gray-500 truncate flex-1" title={pkgAsset.originalFileName || pkgAsset.url || 'file'}>
-                              {pkgAsset.originalFileName || (pkgAsset.url ? pkgAsset.url.split('/').pop()?.split('?')[0] : 'file')}
+                            <span
+                              className="text-[10px] font-bold text-gray-500 truncate flex-1"
+                              title={getCleanFilename(pkgAsset)}
+                            >
+                              {getCleanFilename(pkgAsset)}
                             </span>
                           </div>
                           <input
