@@ -1087,9 +1087,21 @@ function App() {
                 }
               };
               
-              // Simple video player like the reference website
+              // Simple video player - use proxy for MOV to force correct Content-Type
               const isMov = previewAsset.url.toLowerCase().endsWith('.mov') || previewAsset.url.toLowerCase().endsWith('.qt');
-              const videoUrl = isMov ? previewAsset.url : getVideoUrl(previewAsset.url);
+              let videoUrl = previewAsset.url;
+              
+              // For MOV files, use proxy to force video/mp4 Content-Type header
+              if (isMov) {
+                try {
+                  const u = new URL(previewAsset.url);
+                  if (u.hostname.includes('firebasestorage') || u.hostname.includes('storage.googleapis')) {
+                    videoUrl = `/api/convert-video?url=${encodeURIComponent(previewAsset.url)}`;
+                  }
+                } catch {}
+              } else {
+                videoUrl = getVideoUrl(previewAsset.url);
+              }
               
               return (
                 <div className="w-full flex items-center justify-center bg-black p-6">
@@ -1097,11 +1109,12 @@ function App() {
                     controls 
                     style={{ width: '100%' }} 
                     controlsList="nodownload" 
-                    preload="metadata" 
+                    preload="auto"
                     playsInline
                     className="max-h-[90vh]"
+                    crossOrigin="anonymous"
                   >
-                    <source src={videoUrl} type={isMov ? 'video/mp4' : detectVideoFormat(previewAsset.url) || 'video/mp4'} />
+                    <source src={videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.
                   </video>
                 </div>

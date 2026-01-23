@@ -401,8 +401,15 @@ export const storageService = {
             const storageRef = ref(storage, `content/${Date.now()}-${fileName}`);
             
             // Upload with metadata to preserve content type (important for videos)
+            // For MOV files, force video/mp4 so browsers can play them
+            let contentType = file.type || 'application/octet-stream';
+            const fileName = file.name.toLowerCase();
+            if (fileName.endsWith('.mov') || fileName.endsWith('.qt') || file.type === 'video/quicktime') {
+              contentType = 'video/mp4'; // Force MP4 MIME type for MOV files
+            }
+            
             const metadata = {
-              contentType: file.type || 'application/octet-stream',
+              contentType: contentType,
               customMetadata: {
                 originalName: file.name,
                 uploadedAt: new Date().toISOString()

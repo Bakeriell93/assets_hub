@@ -81,8 +81,8 @@ export default async function handler(req: any, res: any) {
         'ogg': 'video/ogg',
         'ogv': 'video/ogg',
         'ogm': 'video/ogg',
-        // QuickTime/MOV - try as MP4 first (many MOV files are H.264/MP4 compatible)
-        'mov': 'video/mp4', // Many MOV files contain H.264 which browsers support as MP4
+        // QuickTime/MOV - ALWAYS serve as MP4 (browsers can play H.264 MOV as MP4)
+        'mov': 'video/mp4', // Force MP4 MIME type - browsers can play H.264 MOV files
         'qt': 'video/mp4',
         // AVI variants (limited browser support)
         'avi': 'video/x-msvideo',
