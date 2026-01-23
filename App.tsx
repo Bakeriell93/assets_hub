@@ -18,6 +18,143 @@ type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
 
 const SESSION_STORAGE_KEY = 'byd_assets_hub_session';
 
+// Video Thumbnail Component for grid view
+const VideoThumbnail: React.FC<{ videoUrl: string; title: string }> = ({ videoUrl, title }) => {
+  const [thumbnail, setThumbnail] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
+
+  useEffect(() => {
+    if (!videoUrl || !videoRef.current) return;
+
+    // Check cache first
+    const cacheKey = `video_thumb_${videoUrl}`;
+    const cached = localStorage.getItem(cacheKey);
+    if (cached) {
+      setThumbnail(cached);
+      return;
+    }
+
+    const video = videoRef.current;
+    const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
+
+    const isAllowedProxyHost = (u: URL) => {
+      return (
+        u.hostname === 'firebasestorage.googleapis.com' ||
+        u.hostname === 'storage.googleapis.com' ||
+        u.hostname.endsWith('.firebasestorage.app') ||
+        u.hostname.endsWith('.appspot.com')
+      );
+    };
+
+    const getThumbnailVideoUrl = (url: string) => {
+      try {
+        const u = new URL(url);
+        if (!isAllowedProxyHost(u)) return url;
+        const path = u.pathname.toLowerCase();
+        const isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
+        if (isMov) {
+          return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
+        }
+        return `/api/fetch-image?url=${encodeURIComponent(u.toString())}`;
+      } catch {
+        return url;
+      }
+    };
+
+    const thumbnailUrl = getThumbnailVideoUrl(videoUrl);
+    video.src = thumbnailUrl;
+    video.crossOrigin = 'anonymous';
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+
+    const generateThumbnail = () => {
+      try {
+        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+            setThumbnail(thumbnailUrl);
+            try {
+              localStorage.setItem(cacheKey, thumbnailUrl);
+            } catch (e) {
+              console.warn('Failed to cache thumbnail:', e);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('Failed to generate video thumbnail:', err);
+      }
+    };
+
+    const tryGenerateThumbnail = () => {
+      if (video.readyState >= 2) {
+        try {
+          video.currentTime = 0.5;
+        } catch (err) {
+          generateThumbnail();
+        }
+      }
+    };
+
+    video.addEventListener('loadedmetadata', tryGenerateThumbnail, { once: true });
+    video.addEventListener('seeked', generateThumbnail, { once: true });
+    video.addEventListener('loadeddata', generateThumbnail, { once: true });
+
+    const timeoutId = setTimeout(() => {
+      if (!thumbnail && video.readyState >= 2) {
+        generateThumbnail();
+      }
+    }, 2000);
+
+    return () => {
+      video.removeEventListener('loadedmetadata', tryGenerateThumbnail);
+      video.removeEventListener('seeked', generateThumbnail);
+      video.removeEventListener('loadeddata', generateThumbnail);
+      clearTimeout(timeoutId);
+    };
+  }, [videoUrl]);
+
+  return (
+    <div className="relative w-full h-full bg-gray-800">
+      {thumbnail ? (
+        <img 
+          src={thumbnail} 
+          alt={title} 
+          className="w-full h-full object-cover"
+          loading="lazy"
+          decoding="async"
+        />
+      ) : (
+        <div className="w-full h-full flex items-center justify-center">
+          <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </div>
+      )}
+      <video 
+        ref={videoRef}
+        className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
+        preload="metadata"
+        muted
+        playsInline
+        crossOrigin="anonymous"
+      />
+      <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
+        <div className="w-12 h-12 bg-white/90 rounded-full flex items-center justify-center shadow-2xl">
+          <svg className="w-7 h-7 text-gray-900 ml-1.5" fill="currentColor" viewBox="0 0 24 24">
+            <path d="M8 5v14l11-7z" />
+          </svg>
+        </div>
+      </div>
+    </div>
+  );
+};
+
 // Video Player Component with Plyr for better format support
 const VideoPlayerComponent: React.FC<{
   videoUrl: string;
@@ -1161,11 +1298,7 @@ function App() {
                             />
                           )}
                           {pkgAsset.type === 'video' && pkgAsset.url && (
-                            <div className="w-full h-full bg-gray-800 flex items-center justify-center">
-                              <svg className="w-12 h-12 text-white" fill="currentColor" viewBox="0 0 24 24">
-                                <path d="M8 5v14l11-7z" />
-                              </svg>
-                            </div>
+                            <VideoThumbnail videoUrl={pkgAsset.url} title={pkgAsset.title} />
                           )}
                           {pkgAsset.type === 'design' && (
                             <div className="w-full h-full bg-orange-50 flex items-center justify-center">
