@@ -394,9 +394,29 @@ export const storageService = {
           publicUrl = await fileToDataUrl(file);
         } else {
           try {
-            const storageRef = ref(storage, `content/${Date.now()}-${file.name}`);
-            const snapshot = await uploadBytes(storageRef, file);
+            // Preserve original filename for videos and other files
+            const fileName = file.name.replace(/[^a-zA-Z0-9.-]/g, '_');
+            const storageRef = ref(storage, `content/${Date.now()}-${fileName}`);
+            
+            // Upload with metadata to preserve content type (important for videos)
+            const metadata = {
+              contentType: file.type || 'application/octet-stream',
+              customMetadata: {
+                originalName: file.name,
+                uploadedAt: new Date().toISOString()
+              }
+            };
+            
+            const snapshot = await uploadBytes(storageRef, file, metadata);
             publicUrl = await getDownloadURL(snapshot.ref);
+            
+            console.log('File uploaded successfully:', {
+              type: file.type,
+              size: file.size,
+              fileName: file.name,
+              url: publicUrl.substring(0, 100) + '...',
+              storagePath: snapshot.ref.fullPath
+            });
           } catch (uploadError) {
             console.error('Firebase Storage upload failed:', uploadError);
             // Fallback to data URL if Firebase Storage fails

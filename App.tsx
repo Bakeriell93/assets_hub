@@ -607,22 +607,39 @@ function App() {
                   key={previewAsset.url}
                   src={previewAsset.url} 
                   controls 
-                  autoPlay
                   className="w-full h-auto max-h-[90vh]" 
                   playsInline
                   preload="auto"
-                  crossOrigin="anonymous"
+                  onLoadedData={(e) => {
+                    console.log('Video loaded:', {
+                      url: previewAsset.url,
+                      duration: e.currentTarget.duration,
+                      videoWidth: e.currentTarget.videoWidth,
+                      videoHeight: e.currentTarget.videoHeight
+                    });
+                  }}
                   onError={(e) => {
-                    console.error('Video playback error:', e);
                     const video = e.currentTarget;
-                    // Try using the proxy URL if direct URL fails
-                    try {
-                      const proxyUrl = `/api/fetch-image?url=${encodeURIComponent(previewAsset.url)}`;
-                      video.src = proxyUrl;
-                      video.load();
-                    } catch (err) {
-                      console.error('Failed to use proxy URL:', err);
-                    }
+                    const error = video.error;
+                    console.error('Video playback error:', {
+                      code: error?.code,
+                      message: error?.message,
+                      url: previewAsset.url,
+                      networkState: video.networkState,
+                      readyState: video.readyState
+                    });
+                    
+                    // Show error message to user
+                    const errorMsg = document.createElement('div');
+                    errorMsg.className = 'absolute inset-0 flex items-center justify-center bg-red-900/80 text-white p-4';
+                    errorMsg.innerHTML = `
+                      <div class="text-center">
+                        <p class="font-bold mb-2">Video playback failed</p>
+                        <p class="text-sm">Error: ${error?.message || 'Unknown error'}</p>
+                        <p class="text-xs mt-2 opacity-75">URL: ${previewAsset.url.substring(0, 50)}...</p>
+                      </div>
+                    `;
+                    video.parentElement?.appendChild(errorMsg);
                   }}
                 >
                   Your browser does not support the video tag.
