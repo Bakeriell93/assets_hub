@@ -79,16 +79,11 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       const contentRange = upstream.headers.get('content-range') || undefined;
       const acceptRanges = upstream.headers.get('accept-ranges') || 'bytes';
       
-      // Get actual Content-Type from Firebase, but override to video/mp4 for MOV
-      const upstreamContentType = upstream.headers.get('content-type') || '';
-      const finalContentType = upstreamContentType.includes('quicktime') || upstreamContentType.includes('x-quicktime') 
-        ? 'video/mp4' 
-        : 'video/mp4'; // Always force MP4 for MOV files
-      
-      // Serve as MP4 - browsers can play H.264 MOV files as MP4
+      // ALWAYS force video/mp4 Content-Type for MOV files (regardless of what Firebase sends)
+      // This is the key fix - browsers reject video/quicktime but accept video/mp4 for H.264 MOV files
       res.statusCode = upstream.status;
       Object.entries(withCors({
-        'Content-Type': finalContentType,
+        'Content-Type': 'video/mp4', // Force MP4 - this is what makes it work!
         ...(contentLength ? { 'Content-Length': contentLength } : {}),
         ...(contentRange ? { 'Content-Range': contentRange } : {}),
         'Accept-Ranges': acceptRanges,
