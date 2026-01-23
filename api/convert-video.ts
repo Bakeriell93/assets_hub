@@ -3,6 +3,8 @@
 // For server-side, we'll use a simpler approach: direct streaming with proper headers
 
 import type { VercelRequest, VercelResponse } from '@vercel/node';
+import { Readable } from 'node:stream';
+import { pipeline } from 'node:stream/promises';
 
 const ALLOWED_HOSTS = new Set([
   'firebasestorage.googleapis.com',
@@ -92,30 +94,21 @@ export default async function handler(req: VercelRequest, res: VercelResponse) {
       
       // Always stream video files to avoid memory issues
       if (upstream.body) {
-        const reader = upstream.body.getReader();
-        
-        const pump = async () => {
-          try {
-            while (true) {
-              const { done, value } = await reader.read();
-              if (done) {
-                res.end();
-                return;
-              }
-              res.write(Buffer.from(value));
-            }
-          } catch (streamErr: any) {
-            console.error('Streaming error in convert-video:', streamErr);
-            if (!res.headersSent) {
-              res.statusCode = 500;
-              res.end(`Streaming error: ${streamErr?.message || String(streamErr)}`);
-            } else {
-              res.end();
-            }
+        try {
+          const webBody = upstream.body as unknown as ReadableStream<Uint8Array>;
+          const nodeReadable = typeof (webBody as any).getReader === 'function'
+            ? Readable.fromWeb(webBody as any)
+            : (upstream.body as any);
+          await pipeline(nodeReadable, res);
+          return;
+        } catch (streamErr: any) {
+          console.error('Streaming error in convert-video:', streamErr);
+          if (!res.headersSent) {
+            res.statusCode = 500;
+            return res.end(`Streaming error: ${streamErr?.message || String(streamErr)}`);
           }
-        };
-        
-        return pump();
+          return res.end();
+        }
       }
       
       // Fallback to buffer (shouldn't happen for videos, but just in case)
