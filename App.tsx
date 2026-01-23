@@ -846,7 +846,7 @@ function App() {
                           setEditingPackageAssets(pkgAssets);
                           setIsAssetModalOpen(true); 
                         }}
-                        onDelete={storageService.deleteAsset}
+                        onDelete={viewMode === 'trash' && currentUser?.role === 'Admin' ? storageService.permanentlyDeleteAsset : storageService.deleteAsset}
                         onRestore={storageService.restoreAsset}
                         isTrashView={viewMode === 'trash'}
                       />
@@ -1068,7 +1068,7 @@ function App() {
                           setEditingPackageAssets(pkgAssets);
                           setIsAssetModalOpen(true); 
                         }}
-                            onDelete={storageService.deleteAsset}
+                            onDelete={currentUser?.role === 'Admin' ? storageService.permanentlyDeleteAsset : storageService.deleteAsset}
                             onRestore={storageService.restoreAsset}
                             isTrashView={true}
                           />
