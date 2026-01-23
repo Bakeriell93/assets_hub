@@ -30,7 +30,8 @@ try {
   if (app) {
     try {
       db = getFirestore(app);
-      storage = getStorage(app);
+      // Explicitly specify the EU bucket for storage
+      storage = getStorage(app, 'gs://eu13657.firebasestorage.app');
       
       // Verify services are available
       if (!db) {
@@ -40,7 +41,7 @@ try {
         throw new Error("Storage service is not available");
       }
       
-      console.log("Firebase initialized successfully");
+      console.log("Firebase initialized successfully with EU bucket:", 'eu13657.firebasestorage.app');
     } catch (serviceError: any) {
       console.error("Firebase service initialization error:", serviceError);
       initError = new Error(`Firebase services not available: ${serviceError?.message || 'Unknown error'}`);
