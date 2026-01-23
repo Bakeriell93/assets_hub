@@ -8,26 +8,38 @@ allow read, write: if false;
 
 This prevents uploads and downloads from working. You **MUST** update these rules in Firebase Console.
 
-## Solution
-Update the Firebase Storage rules in Firebase Console for the bucket `eu13657.firebasestorage.app`.
+## Solution - Quick Fix
 
-### Step 1: Update Storage Rules
+Since you manage roles from the frontend (no Firebase Auth needed), simply change:
 
-Go to Firebase Console → Storage → Rules tab for bucket `eu13657`
+**FROM:**
+```javascript
+allow read, write: if false;
+```
 
-### Recommended Rules (matches your app's current setup - no auth required):
+**TO:**
+```javascript
+allow read, write: if true;
+```
+
+### Complete Rules (Copy & Paste This):
+
+Go to Firebase Console → Storage → Rules tab for bucket `eu13657`, then replace everything with:
+
 ```javascript
 rules_version = '2';
 
 service firebase.storage {
   match /b/{bucket}/o {
     match /{allPaths=**} {
-      // Allow all access (matches your current app setup)
+      // Allow all access (roles managed in frontend)
       allow read, write: if true;
     }
   }
 }
 ```
+
+Then click **Publish**.
 
 ### Alternative: Public Read, Authenticated Write:
 ```javascript
@@ -52,27 +64,66 @@ service firebase.storage {
 5. Paste the appropriate rules above
 6. Click **Publish**
 
-## CORS Configuration
-If you still get CORS errors after updating rules, you may also need to configure CORS for the bucket:
+## CORS Configuration ⚠️ REQUIRED
+
+**You MUST configure CORS or uploads will fail with CORS errors!**
+
+### Option 1: Using gsutil (Recommended - Fastest)
+
+1. **Install Google Cloud SDK** (if not already installed):
+   - Download from: https://cloud.google.com/sdk/docs/install
+   - Or use: `npm install -g @google-cloud/storage`
+
+2. **Open Terminal/Command Prompt** and run these commands:
+   ```bash
+   # Authenticate with Google
+   gcloud auth login
+   
+   # Set your project
+   gcloud config set project content-b7d4c
+   
+   # Set CORS (the cors.json file is in your project root)
+   gsutil cors set cors.json gs://eu13657
+   
+   # Verify it worked
+   gsutil cors get gs://eu13657
+   ```
+
+   The `cors.json` file is already in your project root - just run the command!
+
+### Option 2: Using Firebase Console (if available)
 
 1. Go to Firebase Console → Storage
 2. Click on the bucket `eu13657`
-3. Go to **Permissions** tab
-4. Add CORS configuration if needed
+3. Go to **Permissions** or **Settings** tab
+4. Look for **CORS configuration** section
+5. Add the CORS configuration (see `cors.json` file in project root)
 
-Or use `gsutil` command:
-```bash
-gsutil cors set cors.json gs://eu13657
-```
+### CORS Configuration Details
 
-Where `cors.json` contains:
+The `cors.json` file contains:
 ```json
 [
   {
     "origin": ["*"],
-    "method": ["GET", "HEAD", "PUT", "POST", "DELETE"],
-    "responseHeader": ["Content-Type", "Authorization"],
+    "method": ["GET", "HEAD", "PUT", "POST", "DELETE", "OPTIONS"],
+    "responseHeader": ["Content-Type", "Authorization", "Content-Length", "Content-Range", "Accept-Ranges"],
     "maxAgeSeconds": 3600
   }
 ]
 ```
+
+**What this does:**
+- `"origin": ["*"]` - Allows requests from any origin (your Vercel app)
+- `"method"` - Allows all HTTP methods needed for uploads/downloads
+- `"responseHeader"` - Allows necessary headers for video streaming and file operations
+- `"maxAgeSeconds": 3600` - Caches CORS preflight responses for 1 hour
+
+### Verify CORS is Set
+
+After setting CORS, verify it's working:
+```bash
+gsutil cors get gs://eu13657
+```
+
+This should show your CORS configuration.
