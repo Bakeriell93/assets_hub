@@ -14,7 +14,7 @@ function withCors(headers: Record<string, string>) {
     ...headers,
     'Access-Control-Allow-Origin': '*',
     'Access-Control-Allow-Methods': 'GET, OPTIONS',
-    'Access-Control-Allow-Headers': 'Content-Type',
+    'Access-Control-Allow-Headers': 'Content-Type, Range',
   };
 }
 
@@ -45,22 +45,32 @@ export default async function handler(req: any, res: any) {
       return res.end('Host not allowed');
     }
 
-    const upstream = await fetch(parsed.toString(), { redirect: 'follow' });
+    const rangeHeader = req.headers?.range as string | undefined;
+    const upstream = await fetch(parsed.toString(), {
+      redirect: 'follow',
+      headers: rangeHeader ? { Range: rangeHeader } : undefined,
+    });
     if (!upstream.ok) {
       res.statusCode = 502;
       return res.end(`Upstream fetch failed: ${upstream.status}`);
     }
 
     const contentType = upstream.headers.get('content-type') || 'application/octet-stream';
+    const contentLength = upstream.headers.get('content-length') || undefined;
+    const contentRange = upstream.headers.get('content-range') || undefined;
+    const acceptRanges = upstream.headers.get('accept-ranges') || 'bytes';
     const arrayBuffer = await upstream.arrayBuffer();
     const buffer = Buffer.from(arrayBuffer);
 
     // CDN caching on Vercel:
     // - Browser: cache for 1 hour
     // - Vercel Edge: cache for 1 day, SWR for 7 days
-    res.statusCode = 200;
+    res.statusCode = upstream.status;
     Object.entries(withCors({
       'Content-Type': contentType,
+      ...(contentLength ? { 'Content-Length': contentLength } : {}),
+      ...(contentRange ? { 'Content-Range': contentRange } : {}),
+      'Accept-Ranges': acceptRanges,
       'Cache-Control': 'public, max-age=3600',
       'Vercel-CDN-Cache-Control': 'public, s-maxage=86400, stale-while-revalidate=604800',
     })).forEach(([k, v]) => res.setHeader(k, v));
