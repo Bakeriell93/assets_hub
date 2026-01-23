@@ -1,5 +1,5 @@
 
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Asset, UserRole } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
 
@@ -15,10 +15,43 @@ interface AssetCardProps {
 const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, onPreview, onEdit, onDelete }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
+  const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const isPackage = packageAssets.length > 1;
   const isHighPerformer = (asset.ctr && asset.ctr > 2) || (asset.cr && asset.cr > 1.5);
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
+
+  // Generate video thumbnail
+  useEffect(() => {
+    if (asset.type === 'video' && asset.url && videoRef.current) {
+      const video = videoRef.current;
+      const generateThumbnail = () => {
+        try {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth || 640;
+          canvas.height = video.videoHeight || 360;
+          const ctx = canvas.getContext('2d');
+          if (ctx && video.readyState >= 2) {
+            ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+            setVideoThumbnail(thumbnailUrl);
+          }
+        } catch (err) {
+          console.warn('Failed to generate video thumbnail (CORS may be blocking):', err);
+        }
+      };
+
+      video.currentTime = 0.1;
+      video.addEventListener('loadeddata', generateThumbnail, { once: true });
+      video.addEventListener('seeked', generateThumbnail, { once: true });
+      
+      return () => {
+        video.removeEventListener('loadeddata', generateThumbnail);
+        video.removeEventListener('seeked', generateThumbnail);
+      };
+    }
+  }, [asset.type, asset.url]);
 
   const isAllowedProxyHost = (u: URL) => {
     return u.hostname === 'firebasestorage.googleapis.com' || u.hostname === 'storage.googleapis.com';
@@ -217,20 +250,25 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         )}
         {asset.type === 'video' && asset.url && (
             <div className="relative w-full h-full bg-gray-900">
+               {videoThumbnail ? (
+                 <img src={videoThumbnail} alt={asset.title} className="w-full h-full object-cover" />
+               ) : (
+                 <div className="w-full h-full flex items-center justify-center bg-gray-800">
+                   <div className="w-14 h-14 bg-white/20 rounded-full flex items-center justify-center">
+                     <svg className="w-7 h-7 text-white ml-1.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+                   </div>
+                 </div>
+               )}
                <video 
+                 ref={videoRef}
                  src={asset.url} 
-                 className="w-full h-full object-cover"
+                 className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
                  preload="metadata"
                  muted
                  playsInline
-                 onLoadedMetadata={(e) => {
-                   // Seek to 0.1 seconds to show a frame as thumbnail
-                   const video = e.currentTarget;
-                   video.currentTime = 0.1;
-                 }}
-                 onError={(e) => {
-                   // Fallback if video fails to load
-                   console.warn('Video preview failed, showing placeholder');
+                 crossOrigin="anonymous"
+                 onError={() => {
+                   console.warn('Video thumbnail generation failed - CORS or format issue');
                  }}
                />
                <div className="absolute inset-0 flex items-center justify-center bg-black/30 pointer-events-none">
@@ -282,24 +320,28 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                 >
                   Download
                 </button>
-                <a
-                  href="https://www.pxbee.com/ai-image-extender/"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-blue-600 px-4 py-2.5 rounded-2xl text-white hover:bg-blue-700 transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
-                  title="Open PxBee AI Image Extender (Story resize/outpaint)"
-                >
-                  Resize
-                </a>
-                <a
-                  href="https://ai.studio/apps/drive/1RIQCDDeZ-toZvjsRMJU4JTQDQrO4xpSt"
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="bg-[#111111] px-4 py-2.5 rounded-2xl text-white hover:bg-black transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
-                  title="Open AI Studio image edit app"
-                >
-                  Edit Image Text
-                </a>
+                {asset.type === 'image' && (
+                  <>
+                    <a
+                      href="https://www.pxbee.com/ai-image-extender/"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-blue-600 px-4 py-2.5 rounded-2xl text-white hover:bg-blue-700 transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
+                      title="Open PxBee AI Image Extender (Story resize/outpaint)"
+                    >
+                      Resize
+                    </a>
+                    <a
+                      href="https://ai.studio/apps/drive/1RIQCDDeZ-toZvjsRMJU4JTQDQrO4xpSt"
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="bg-[#111111] px-4 py-2.5 rounded-2xl text-white hover:bg-black transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
+                      title="Open AI Studio image edit app"
+                    >
+                      Edit Image Text
+                    </a>
+                  </>
+                )}
               </div>
             )}
         </div>

@@ -602,9 +602,32 @@ function App() {
               <img src={previewAsset.url} alt={previewAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
             )}
             {previewAsset.type === 'video' && previewAsset.url && (
-              <video src={previewAsset.url} controls className="w-full h-auto max-h-[90vh]" playsInline>
-                Your browser does not support the video tag.
-              </video>
+              <div className="w-full flex items-center justify-center bg-black p-6">
+                <video 
+                  key={previewAsset.url}
+                  src={previewAsset.url} 
+                  controls 
+                  autoPlay
+                  className="w-full h-auto max-h-[90vh]" 
+                  playsInline
+                  preload="auto"
+                  crossOrigin="anonymous"
+                  onError={(e) => {
+                    console.error('Video playback error:', e);
+                    const video = e.currentTarget;
+                    // Try using the proxy URL if direct URL fails
+                    try {
+                      const proxyUrl = `/api/fetch-image?url=${encodeURIComponent(previewAsset.url)}`;
+                      video.src = proxyUrl;
+                      video.load();
+                    } catch (err) {
+                      console.error('Failed to use proxy URL:', err);
+                    }
+                  }}
+                >
+                  Your browser does not support the video tag.
+                </video>
+              </div>
             )}
             {previewAsset.type === 'text' && (
               <div className="p-12 max-h-[90vh] overflow-y-auto">
