@@ -7,7 +7,7 @@ interface AssetCardProps {
   asset: Asset;
   packageAssets?: Asset[]; // All assets in the package (if this is a package)
   userRole: UserRole;
-  onPreview: (asset: Asset) => void;
+  onPreview: (asset: Asset, packageAssets?: Asset[]) => void;
   onEdit: (asset: Asset) => void;
   onDelete: (id: string) => void;
   onRestore?: (id: string) => void;
@@ -346,7 +346,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
   const handlePreview = (e?: React.MouseEvent) => {
     if (e) e.stopPropagation();
-    onPreview(asset);
+    onPreview(asset, isPackage ? packageAssets : undefined);
   };
 
   const confirmDelete = (e: React.MouseEvent) => {
@@ -363,7 +363,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       {isPackage && (
         <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-purple-600 text-white text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg flex items-center gap-1.5">
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" /></svg>
-          Package ({packageAssets.length})
+          Package
         </div>
       )}
       {isHighPerformer && !isPackage && (
@@ -581,6 +581,25 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             </div>
             <span className="truncate max-w-[80px] bg-gray-50 px-2 py-1 rounded-md">{asset.uploadedBy}</span>
         </div>
+
+        {/* Package Info - Show below card content */}
+        {isPackage && (
+          <div className="mt-3 pt-3 border-t-2 border-purple-200 bg-purple-50/50 px-6 pb-4 -mx-6 -mb-6 rounded-b-[32px]">
+            <div className="flex items-center justify-between mb-2">
+              <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest">
+                {packageAssets.length} {packageAssets.length === 1 ? 'Asset' : 'Assets'} in Package
+              </span>
+            </div>
+            <div className="space-y-1.5 max-h-32 overflow-y-auto">
+              {packageAssets.map((pkgAsset, idx) => (
+                <div key={pkgAsset.id} className="flex items-start gap-2 text-[9px]">
+                  <span className="text-purple-600 font-black min-w-[20px]">{idx + 1}.</span>
+                  <span className="text-gray-700 font-bold truncate flex-1">{pkgAsset.title}</span>
+                </div>
+              ))}
+            </div>
+          </div>
+        )}
       </div>
 
       <DownloadFormatModal

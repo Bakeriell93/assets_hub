@@ -290,6 +290,8 @@ function App() {
   const [isAdminPanelOpen, setIsAdminPanelOpen] = useState(false);
   const [isBulkUploadOpen, setIsBulkUploadOpen] = useState(false);
   const [previewAsset, setPreviewAsset] = useState<Asset | null>(null);
+  const [previewPackageAssets, setPreviewPackageAssets] = useState<Asset[]>([]);
+  const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   
   // Upload Progress
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
@@ -692,7 +694,11 @@ function App() {
                         asset={asset}
                         packageAssets={packageAssets}
                         userRole={currentUser?.role!}
-                        onPreview={setPreviewAsset}
+                        onPreview={(asset, packageAssets) => {
+                          setPreviewAsset(asset);
+                          setPreviewPackageAssets(packageAssets || [asset]);
+                          setCurrentPreviewIndex(0);
+                        }}
                         onEdit={(a) => { setEditingAsset(a); setIsAssetModalOpen(true); }}
                         onDelete={storageService.deleteAsset}
                         onRestore={storageService.restoreAsset}
@@ -904,7 +910,11 @@ function App() {
                             asset={asset}
                             packageAssets={packageAssets}
                             userRole={currentUser?.role!}
-                            onPreview={setPreviewAsset}
+                            onPreview={(asset, packageAssets) => {
+                          setPreviewAsset(asset);
+                          setPreviewPackageAssets(packageAssets || [asset]);
+                          setCurrentPreviewIndex(0);
+                        }}
                             onEdit={(a) => { setEditingAsset(a); setIsAssetModalOpen(true); }}
                             onDelete={storageService.deleteAsset}
                             onRestore={storageService.restoreAsset}
@@ -997,23 +1007,83 @@ function App() {
       )}
       
       {/* Preview Modal */}
-      {previewAsset && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" onClick={() => setPreviewAsset(null)}>
-          <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => setPreviewAsset(null)}></div>
-          <div className="relative max-w-6xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl" onClick={(e) => e.stopPropagation()}>
-            <div className="absolute top-4 right-4 z-10">
-              <button 
-                onClick={() => setPreviewAsset(null)}
-                className="p-3 bg-white/90 hover:bg-white rounded-full transition-all shadow-lg"
-              >
-                <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-            </div>
-            
-            {previewAsset.type === 'image' && previewAsset.url && (
-              <img src={previewAsset.url} alt={previewAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
-            )}
-            {previewAsset.type === 'video' && previewAsset.url && (() => {
+      {previewAsset && (() => {
+        const isPackage = previewPackageAssets.length > 1;
+        const currentAsset = previewPackageAssets[currentPreviewIndex] || previewAsset;
+        const canGoPrev = isPackage && currentPreviewIndex > 0;
+        const canGoNext = isPackage && currentPreviewIndex < previewPackageAssets.length - 1;
+
+        return (
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); }}>
+            <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); }}></div>
+            <div className="relative max-w-6xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+              {/* Header with package navigation */}
+              <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
+                {isPackage && (
+                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
+                    {canGoPrev && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setCurrentPreviewIndex(currentPreviewIndex - 1); }}
+                        className="p-1.5 hover:bg-gray-100 rounded-full transition-all"
+                        title="Previous asset"
+                      >
+                        <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                        </svg>
+                      </button>
+                    )}
+                    <span className="text-xs font-black text-gray-700 px-2">
+                      {currentPreviewIndex + 1} / {previewPackageAssets.length}
+                    </span>
+                    {canGoNext && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setCurrentPreviewIndex(currentPreviewIndex + 1); }}
+                        className="p-1.5 hover:bg-gray-100 rounded-full transition-all"
+                        title="Next asset"
+                      >
+                        <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
+                        </svg>
+                      </button>
+                    )}
+                  </div>
+                )}
+                <button 
+                  onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); }}
+                  className="p-3 bg-white/90 hover:bg-white rounded-full transition-all shadow-lg ml-auto"
+                >
+                  <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
+
+              {/* Package asset list buttons */}
+              {isPackage && (
+                <div className="absolute bottom-20 left-4 right-4 z-10 bg-white/90 backdrop-blur-sm rounded-2xl p-3 shadow-lg max-h-32 overflow-y-auto">
+                  <div className="flex flex-wrap gap-2">
+                    {previewPackageAssets.map((pkgAsset, idx) => (
+                      <button
+                        key={pkgAsset.id}
+                        onClick={(e) => { e.stopPropagation(); setCurrentPreviewIndex(idx); }}
+                        className={`px-3 py-1.5 rounded-lg text-[10px] font-bold uppercase tracking-wider transition-all ${
+                          idx === currentPreviewIndex
+                            ? 'bg-blue-600 text-white shadow-md'
+                            : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                        title={pkgAsset.title}
+                      >
+                        <span className="truncate max-w-[120px] block">{pkgAsset.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+              
+              {/* Asset Preview Content */}
+              <div className="flex-1 overflow-y-auto">
+                {currentAsset.type === 'image' && currentAsset.url && (
+                  <img src={currentAsset.url} alt={currentAsset.title} className="w-full h-auto max-h-[90vh] object-contain" />
+                )}
+                {currentAsset.type === 'video' && currentAsset.url && (() => {
               // Use proxy only when needed (e.g., MOV conversion)
               const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
               const isAllowedProxyHost = (u: URL) => {
@@ -1097,7 +1167,7 @@ function App() {
               
               // Direct playback - Firebase Storage URLs work when Content-Type is video/mp4
               // IMPORTANT: Run gsutil command to update existing files metadata first!
-              const videoUrl = previewAsset.url;
+              const videoUrl = currentAsset.url;
               
               return (
                 <div className="w-full flex items-center justify-center bg-black p-6">
@@ -1115,39 +1185,41 @@ function App() {
                 </div>
               );
             })()}
-            {previewAsset.type === 'text' && (
-              <div className="p-12 max-h-[90vh] overflow-y-auto">
-                <h2 className="text-3xl font-black text-gray-900 mb-4">{previewAsset.title}</h2>
-                <p className="text-lg text-gray-700 whitespace-pre-wrap">{previewAsset.content}</p>
+                {currentAsset.type === 'text' && (
+                  <div className="p-12 max-h-[90vh] overflow-y-auto">
+                    <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
+                    <p className="text-lg text-gray-700 whitespace-pre-wrap">{currentAsset.content}</p>
+                  </div>
+                )}
+                {currentAsset.type === 'design' && (
+                  <div className="p-12 text-center">
+                    <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
+                    <p className="text-gray-600">Design file - download to view</p>
+                  </div>
+                )}
               </div>
-            )}
-            {previewAsset.type === 'design' && (
-              <div className="p-12 text-center">
-                <h2 className="text-3xl font-black text-gray-900 mb-4">{previewAsset.title}</h2>
-                <p className="text-gray-600">Design file - download to view</p>
-              </div>
-            )}
-            
-            <div className="p-6 bg-gray-50 border-t border-gray-100">
-              <div className="flex flex-wrap gap-2 mb-3">
-                <span className="px-3 py-1 rounded-lg bg-gray-200 text-[10px] font-black text-gray-700 uppercase">{previewAsset.market}</span>
-                <span className="px-3 py-1 rounded-lg bg-blue-100 text-[10px] font-black text-blue-700 uppercase">{previewAsset.platform}</span>
-                {(previewAsset.carModels && previewAsset.carModels.length > 0 ? previewAsset.carModels : [previewAsset.carModel]).map((model, idx) => (
-                  <span key={idx} className="px-3 py-1 rounded-lg bg-purple-100 text-[10px] font-black text-purple-700 uppercase">{model}</span>
-                ))}
-              </div>
-              {previewAsset.objectives && previewAsset.objectives.length > 0 && (
+              
+              <div className="p-6 bg-gray-50 border-t border-gray-100">
                 <div className="flex flex-wrap gap-2 mb-3">
-                  {previewAsset.objectives.map(obj => (
-                    <span key={obj} className="px-3 py-1 rounded-lg bg-green-100 text-[10px] font-black text-green-700 uppercase">{obj}</span>
+                  <span className="px-3 py-1 rounded-lg bg-gray-200 text-[10px] font-black text-gray-700 uppercase">{currentAsset.market}</span>
+                  <span className="px-3 py-1 rounded-lg bg-blue-100 text-[10px] font-black text-blue-700 uppercase">{currentAsset.platform}</span>
+                  {(currentAsset.carModels && currentAsset.carModels.length > 0 ? currentAsset.carModels : [currentAsset.carModel]).map((model, idx) => (
+                    <span key={idx} className="px-3 py-1 rounded-lg bg-purple-100 text-[10px] font-black text-purple-700 uppercase">{model}</span>
                   ))}
                 </div>
-              )}
-              <p className="text-sm text-gray-600">Uploaded by {previewAsset.uploadedBy} • {new Date(previewAsset.createdAt).toLocaleDateString()}</p>
+                {currentAsset.objectives && currentAsset.objectives.length > 0 && (
+                  <div className="flex flex-wrap gap-2 mb-3">
+                    {currentAsset.objectives.map(obj => (
+                      <span key={obj} className="px-3 py-1 rounded-lg bg-green-100 text-[10px] font-black text-green-700 uppercase">{obj}</span>
+                    ))}
+                  </div>
+                )}
+                <p className="text-sm text-gray-600">Uploaded by {currentAsset.uploadedBy} • {new Date(currentAsset.createdAt).toLocaleDateString()}</p>
+              </div>
             </div>
           </div>
-        </div>
-      )}
+        );
+      })()}
     </div>
   );
 }
