@@ -123,14 +123,17 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       return;
     }
 
-    if (isPackageMode && files.length === 0) {
-      alert("Please select at least one file for the package.");
-      return;
-    }
+    // Skip file validation when editing existing asset (only updating metadata)
+    if (!editingAsset) {
+      if (isPackageMode && files.length === 0) {
+        alert("Please select at least one file for the package.");
+        return;
+      }
 
-    if (!isPackageMode && !file && type !== 'text' && !content) {
-      alert("Please select a file to upload.");
-      return;
+      if (!isPackageMode && !file && type !== 'text' && !content) {
+        alert("Please select a file to upload.");
+        return;
+      }
     }
 
     if (isPackageMode && onSavePackage) {
@@ -146,14 +149,20 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         else if (filename.includes('dooh') || filename.includes('display')) assetPlatform = 'DOOH';
         else if (filename.includes('banner')) assetPlatform = 'Banner';
 
+        // Handle car models: if "Other" is selected, use customCarModel
+        const processedCarModels = selectedCarModels.length > 0 
+          ? selectedCarModels.map(m => m === 'Other' ? (customCarModel || m) : m)
+          : (carModel === 'Other' ? [customCarModel || carModel] : [carModel]);
+        const primaryCarModel = processedCarModels[0] || carModel;
+
         return {
           asset: {
             title: `${title} - ${assetPlatform}`,
             type,
             market,
             platform: assetPlatform,
-            carModel: selectedCarModels.length > 0 ? selectedCarModels[0] : (carModel === 'Other' ? customCarModel : carModel),
-            carModels: selectedCarModels.length > 0 ? selectedCarModels : undefined,
+            carModel: primaryCarModel,
+            carModels: processedCarModels.length > 1 ? processedCarModels : undefined,
             usageRights,
             objectives: selectedObjectives,
             ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
@@ -174,12 +183,19 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       return;
     }
 
+    // Handle car models: if "Other" is selected, use customCarModel
+    const processedCarModels = selectedCarModels.length > 0 
+      ? selectedCarModels.map(m => m === 'Other' ? (customCarModel || m) : m)
+      : (carModel === 'Other' ? [customCarModel || carModel] : [carModel]);
+    const primaryCarModel = processedCarModels[0] || (carModel === 'Other' ? customCarModel : carModel);
+
     const data = {
       title,
       type,
       market,
       platform,
-      carModel: carModel === 'Other' ? customCarModel : carModel,
+      carModel: primaryCarModel,
+      ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
       usageRights,
       objectives: selectedObjectives,
       ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
