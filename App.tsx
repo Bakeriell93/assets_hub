@@ -1148,6 +1148,48 @@ function App() {
                   <div>
                     <h2 className="text-6xl font-black text-gray-900 tracking-tighter uppercase leading-none">TRASH</h2>
                     <p className="text-[12px] font-black text-gray-400 mt-4 uppercase tracking-[0.4em]">Deleted Assets (Auto-deleted after 3 days)</p>
+                    {currentUser?.role === 'Admin' && filteredAssets.filter(a => a.deletedAt).length > 0 && (
+                      <button
+                        onClick={async () => {
+                          const trashAssets = filteredAssets.filter(a => a.deletedAt);
+                          if (trashAssets.length === 0) return;
+                          
+                          const confirmMessage = `Are you sure you want to permanently delete ALL ${trashAssets.length} item${trashAssets.length !== 1 ? 's' : ''} in trash? This action cannot be undone.`;
+                          if (!window.confirm(confirmMessage)) return;
+                          
+                          try {
+                            setUploadStatus('Deleting all trash items...');
+                            setUploadProgress(0);
+                            
+                            // Delete all trash assets
+                            for (let i = 0; i < trashAssets.length; i++) {
+                              const asset = trashAssets[i];
+                              await storageService.permanentlyDeleteAsset(asset.id);
+                              setUploadProgress(((i + 1) / trashAssets.length) * 100);
+                              setUploadStatus(`Deleting ${i + 1} of ${trashAssets.length}...`);
+                            }
+                            
+                            setUploadProgress(100);
+                            setUploadStatus('All trash items deleted successfully');
+                            setTimeout(() => {
+                              setUploadProgress(null);
+                              setUploadStatus('');
+                            }, 2000);
+                          } catch (error: any) {
+                            console.error('Failed to delete all trash:', error);
+                            alert(`Failed to delete all trash items: ${error?.message || 'Unknown error'}`);
+                            setUploadProgress(null);
+                            setUploadStatus('');
+                          }
+                        }}
+                        className="mt-4 px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-xs font-black uppercase tracking-widest transition-all shadow-lg flex items-center gap-2"
+                      >
+                        <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" />
+                        </svg>
+                        Delete All ({filteredAssets.filter(a => a.deletedAt).length})
+                      </button>
+                    )}
                   </div>
                   <div className="text-right">
                     <p className="text-7xl font-black text-red-600 leading-none tracking-tighter">
