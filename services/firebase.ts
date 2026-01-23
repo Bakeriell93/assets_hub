@@ -6,7 +6,7 @@ const firebaseConfig = {
   apiKey: "AIzaSyAFfWS8fD8G1XRvWHXefeUmCjdHY8l7t8s",
   authDomain: "content-b7d4c.firebaseapp.com",
   projectId: "content-b7d4c",
-  storageBucket: "eu13657.firebasestorage.app", // EU bucket for faster uploads
+  storageBucket: "eu13657", // EU bucket for faster uploads
   messagingSenderId: "451578978927",
   appId: "1:451578978927:web:3294a541652f07b944239a",
   measurementId: "G-Z0QF8SYSW2"
@@ -31,7 +31,7 @@ try {
     try {
       db = getFirestore(app);
       // Explicitly specify the EU bucket for storage
-      storage = getStorage(app, 'gs://eu13657.firebasestorage.app');
+      storage = getStorage(app, "gs://eu13657");
       
       // Verify services are available
       if (!db) {
@@ -41,7 +41,7 @@ try {
         throw new Error("Storage service is not available");
       }
       
-      console.log("Firebase initialized successfully with EU bucket:", 'eu13657.firebasestorage.app');
+      console.log("Firebase initialized successfully with EU bucket:", "eu13657");
     } catch (serviceError: any) {
       console.error("Firebase service initialization error:", serviceError);
       initError = new Error(`Firebase services not available: ${serviceError?.message || 'Unknown error'}`);

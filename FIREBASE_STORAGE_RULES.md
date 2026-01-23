@@ -60,7 +60,7 @@ service firebase.storage {
 1. Go to Firebase Console: https://console.firebase.google.com/
 2. Select your project: `content-b7d4c`
 3. Navigate to: **Storage** → **Rules** tab
-4. Make sure you're editing rules for the bucket: `eu13657.firebasestorage.app`
+4. Make sure you're editing rules for the bucket: `eu13657`
 5. Paste the appropriate rules above
 6. Click **Publish**
 
