@@ -1087,25 +1087,9 @@ function App() {
                 }
               };
               
-              // Simple video player - use transcode proxy for MOV when configured
-              const isMov = previewAsset.url.toLowerCase().endsWith('.mov') || previewAsset.url.toLowerCase().endsWith('.qt');
-              const transcodeBase = import.meta.env.VITE_TRANSCODE_URL as string | undefined;
-              let videoUrl = previewAsset.url;
-              
-              // For MOV files, use transcode service if configured, otherwise fallback to proxy
-              if (isMov) {
-                try {
-                  const u = new URL(previewAsset.url);
-                  if (transcodeBase) {
-                    const base = transcodeBase.replace(/\/$/, '');
-                    videoUrl = `${base}/?url=${encodeURIComponent(previewAsset.url)}`;
-                  } else if (u.hostname.includes('firebasestorage') || u.hostname.includes('storage.googleapis')) {
-                    videoUrl = `/api/convert-video?url=${encodeURIComponent(previewAsset.url)}`;
-                  }
-                } catch {}
-              } else {
-                videoUrl = getVideoUrl(previewAsset.url);
-              }
+              // Direct playback - Firebase Storage URLs work when Content-Type is video/mp4
+              // IMPORTANT: Run gsutil command to update existing files metadata first!
+              const videoUrl = previewAsset.url;
               
               return (
                 <div className="w-full flex items-center justify-center bg-black p-6">
@@ -1113,22 +1097,9 @@ function App() {
                     controls 
                     style={{ width: '100%' }} 
                     controlsList="nodownload" 
-                    preload="metadata"
+                    preload="auto"
                     playsInline
                     className="max-h-[90vh]"
-                    crossOrigin="anonymous"
-                    onError={(e) => {
-                      const video = e.currentTarget;
-                      console.error('Video error:', {
-                        code: video.error?.code,
-                        message: video.error?.message,
-                        networkState: video.networkState,
-                        readyState: video.readyState,
-                        src: videoUrl
-                      });
-                    }}
-                    onLoadStart={() => console.log('Video load started:', videoUrl)}
-                    onCanPlay={() => console.log('Video can play:', videoUrl)}
                   >
                     <source src={videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.
