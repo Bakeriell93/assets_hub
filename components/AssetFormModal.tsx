@@ -175,8 +175,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         else if (filename.includes('dooh') || filename.includes('display')) assetPlatform = 'DOOH';
         else if (filename.includes('banner')) assetPlatform = 'Banner';
 
-        // Use custom title if provided, otherwise use filename (without extension)
-        const fileTitle = fileTitles[idx] || f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        // Use custom per-file title if provided, otherwise use main title field, otherwise use filename
+        const fileTitle = fileTitles[idx] || title || f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
 
         // Handle car models: if "Other" is selected, use customCarModel
         const processedCarModels = selectedCarModels.length > 0 
