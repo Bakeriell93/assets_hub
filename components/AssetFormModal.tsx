@@ -36,6 +36,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number | null>(null); // Selected thumbnail index for package preview
   const [isGeneratingThumbnails, setIsGeneratingThumbnails] = useState(false);
   const [isPackageMode, setIsPackageMode] = useState(false);
+  const [isChangingPreview, setIsChangingPreview] = useState(false); // For edit mode - show preview selection UI
+  const [editPackageThumbnails, setEditPackageThumbnails] = useState<Record<string, string>>({}); // Thumbnails for editing existing package
   const [originalTitle, setOriginalTitle] = useState('');
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
   const [isCarModelsDropdownOpen, setIsCarModelsDropdownOpen] = useState(false);
@@ -87,9 +89,21 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
           titles[asset.id] = asset.title;
         });
         setPackageAssetTitles(titles);
+        
+        // Find current preview asset
+        const currentPreviewId = editingAsset.packagePreviewAssetId;
+        const currentPreviewIndex = editingPackageAssets.findIndex(a => a.id === currentPreviewId);
+        if (currentPreviewIndex >= 0) {
+          setSelectedPreviewIndex(currentPreviewIndex);
+        } else {
+          setSelectedPreviewIndex(0);
+        }
       } else {
         setPackageAssetTitles({});
+        setSelectedPreviewIndex(null);
       }
+      setIsChangingPreview(false);
+      setEditPackageThumbnails({});
     } else {
       setTitle('');
       setOriginalTitle('');
@@ -112,6 +126,10 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setFiles([]);
       setFileTitles({});
       setPackageAssetTitles({});
+      setPackageThumbnails({});
+      setEditPackageThumbnails({});
+      setSelectedPreviewIndex(null);
+      setIsChangingPreview(false);
       setIsPackageMode(false);
       setIsCarModelsDropdownOpen(false);
     }
@@ -237,6 +255,13 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       if (editingPackageAssets.length > 1) {
         const nextMainTitle = title.trim();
         const hasMainTitleChange = nextMainTitle.length > 0 && nextMainTitle !== originalTitle;
+        
+        // Determine the new preview asset ID if preview was changed
+        let newPreviewAssetId: string | undefined = undefined;
+        if (isChangingPreview && selectedPreviewIndex !== null && selectedPreviewIndex < editingPackageAssets.length) {
+          newPreviewAssetId = editingPackageAssets[selectedPreviewIndex].id;
+        }
+        
         // Update all package assets
         for (const pkgAsset of editingPackageAssets) {
           const perItemTitle = packageAssetTitles[pkgAsset.id] || pkgAsset.title;
@@ -264,6 +289,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             status: pkgAsset.status,
             createdAt: pkgAsset.createdAt,
             ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+            // Update preview asset ID if changed
+            ...(newPreviewAssetId !== undefined ? { packagePreviewAssetId: newPreviewAssetId } : {}),
           };
           await storageService.updateAsset(pkgAsset.id, updates);
         }
@@ -564,31 +591,223 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
 
                 {/* Show package asset name editor when editing a package */}
                 {editingAsset && editingPackageAssets.length > 1 && (
-                  <div className="space-y-3 mb-6">
-                    <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Edit Package Asset Names</p>
-                    <div className="space-y-2 max-h-60 overflow-y-auto">
-                      {editingPackageAssets.map((pkgAsset) => (
-                        <div key={pkgAsset.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                          <div className="flex items-center justify-between mb-2">
-                            <span
-                              className="text-[10px] font-bold text-gray-500 truncate flex-1"
-                              title={getCleanFilename(pkgAsset)}
-                            >
-                              {getCleanFilename(pkgAsset)}
-                            </span>
-                          </div>
-                          <input
-                            type="text"
-                            value={packageAssetTitles[pkgAsset.id] || pkgAsset.title}
-                            onChange={(e) => {
-                              setPackageAssetTitles({ ...packageAssetTitles, [pkgAsset.id]: e.target.value });
-                            }}
-                            placeholder="Enter custom name..."
-                            className="w-full px-3 py-2 text-xs font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                          />
-                        </div>
-                      ))}
+                  <div className="space-y-4 mb-6">
+                    <div className="flex items-center justify-between">
+                      <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Edit Package Asset Names</p>
+                      {!isChangingPreview && (
+                        <button
+                          type="button"
+                          onClick={async () => {
+                            setIsChangingPreview(true);
+                            // Generate thumbnails for existing package assets
+                            setIsGeneratingThumbnails(true);
+                            const thumbnails: Record<string, string> = {};
+                            
+                            for (const pkgAsset of editingPackageAssets) {
+                              try {
+                                if (pkgAsset.type === 'image' && pkgAsset.url) {
+                                  // Generate image thumbnail
+                                  const img = new Image();
+                                  img.crossOrigin = 'anonymous';
+                                  await new Promise<void>((resolve, reject) => {
+                                    img.onload = () => {
+                                      try {
+                                        const canvas = document.createElement('canvas');
+                                        const maxSize = 200;
+                                        let width = img.width;
+                                        let height = img.height;
+                                        
+                                        if (width > height) {
+                                          if (width > maxSize) {
+                                            height = (height * maxSize) / width;
+                                            width = maxSize;
+                                          }
+                                        } else {
+                                          if (height > maxSize) {
+                                            width = (width * maxSize) / height;
+                                            height = maxSize;
+                                          }
+                                        }
+                                        
+                                        canvas.width = width;
+                                        canvas.height = height;
+                                        const ctx = canvas.getContext('2d');
+                                        if (ctx) {
+                                          ctx.drawImage(img, 0, 0, width, height);
+                                          thumbnails[pkgAsset.id] = canvas.toDataURL('image/jpeg', 0.7);
+                                        }
+                                        resolve();
+                                      } catch (err) {
+                                        reject(err);
+                                      }
+                                    };
+                                    img.onerror = () => reject(new Error('Failed to load image'));
+                                    img.src = pkgAsset.url;
+                                  });
+                                } else if (pkgAsset.type === 'video' && pkgAsset.url) {
+                                  // Generate video thumbnail
+                                  const video = document.createElement('video');
+                                  video.crossOrigin = 'anonymous';
+                                  await new Promise<void>((resolve, reject) => {
+                                    video.onloadedmetadata = () => {
+                                      try {
+                                        video.currentTime = 0.5;
+                                      } catch {
+                                        video.currentTime = 0;
+                                      }
+                                    };
+                                    video.onseeked = () => {
+                                      try {
+                                        const canvas = document.createElement('canvas');
+                                        const maxSize = 200;
+                                        let width = video.videoWidth;
+                                        let height = video.videoHeight;
+                                        
+                                        if (width > height) {
+                                          if (width > maxSize) {
+                                            height = (height * maxSize) / width;
+                                            width = maxSize;
+                                          }
+                                        } else {
+                                          if (height > maxSize) {
+                                            width = (width * maxSize) / height;
+                                            height = maxSize;
+                                          }
+                                        }
+                                        
+                                        canvas.width = width;
+                                        canvas.height = height;
+                                        const ctx = canvas.getContext('2d');
+                                        if (ctx) {
+                                          ctx.drawImage(video, 0, 0, width, height);
+                                          thumbnails[pkgAsset.id] = canvas.toDataURL('image/jpeg', 0.7);
+                                        }
+                                        resolve();
+                                      } catch (err) {
+                                        reject(err);
+                                      }
+                                    };
+                                    video.onerror = () => reject(new Error('Failed to load video'));
+                                    video.src = pkgAsset.url;
+                                    video.muted = true;
+                                    video.load();
+                                  });
+                                }
+                              } catch (err) {
+                                console.warn(`Failed to generate thumbnail for ${pkgAsset.title}:`, err);
+                              }
+                            }
+                            
+                            setEditPackageThumbnails(thumbnails);
+                            setIsGeneratingThumbnails(false);
+                          }}
+                          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                          </svg>
+                          Change Preview Cover
+                        </button>
+                      )}
                     </div>
+                    
+                    {!isChangingPreview ? (
+                      <div className="space-y-2 max-h-60 overflow-y-auto">
+                        {editingPackageAssets.map((pkgAsset) => (
+                          <div key={pkgAsset.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
+                            <div className="flex items-center justify-between mb-2">
+                              <span
+                                className="text-[10px] font-bold text-gray-500 truncate flex-1"
+                                title={getCleanFilename(pkgAsset)}
+                              >
+                                {getCleanFilename(pkgAsset)}
+                              </span>
+                            </div>
+                            <input
+                              type="text"
+                              value={packageAssetTitles[pkgAsset.id] || pkgAsset.title}
+                              onChange={(e) => {
+                                setPackageAssetTitles({ ...packageAssetTitles, [pkgAsset.id]: e.target.value });
+                              }}
+                              placeholder="Enter custom name..."
+                              className="w-full px-3 py-2 text-xs font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                            />
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between">
+                          <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Select Preview Image</p>
+                          <button
+                            type="button"
+                            onClick={() => setIsChangingPreview(false)}
+                            className="text-xs text-gray-500 hover:text-gray-700 font-bold"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                        <p className="text-[10px] text-gray-400">Choose which image/video thumbnail to display on the package card</p>
+                        {isGeneratingThumbnails ? (
+                          <div className="text-center py-4">
+                            <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                            <p className="text-xs text-gray-500 mt-2">Generating thumbnails...</p>
+                          </div>
+                        ) : (
+                          <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                            {editingPackageAssets.map((pkgAsset, idx) => {
+                              const thumbnail = editPackageThumbnails[pkgAsset.id];
+                              const isSelected = selectedPreviewIndex === idx;
+                              return (
+                                <button
+                                  key={pkgAsset.id}
+                                  type="button"
+                                  onClick={() => setSelectedPreviewIndex(idx)}
+                                  className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                                    isSelected 
+                                      ? 'border-blue-600 ring-2 ring-blue-200' 
+                                      : 'border-gray-200 hover:border-gray-300'
+                                  }`}
+                                  title={pkgAsset.title}
+                                >
+                                  {thumbnail ? (
+                                    <img 
+                                      src={thumbnail} 
+                                      alt={pkgAsset.title}
+                                      className="w-full h-full object-cover"
+                                    />
+                                  ) : (
+                                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                      {pkgAsset.type === 'image' ? (
+                                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                        </svg>
+                                      ) : (
+                                        <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
+                                          <path d="M8 5v14l11-7z" />
+                                        </svg>
+                                      )}
+                                    </div>
+                                  )}
+                                  {isSelected && (
+                                    <div className="absolute inset-0 bg-blue-600/20 flex items-center justify-center">
+                                      <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                                        <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                          <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                        </svg>
+                                      </div>
+                                    </div>
+                                  )}
+                                  <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] font-bold px-1 py-0.5 truncate">
+                                    {idx + 1}
+                                  </div>
+                                </button>
+                              );
+                            })}
+                          </div>
+                        )}
+                      </div>
+                    )}
                   </div>
                 )}
 
