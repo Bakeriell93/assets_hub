@@ -33,6 +33,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [fileTitles, setFileTitles] = useState<Record<number, string>>({}); // Store custom titles for each file
   const [packageAssetTitles, setPackageAssetTitles] = useState<Record<string, string>>({}); // Store custom titles for package assets when editing
   const [isPackageMode, setIsPackageMode] = useState(false);
+  const [originalTitle, setOriginalTitle] = useState('');
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
   const [isCarModelsDropdownOpen, setIsCarModelsDropdownOpen] = useState(false);
   
@@ -44,6 +45,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   useEffect(() => {
     if (editingAsset) {
       setTitle(editingAsset.title);
+      setOriginalTitle(editingAsset.title);
       setUploaderName(editingAsset.uploadedBy);
       setType(editingAsset.type);
       setMarket(editingAsset.market);
@@ -87,6 +89,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       }
     } else {
       setTitle('');
+      setOriginalTitle('');
       setUploaderName('');
       setType('image');
       setMarket('Global' as Market);
@@ -223,9 +226,14 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     if (editingAsset) {
       // If editing a package, update all package assets with new titles
       if (editingPackageAssets.length > 1) {
+        const nextMainTitle = title.trim();
+        const hasMainTitleChange = nextMainTitle.length > 0 && nextMainTitle !== originalTitle;
         // Update all package assets
         for (const pkgAsset of editingPackageAssets) {
-          const newTitle = packageAssetTitles[pkgAsset.id] || pkgAsset.title;
+          const perItemTitle = packageAssetTitles[pkgAsset.id] || pkgAsset.title;
+          const shouldUseMainTitle =
+            hasMainTitleChange && perItemTitle === originalTitle;
+          const newTitle = shouldUseMainTitle ? nextMainTitle : perItemTitle;
           const updates: Partial<Asset> = {
             title: newTitle,
             // Preserve other fields
