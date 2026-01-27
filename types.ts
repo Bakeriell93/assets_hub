@@ -64,6 +64,7 @@ export interface Asset {
   // Package grouping
   packageId?: string; // If set, this asset is part of a package
   packageOrder?: number; // Order within package
+  packagePreviewAssetId?: string; // ID of the asset to use as package card preview thumbnail
   // Soft delete (trash)
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
 }

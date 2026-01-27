@@ -693,18 +693,42 @@ function App() {
       setUploadProgress(0);
       setUploadStatus(`Uploading package (0/${packageAssets.length})...`);
 
+      // Find the preview asset index before upload
+      const previewAssetIndex = packageAssets.findIndex(({ asset }) => 
+        asset.packagePreviewAssetId && asset.packagePreviewAssetId.startsWith('temp_')
+      );
+      const uploadedAssets: Asset[] = [];
+      
       // Upload all assets in the package
       for (let i = 0; i < packageAssets.length; i++) {
         const { asset, file } = packageAssets[i];
         const assetProgress = (i / packageAssets.length) * 100;
         
-        await storageService.addAsset(asset, file, (progress) => {
+        // Get the uploaded asset
+        const uploadedAsset = await storageService.addAsset(asset, file, (progress) => {
           // Calculate overall progress: previous assets + current asset progress
           const overallProgress = assetProgress + (progress / packageAssets.length);
           setUploadProgress(overallProgress);
           setUploadStatus(`Uploading package (${i + 1}/${packageAssets.length}): ${asset.title || 'Asset'}`);
         });
+        
+        // Store the uploaded asset
+        if (uploadedAsset) {
+          uploadedAssets.push(uploadedAsset);
+        }
       }
+      
+      // Update all package assets with the correct preview asset ID
+      if (previewAssetIndex >= 0 && previewAssetIndex < uploadedAssets.length) {
+        const previewAssetId = uploadedAssets[previewAssetIndex].id;
+        
+        // Update all assets in the package to reference the preview asset
+        for (const uploadedAsset of uploadedAssets) {
+          await storageService.updateAsset(uploadedAsset.id, { packagePreviewAssetId: previewAssetId });
+        }
+      }
+      
+      // Clean up thumbnails from memory (they're only in component state, will be garbage collected)
 
       setUploadProgress(100);
       setUploadStatus('Package upload complete!');
@@ -800,11 +824,17 @@ function App() {
 
   // Sort packages by their first asset's createdAt
   const packageGroups = Array.from(packageMap.values())
-    .map(pkgAssets => ({
-      packageId: pkgAssets[0].packageId!,
-      assets: pkgAssets.sort((a, b) => (a.packageOrder || 0) - (b.packageOrder || 0)),
-      representative: pkgAssets.sort((a, b) => (a.packageOrder || 0) - (b.packageOrder || 0))[0]
-    }))
+    .map(pkgAssets => {
+      const sorted = pkgAssets.sort((a, b) => (a.packageOrder || 0) - (b.packageOrder || 0));
+      // Use preview asset if specified, otherwise use first asset
+      const previewAsset = sorted.find(a => a.packagePreviewAssetId && pkgAssets.some(pa => pa.id === a.packagePreviewAssetId));
+      const representative = previewAsset || sorted[0];
+      return {
+        packageId: pkgAssets[0].packageId!,
+        assets: sorted,
+        representative
+      };
+    })
     .sort((a, b) => b.representative.createdAt - a.representative.createdAt);
 
   const sortedAssets = [

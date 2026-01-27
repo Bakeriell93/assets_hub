@@ -32,6 +32,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [files, setFiles] = useState<File[]>([]);
   const [fileTitles, setFileTitles] = useState<Record<number, string>>({}); // Store custom titles for each file
   const [packageAssetTitles, setPackageAssetTitles] = useState<Record<string, string>>({}); // Store custom titles for package assets when editing
+  const [packageThumbnails, setPackageThumbnails] = useState<Record<number, string>>({}); // Store generated thumbnails for package files
+  const [selectedPreviewIndex, setSelectedPreviewIndex] = useState<number | null>(null); // Selected thumbnail index for package preview
+  const [isGeneratingThumbnails, setIsGeneratingThumbnails] = useState(false);
   const [isPackageMode, setIsPackageMode] = useState(false);
   const [originalTitle, setOriginalTitle] = useState('');
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
@@ -168,6 +171,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     if (isPackageMode && onSavePackage) {
       // Create package with multiple files
       const packageId = `pkg_${Date.now()}`;
+      const previewAssetIndex = selectedPreviewIndex !== null ? selectedPreviewIndex : 0;
       const packageAssets = files.map((f, idx) => {
         // Extract platform from filename or use default
         const filename = f.name.toLowerCase();
@@ -205,11 +209,16 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             comments: comments || undefined,
             packageId,
             packageOrder: idx,
-            originalFileName: f.name // Store original Windows filename
+            originalFileName: f.name, // Store original Windows filename
+            // Store which asset should be used as preview (will be set after upload with actual IDs)
+            ...(idx === previewAssetIndex ? { packagePreviewAssetId: 'temp_' + idx } : {})
           } as Omit<Asset, 'id' | 'createdAt'>,
           file: f
         };
       });
+      
+      // After upload, we'll need to update the preview asset ID with the actual asset ID
+      // This will be handled in the onSavePackage callback
 
       await onSavePackage(packageAssets);
       onClose();
@@ -596,6 +605,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               setFile(null);
                               setFiles([]);
                               setFileTitles({});
+                              setPackageThumbnails({});
+                              setSelectedPreviewIndex(null);
                             }}
                             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
                           />
@@ -618,7 +629,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               required 
                               multiple
                               accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : '*/*'} 
-                              onChange={(e) => {
+                              onChange={async (e) => {
                                 const selectedFiles = Array.from(e.target.files || []);
                                 setFiles(selectedFiles);
                                 // Initialize titles with default (filename without extension)
@@ -627,6 +638,121 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                                   initialTitles[idx] = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
                                 });
                                 setFileTitles(initialTitles);
+                                
+                                // Generate thumbnails for all files
+                                setIsGeneratingThumbnails(true);
+                                setSelectedPreviewIndex(0); // Default to first file
+                                const thumbnails: Record<number, string> = {};
+                                
+                                for (let idx = 0; idx < selectedFiles.length; idx++) {
+                                  const file = selectedFiles[idx];
+                                  try {
+                                    if (file.type.startsWith('image/')) {
+                                      // Generate image thumbnail
+                                      const img = new Image();
+                                      const objectUrl = URL.createObjectURL(file);
+                                      await new Promise<void>((resolve, reject) => {
+                                        img.onload = () => {
+                                          try {
+                                            const canvas = document.createElement('canvas');
+                                            const maxSize = 200;
+                                            let width = img.width;
+                                            let height = img.height;
+                                            
+                                            if (width > height) {
+                                              if (width > maxSize) {
+                                                height = (height * maxSize) / width;
+                                                width = maxSize;
+                                              }
+                                            } else {
+                                              if (height > maxSize) {
+                                                width = (width * maxSize) / height;
+                                                height = maxSize;
+                                              }
+                                            }
+                                            
+                                            canvas.width = width;
+                                            canvas.height = height;
+                                            const ctx = canvas.getContext('2d');
+                                            if (ctx) {
+                                              ctx.drawImage(img, 0, 0, width, height);
+                                              thumbnails[idx] = canvas.toDataURL('image/jpeg', 0.7);
+                                            }
+                                            URL.revokeObjectURL(objectUrl);
+                                            resolve();
+                                          } catch (err) {
+                                            URL.revokeObjectURL(objectUrl);
+                                            reject(err);
+                                          }
+                                        };
+                                        img.onerror = () => {
+                                          URL.revokeObjectURL(objectUrl);
+                                          reject(new Error('Failed to load image'));
+                                        };
+                                        img.src = objectUrl;
+                                      });
+                                    } else if (file.type.startsWith('video/')) {
+                                      // Generate video thumbnail
+                                      const video = document.createElement('video');
+                                      const objectUrl = URL.createObjectURL(file);
+                                      await new Promise<void>((resolve, reject) => {
+                                        video.onloadedmetadata = () => {
+                                          try {
+                                            video.currentTime = 0.5; // Seek to 0.5 seconds
+                                          } catch {
+                                            // If seeking fails, try at 0
+                                            video.currentTime = 0;
+                                          }
+                                        };
+                                        video.onseeked = () => {
+                                          try {
+                                            const canvas = document.createElement('canvas');
+                                            const maxSize = 200;
+                                            let width = video.videoWidth;
+                                            let height = video.videoHeight;
+                                            
+                                            if (width > height) {
+                                              if (width > maxSize) {
+                                                height = (height * maxSize) / width;
+                                                width = maxSize;
+                                              }
+                                            } else {
+                                              if (height > maxSize) {
+                                                width = (width * maxSize) / height;
+                                                height = maxSize;
+                                              }
+                                            }
+                                            
+                                            canvas.width = width;
+                                            canvas.height = height;
+                                            const ctx = canvas.getContext('2d');
+                                            if (ctx) {
+                                              ctx.drawImage(video, 0, 0, width, height);
+                                              thumbnails[idx] = canvas.toDataURL('image/jpeg', 0.7);
+                                            }
+                                            URL.revokeObjectURL(objectUrl);
+                                            resolve();
+                                          } catch (err) {
+                                            URL.revokeObjectURL(objectUrl);
+                                            reject(err);
+                                          }
+                                        };
+                                        video.onerror = () => {
+                                          URL.revokeObjectURL(objectUrl);
+                                          reject(new Error('Failed to load video'));
+                                        };
+                                        video.src = objectUrl;
+                                        video.muted = true;
+                                        video.load();
+                                      });
+                                    }
+                                  } catch (err) {
+                                    console.warn(`Failed to generate thumbnail for ${file.name}:`, err);
+                                  }
+                                }
+                                
+                                setPackageThumbnails(thumbnails);
+                                setIsGeneratingThumbnails(false);
                               }} 
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
                             />
@@ -653,18 +779,35 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                                           const newFiles = files.filter((_, i) => i !== idx);
                                           setFiles(newFiles);
                                           const newTitles = { ...fileTitles };
+                                          const newThumbnails = { ...packageThumbnails };
                                           delete newTitles[idx];
-                                          // Reindex remaining titles
-                                          const reindexed: Record<number, string> = {};
+                                          delete newThumbnails[idx];
+                                          // Reindex remaining titles and thumbnails
+                                          const reindexedTitles: Record<number, string> = {};
+                                          const reindexedThumbnails: Record<number, string> = {};
                                           Object.keys(newTitles).forEach(oldIdx => {
                                             const oldIndex = parseInt(oldIdx);
                                             if (oldIndex > idx) {
-                                              reindexed[oldIndex - 1] = newTitles[oldIndex];
+                                              reindexedTitles[oldIndex - 1] = newTitles[oldIndex];
                                             } else {
-                                              reindexed[oldIndex] = newTitles[oldIndex];
+                                              reindexedTitles[oldIndex] = newTitles[oldIndex];
                                             }
                                           });
-                                          setFileTitles(reindexed);
+                                          Object.keys(newThumbnails).forEach(oldIdx => {
+                                            const oldIndex = parseInt(oldIdx);
+                                            if (oldIndex > idx) {
+                                              reindexedThumbnails[oldIndex - 1] = newThumbnails[oldIndex];
+                                            } else {
+                                              reindexedThumbnails[oldIndex] = newThumbnails[oldIndex];
+                                            }
+                                          });
+                                          setFileTitles(reindexedTitles);
+                                          setPackageThumbnails(reindexedThumbnails);
+                                          if (selectedPreviewIndex === idx) {
+                                            setSelectedPreviewIndex(0);
+                                          } else if (selectedPreviewIndex !== null && selectedPreviewIndex > idx) {
+                                            setSelectedPreviewIndex(selectedPreviewIndex - 1);
+                                          }
                                         }}
                                         className="ml-2 text-red-500 hover:text-red-700 text-xs font-black"
                                       >
@@ -683,6 +826,66 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                                   </div>
                                 ))}
                               </div>
+                              
+                              {/* Thumbnail Selection */}
+                              {Object.keys(packageThumbnails).length > 0 && (
+                                <div className="space-y-3 mt-4">
+                                  <p className="text-xs font-bold text-gray-500 uppercase tracking-tighter">Select Preview Image</p>
+                                  <p className="text-[10px] text-gray-400">Choose which image/video thumbnail to display on the package card</p>
+                                  {isGeneratingThumbnails ? (
+                                    <div className="text-center py-4">
+                                      <div className="inline-block animate-spin rounded-full h-6 w-6 border-b-2 border-blue-600"></div>
+                                      <p className="text-xs text-gray-500 mt-2">Generating thumbnails...</p>
+                                    </div>
+                                  ) : (
+                                    <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
+                                      {files.map((f, idx) => {
+                                        const thumbnail = packageThumbnails[idx];
+                                        const isSelected = selectedPreviewIndex === idx;
+                                        return (
+                                          <button
+                                            key={idx}
+                                            type="button"
+                                            onClick={() => setSelectedPreviewIndex(idx)}
+                                            className={`relative aspect-square rounded-lg overflow-hidden border-2 transition-all ${
+                                              isSelected 
+                                                ? 'border-blue-600 ring-2 ring-blue-200' 
+                                                : 'border-gray-200 hover:border-gray-300'
+                                            }`}
+                                            title={f.name}
+                                          >
+                                            {thumbnail ? (
+                                              <img 
+                                                src={thumbnail} 
+                                                alt={f.name}
+                                                className="w-full h-full object-cover"
+                                              />
+                                            ) : (
+                                              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
+                                                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                              </div>
+                                            )}
+                                            {isSelected && (
+                                              <div className="absolute inset-0 bg-blue-600/20 flex items-center justify-center">
+                                                <div className="w-6 h-6 bg-blue-600 rounded-full flex items-center justify-center">
+                                                  <svg className="w-4 h-4 text-white" fill="currentColor" viewBox="0 0 20 20">
+                                                    <path fillRule="evenodd" d="M16.707 5.293a1 1 0 010 1.414l-8 8a1 1 0 01-1.414 0l-4-4a1 1 0 011.414-1.414L8 12.586l7.293-7.293a1 1 0 011.414 0z" clipRule="evenodd" />
+                                                  </svg>
+                                                </div>
+                                              </div>
+                                            )}
+                                            <div className="absolute bottom-0 left-0 right-0 bg-black/60 text-white text-[8px] font-bold px-1 py-0.5 truncate">
+                                              {idx + 1}
+                                            </div>
+                                          </button>
+                                        );
+                                      })}
+                                    </div>
+                                  )}
+                                </div>
+                              )}
                             </div>
                           )}
                         </div>

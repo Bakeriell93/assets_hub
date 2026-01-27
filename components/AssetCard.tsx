@@ -154,6 +154,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isPackage = packageAssets.length > 1;
+  
+  // Get the preview asset for package (use packagePreviewAssetId if set, otherwise first asset)
+  const previewAsset = isPackage 
+    ? (asset.packagePreviewAssetId 
+        ? packageAssets.find(a => a.id === asset.packagePreviewAssetId) || packageAssets[0]
+        : packageAssets[0])
+    : asset;
   const isHighPerformer = (asset.ctr && asset.ctr > 2) || (asset.cr && asset.cr > 1.5);
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
@@ -161,9 +168,9 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
   // Generate video thumbnail - cached in localStorage
   useEffect(() => {
-    if (asset.type === 'video' && asset.url && videoRef.current) {
+    if (previewAsset.type === 'video' && previewAsset.url && videoRef.current) {
       // Check cache first
-      const cacheKey = `video_thumb_${asset.url}`;
+      const cacheKey = `video_thumb_${previewAsset.url}`;
       const cached = localStorage.getItem(cacheKey);
       if (cached) {
         setVideoThumbnail(cached);
@@ -171,7 +178,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       }
       
       const video = videoRef.current;
-      const videoUrl = getThumbnailVideoUrl(asset.url);
+      const videoUrl = getThumbnailVideoUrl(previewAsset.url);
       let isMov = false;
       try {
         const u = new URL(asset.url);
@@ -259,7 +266,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         clearTimeout(timeoutId);
       };
     }
-  }, [asset.type, asset.url]);
+  }, [previewAsset.type, previewAsset.url]);
 
   const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
 
@@ -641,15 +648,15 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
       {/* Visual Preview */}
       <div className="relative h-56 bg-gray-50 flex items-center justify-center overflow-hidden">
-        {asset.type === 'image' && asset.url && (
+        {previewAsset.type === 'image' && previewAsset.url && (
           <ImageThumbnail 
-            imageUrl={asset.url}
-            assetId={asset.id}
-            assetUpdatedAt={asset.createdAt}
-            title={asset.title}
+            imageUrl={previewAsset.url}
+            assetId={previewAsset.id}
+            assetUpdatedAt={previewAsset.createdAt}
+            title={previewAsset.title}
           />
         )}
-        {asset.type === 'video' && asset.url && (
+        {previewAsset.type === 'video' && previewAsset.url && (
             <div className="relative w-full h-full bg-gray-900">
                {videoThumbnail ? (
                  <img 
@@ -668,7 +675,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                )}
               <video 
                 ref={videoRef}
-                src={getThumbnailVideoUrl(asset.url)} 
+                src={getThumbnailVideoUrl(previewAsset.url)} 
                  className="absolute inset-0 w-full h-full object-cover opacity-0 pointer-events-none"
                  preload="metadata"
                  muted
@@ -680,22 +687,22 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                    console.warn('Video thumbnail generation failed:', {
                      code: error?.code,
                      message: error?.message,
-                     url: asset.url
+                     url: previewAsset.url
                    });
                  }}
                >
                  {/* For MOV/APCN files, try as MP4 since many are H.264 compatible */}
                 {(() => {
                   try {
-                    const u = new URL(asset.url);
+                    const u = new URL(previewAsset.url);
                     const path = u.pathname.toLowerCase();
                     if (path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn')) {
-                      return <source src={getThumbnailVideoUrl(asset.url)} type="video/mp4" />;
+                      return <source src={getThumbnailVideoUrl(previewAsset.url)} type="video/mp4" />;
                     }
                   } catch {
-                    const lower = asset.url.toLowerCase();
+                    const lower = previewAsset.url.toLowerCase();
                     if (lower.endsWith('.mov') || lower.endsWith('.qt') || lower.endsWith('.apcn')) {
-                      return <source src={getThumbnailVideoUrl(asset.url)} type="video/mp4" />;
+                      return <source src={getThumbnailVideoUrl(previewAsset.url)} type="video/mp4" />;
                     }
                   }
                   return null;

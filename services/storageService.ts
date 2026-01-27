@@ -381,7 +381,7 @@ export const storageService = {
     }
   },
 
-  addAsset: async (asset: Omit<Asset, 'id' | 'createdAt' | 'size' | 'status'>, file?: File, onProgress?: (progress: number) => void): Promise<void> => {
+  addAsset: async (asset: Omit<Asset, 'id' | 'createdAt' | 'size' | 'status'>, file?: File, onProgress?: (progress: number) => void): Promise<Asset> => {
     let publicUrl = asset.url;
     let size = 0;
 
@@ -506,12 +506,13 @@ export const storageService = {
         const newAsset = { ...finalPayload, id } as Asset;
         writeLS(LS_KEYS.assets, [newAsset, ...existing]);
         await storageService.logSecurityEvent(`Asset Published (local): ${asset.title}`, 'low');
-        return;
+        return newAsset;
       }
 
       const docRef = await addDoc(collection(db!, ASSETS_COLLECTION), finalPayload);
       console.log('Asset saved successfully with ID:', docRef.id);
       await storageService.logSecurityEvent(`Asset Published: ${asset.title}`, 'low');
+      return { ...finalPayload, id: docRef.id } as Asset;
     } catch (error) {
       console.error('addAsset error:', error);
       handleError('addAsset', error);
