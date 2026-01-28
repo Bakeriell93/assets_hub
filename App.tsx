@@ -493,8 +493,8 @@ function App() {
   
   const [assets, setAssets] = useState<Asset[]>([]);
   // OPTIMIZATION: Pagination to reduce initial load and bandwidth
-  const [visibleAssetsCount, setVisibleAssetsCount] = useState(20); // Load 20 assets initially
-  const ASSETS_PER_PAGE = 20; // Load 20 more assets per page
+  const [visibleAssetsCount, setVisibleAssetsCount] = useState(8); // Load 8 assets initially
+  const ASSETS_PER_PAGE = 8; // Load 8 more assets per page
   // Use defaults from types.ts as initial state
   const [config, setConfig] = useState<SystemConfig>({ 
     markets: MARKETS, 
