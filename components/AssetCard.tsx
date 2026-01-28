@@ -29,19 +29,21 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
       }
     }
 
-    // Generate thumbnail using fetch-image API with size parameter
-    // Use a small size for thumbnail (300px width should be enough for card display)
+    // OPTIMIZATION: Use Firebase Storage URL directly - no Vercel proxying
+    // Firebase Storage already has CDN, so direct access reduces Fast Origin Transfer
+    // Only use proxy if CORS fails (fallback)
     const getThumbnailUrl = () => {
       try {
         const u = new URL(imageUrl);
-        const isAllowed = u.hostname === 'firebasestorage.googleapis.com' ||
+        const isFirebaseStorage = u.hostname === 'firebasestorage.googleapis.com' ||
           u.hostname === 'storage.googleapis.com' ||
           u.hostname.endsWith('.firebasestorage.app') ||
           u.hostname.endsWith('.appspot.com');
         
-        if (isAllowed) {
-          // Use fetch-image API which can handle thumbnails
-          return `/api/fetch-image?url=${encodeURIComponent(imageUrl)}`;
+        if (isFirebaseStorage) {
+          // Use Firebase Storage URL directly - Firebase CDN handles caching
+          // This avoids proxying through Vercel, reducing Fast Origin Transfer
+          return imageUrl;
         }
         return imageUrl;
       } catch {
@@ -133,6 +135,8 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
       loading="lazy"
       decoding="async"
+      // OPTIMIZATION: Add fetchpriority for better resource hints
+      fetchPriority="low"
     />
   );
 };
@@ -285,10 +289,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       if (!isAllowedProxyHost(u)) return url;
       const path = u.pathname.toLowerCase();
       const isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
+      // Only proxy MOV files that need conversion - everything else use direct Firebase Storage URL
       if (isMov) {
         return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
       }
-      return `/api/fetch-image?url=${encodeURIComponent(u.toString())}`;
+      // OPTIMIZATION: Use Firebase Storage URL directly for video thumbnails
+      // Firebase Storage CDN handles caching, reducing Fast Origin Transfer
+      return url;
     } catch {
       return url;
     }
@@ -304,9 +311,14 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       if (isMov && asset.type === 'video') {
         return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
       }
+      // OPTIMIZATION: Use Firebase Storage URL directly - no proxying through Vercel
+      // Firebase Storage already has CDN, so direct access reduces Fast Origin Transfer
+      // Only proxy if explicitly enabled via env var (for CORS issues)
       if (useStorageProxy) {
         return `/api/fetch-image?url=${encodeURIComponent(u.toString())}`;
       }
+      // Default: use direct Firebase Storage URL
+      return url;
     } catch {
       // ignore (data: urls, relative urls)
     }
@@ -665,6 +677,8 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                    className="w-full h-full object-cover" 
                    loading="lazy"
                    decoding="async"
+                   // OPTIMIZATION: Add fetchpriority for better resource hints
+                   fetchPriority="low"
                  />
                ) : (
                  <div className="w-full h-full flex items-center justify-center bg-gray-800">

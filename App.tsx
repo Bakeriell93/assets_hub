@@ -140,10 +140,13 @@ const VideoThumbnail: React.FC<{ videoUrl: string; title: string }> = ({ videoUr
         if (!isAllowedProxyHost(u)) return url;
         const path = u.pathname.toLowerCase();
         const isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
+        // Only proxy MOV files that need conversion - everything else use direct Firebase Storage URL
         if (isMov) {
           return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
         }
-        return `/api/fetch-image?url=${encodeURIComponent(u.toString())}`;
+        // OPTIMIZATION: Use Firebase Storage URL directly for video thumbnails
+        // Firebase Storage CDN handles caching, reducing Fast Origin Transfer
+        return url;
       } catch {
         return url;
       }
@@ -489,6 +492,9 @@ function App() {
   const [viewMode, setViewMode] = useState<ViewMode>('repository');
   
   const [assets, setAssets] = useState<Asset[]>([]);
+  // OPTIMIZATION: Pagination to reduce initial load and bandwidth
+  const [visibleAssetsCount, setVisibleAssetsCount] = useState(20); // Load 20 assets initially
+  const ASSETS_PER_PAGE = 20; // Load 20 more assets per page
   // Use defaults from types.ts as initial state
   const [config, setConfig] = useState<SystemConfig>({ 
     markets: MARKETS, 
@@ -971,7 +977,7 @@ function App() {
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
-                  {sortedAssets.map(asset => {
+                  {sortedAssets.slice(0, visibleAssetsCount).map(asset => {
                     const packageAssets = asset.packageId 
                       ? packageMap.get(asset.packageId) || [asset]
                       : [asset];
@@ -1000,6 +1006,18 @@ function App() {
                     );
                   })}
                 </div>
+                
+                {/* OPTIMIZATION: Load more button for pagination - reduces initial bandwidth */}
+                {sortedAssets.length > visibleAssetsCount && (
+                  <div className="mt-12 text-center">
+                    <button
+                      onClick={() => setVisibleAssetsCount(prev => Math.min(prev + ASSETS_PER_PAGE, sortedAssets.length))}
+                      className="px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] transition-all shadow-xl"
+                    >
+                      Load More ({sortedAssets.length - visibleAssetsCount} remaining)
+                    </button>
+                  </div>
+                )}
               </div>
             )}
 
@@ -1230,8 +1248,9 @@ function App() {
                 </div>
 
                 {filteredAssets.length > 0 ? (
-                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
-                    {sortedAssets.map(asset => {
+                  <>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
+                      {sortedAssets.slice(0, visibleAssetsCount).map((asset, idx) => {
                       const packageAssets = asset.packageId 
                         ? packageMap.get(asset.packageId) || [asset]
                         : [asset];
@@ -1271,7 +1290,20 @@ function App() {
                         </div>
                       );
                     })}
-                  </div>
+                    </div>
+                    
+                    {/* OPTIMIZATION: Load more button for pagination in trash view */}
+                    {sortedAssets.length > visibleAssetsCount && (
+                      <div className="mt-12 text-center">
+                        <button
+                          onClick={() => setVisibleAssetsCount(prev => Math.min(prev + ASSETS_PER_PAGE, sortedAssets.length))}
+                          className="px-10 py-4 bg-blue-600 hover:bg-blue-700 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] transition-all shadow-xl"
+                        >
+                          Load More ({sortedAssets.length - visibleAssetsCount} remaining)
+                        </button>
+                      </div>
+                    )}
+                  </>
                 ) : (
                   <div className="py-48 text-center border-4 border-dashed border-gray-100 rounded-[64px] bg-gray-50/30">
                     <p className="text-sm font-black text-gray-300 uppercase tracking-[0.6em]">TRASH IS EMPTY</p>
@@ -1577,7 +1609,9 @@ function App() {
                       return `/api/convert-video?url=${encodeURIComponent(url)}`;
                     }
                     if (useStorageProxy) {
-                      return `/api/fetch-image?url=${encodeURIComponent(url)}`;
+                      // OPTIMIZATION: Use Firebase Storage URL directly - no proxying through Vercel
+                      // Firebase Storage CDN handles caching, reducing Fast Origin Transfer
+                      return url;
                     }
                   }
                 } catch {
