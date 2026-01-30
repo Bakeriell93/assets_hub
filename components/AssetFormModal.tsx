@@ -328,7 +328,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             size: pkgAsset.size,
             status: pkgAsset.status,
             createdAt: pkgAsset.createdAt,
-            ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+            collectionIds: selectedCollectionIds,
             brand: brand || undefined,
             packageNote: packageNote.trim() || undefined,
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
@@ -362,8 +362,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         size: editingAsset.size,
         status: editingAsset.status,
         createdAt: editingAsset.createdAt,
-        // Only include collectionIds if it's provided and not undefined
-        ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+        // Always send collectionIds so folder filter updates correctly (including empty to clear)
+        collectionIds: selectedCollectionIds,
         brand: brand || undefined,
       };
       
@@ -380,7 +380,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
       usageRights,
       objectives: selectedObjectives,
-      ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+      collectionIds: selectedCollectionIds,
       content: type === 'text' ? content : undefined,
       uploadedBy: uploaderName || 'Anonymous',
       ctr: ctr ? parseFloat(ctr) : undefined,
@@ -929,7 +929,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               type="file" 
                               required 
                               multiple
-                              accept={selectedPackageTypes.includes('image') || selectedPackageTypes.includes('video') || selectedPackageTypes.includes('design') ? 'image/*,video/*,*/*' : '*/*'} 
+                              accept={selectedPackageTypes.length > 1 ? '*/*' : selectedPackageTypes.includes('image') || selectedPackageTypes.includes('video') || selectedPackageTypes.includes('design') ? 'image/*,video/*,*/*' : '*/*'} 
                               onChange={async (e) => {
                                 const selectedFiles = Array.from(e.target.files || []);
                                 setFiles(selectedFiles);
@@ -1059,9 +1059,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                             />
                             <div className="space-y-2 pointer-events-none">
                               <p className="text-sm font-bold text-gray-600">
-                                {files.length > 0 ? `${files.length} file(s) selected` : `Select multiple ${type} files`}
+                                {files.length > 0 ? `${files.length} file(s) selected` : selectedPackageTypes.length > 1 ? 'Upload files' : `Select multiple ${selectedPackageTypes[0] || type} files`}
                               </p>
-                              <p className="text-xs text-gray-400">Upload different formats/dimensions for different platforms</p>
+                              <p className="text-xs text-gray-400">{selectedPackageTypes.length > 1 ? 'All file types allowed' : 'Upload different formats/dimensions for different platforms'}</p>
                             </div>
                           </div>
                           {files.length > 0 && (

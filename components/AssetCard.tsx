@@ -150,9 +150,11 @@ interface AssetCardProps {
   onDelete: (id: string) => void;
   onRestore?: (id: string) => void;
   isTrashView?: boolean;
+  isSelected?: boolean;
+  onToggleSelect?: (e: React.MouseEvent) => void;
 }
 
-const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, onPreview, onEdit, onDelete, onRestore, isTrashView = false }) => {
+const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, onPreview, onEdit, onDelete, onRestore, isTrashView = false, isSelected = false, onToggleSelect }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
@@ -596,11 +598,16 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
   return (
     <div 
-      className={`group bg-white rounded-[32px] border-2 overflow-hidden transition-all duration-500 flex flex-col h-full relative cursor-pointer ${isHighPerformer ? 'border-blue-500 shadow-blue-100 shadow-2xl' : 'border-transparent hover:border-blue-200 shadow-xl shadow-gray-100 hover:shadow-2xl'}`}
+      className={`group bg-white rounded-[32px] border-2 overflow-hidden transition-all duration-500 flex flex-col h-full relative cursor-pointer ${isSelected ? 'ring-2 ring-amber-500 ring-offset-2 border-amber-400' : ''} ${isHighPerformer ? 'border-blue-500 shadow-blue-100 shadow-2xl' : 'border-transparent hover:border-blue-200 shadow-xl shadow-gray-100 hover:shadow-2xl'}`}
       onClick={(e) => handlePreview(e)}
     >
+      {onToggleSelect && !isTrashView && (
+        <div className="absolute top-4 left-4 z-30" onClick={(e) => { e.stopPropagation(); onToggleSelect(e); }}>
+          <input type="checkbox" checked={isSelected} onChange={() => {}} className="w-5 h-5 rounded border-2 border-gray-300 text-amber-500 focus:ring-amber-500 cursor-pointer pointer-events-none" />
+        </div>
+      )}
       {isPackage && (
-        <div className="absolute top-4 left-4 z-10 px-3 py-1 bg-purple-600 text-white text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg flex items-center gap-1.5">
+        <div className={`absolute top-4 z-10 px-3 py-1 bg-purple-600 text-white text-[9px] font-black uppercase tracking-tighter rounded-full shadow-lg flex items-center gap-1.5 ${onToggleSelect ? 'left-14' : 'left-4'}`}>
           <svg className="w-3.5 h-3.5" fill="currentColor" viewBox="0 0 20 20"><path d="M7 3a1 1 0 000 2h6a1 1 0 100-2H7zM4 7a1 1 0 011-1h10a1 1 0 110 2H5a1 1 0 01-1-1zM2 11a2 2 0 012-2h12a2 2 0 012 2v4a2 2 0 01-2 2H4a2 2 0 01-2-2v-4z" /></svg>
           Package
         </div>

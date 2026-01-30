@@ -8,6 +8,7 @@ import AssetFormModal from './components/AssetFormModal';
 import AIInsightsModal from './components/AIInsightsModal';
 import AdminPanel from './components/AdminPanel';
 import BulkUploadModal from './components/BulkUploadModal';
+import BulkEditModal from './components/BulkEditModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
@@ -535,6 +536,8 @@ function App() {
   // Upload Progress
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>('');
+  const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
+  const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -806,6 +809,46 @@ function App() {
   };
 
   const canManageCollections = currentUser?.role === 'Editor' || currentUser?.role === 'Admin';
+  const canEdit = currentUser?.role === 'Editor' || currentUser?.role === 'Admin';
+
+  const visibleRepositoryAssets = sortedAssets.slice(0, visibleAssetsCount);
+  const allVisibleSelected = visibleRepositoryAssets.length > 0 && visibleRepositoryAssets.every(a => selectedAssetIds.has(a.id));
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) setSelectedAssetIds(prev => { const next = new Set(prev); visibleRepositoryAssets.forEach(a => next.delete(a.id)); return next; });
+    else setSelectedAssetIds(prev => { const next = new Set(prev); visibleRepositoryAssets.forEach(a => next.add(a.id)); return next; });
+  };
+  const toggleSelectAsset = (id: string) => {
+    setSelectedAssetIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  };
+  const handleBulkSave = async (updates: Partial<Asset>) => {
+    const idsToUpdate: string[] = [];
+    selectedAssetIds.forEach(repId => {
+      const asset = assets.find(a => a.id === repId);
+      if (!asset) return;
+      if (asset.packageId) {
+        const pkg = packageMap.get(asset.packageId) || [asset];
+        pkg.forEach(a => idsToUpdate.push(a.id));
+      } else idsToUpdate.push(asset.id);
+    });
+    const unique = Array.from(new Set(idsToUpdate));
+    try {
+      setUploadStatus(`Updating ${unique.length} asset(s)...`);
+      setUploadProgress(0);
+      for (let i = 0; i < unique.length; i++) {
+        await storageService.updateAsset(unique[i], updates);
+        setUploadProgress(((i + 1) / unique.length) * 100);
+      }
+      setUploadProgress(100);
+      setUploadStatus('Bulk update complete');
+      setSelectedAssetIds(new Set());
+      setIsBulkEditOpen(false);
+      setTimeout(() => { setUploadProgress(null); setUploadStatus(''); }, 1500);
+    } catch (err: any) {
+      alert(`Bulk update failed: ${err?.message || 'Unknown error'}`);
+      setUploadProgress(null);
+      setUploadStatus('');
+    }
+  };
 
   const normalize = (s: any) => String(s || '').toLowerCase();
   const matchesSearch = (a: Asset, rawQuery: string) => {
@@ -1015,14 +1058,27 @@ function App() {
                       <span className="text-[11px] font-black text-gray-300 uppercase tracking-[0.3em]">Tier: {currentUser?.role}</span>
                     </div>
                   </div>
-                  <div className="text-right">
+                  <div className="text-right flex flex-col items-end gap-3">
                     <p className="text-7xl font-black text-blue-600 leading-none tracking-tighter">{sortedAssets.length}</p>
                     <p className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mt-3">Active Creative Nodes</p>
+                    {canEdit && (
+                      <div className="flex items-center gap-4 mt-2">
+                        <label className="flex items-center gap-2 cursor-pointer text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700">
+                          <input type="checkbox" checked={allVisibleSelected} onChange={toggleSelectAll} className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500" />
+                          Select all
+                        </label>
+                        {selectedAssetIds.size > 0 && (
+                          <button type="button" onClick={() => setIsBulkEditOpen(true)} className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg">
+                            Bulk edit ({selectedAssetIds.size})
+                          </button>
+                        )}
+                      </div>
+                    )}
                   </div>
                 </div>
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
-                  {sortedAssets.slice(0, visibleAssetsCount).map(asset => {
+                  {visibleRepositoryAssets.map(asset => {
                     const packageAssets = asset.packageId 
                       ? packageMap.get(asset.packageId) || [asset]
                       : [asset];
@@ -1032,6 +1088,8 @@ function App() {
                         asset={asset}
                         packageAssets={packageAssets}
                         userRole={currentUser?.role!}
+                        isSelected={selectedAssetIds.has(asset.id)}
+                        onToggleSelect={canEdit ? (e) => { e?.stopPropagation(); toggleSelectAsset(asset.id); } : undefined}
                         onPreview={(asset, packageAssets) => {
                           setPreviewAsset(asset);
                           setPreviewPackageAssets(packageAssets || [asset]);
@@ -1436,6 +1494,13 @@ function App() {
             }, 500);
           }
         }}
+      />
+      <BulkEditModal
+        isOpen={isBulkEditOpen}
+        onClose={() => setIsBulkEditOpen(false)}
+        onSave={handleBulkSave}
+        config={config}
+        collections={collections}
       />
       
       {/* Upload Progress Bar */}
