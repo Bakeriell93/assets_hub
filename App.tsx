@@ -533,6 +533,8 @@ function App() {
   const [currentPreviewIndex, setCurrentPreviewIndex] = useState(0);
   const [previewViewMode, setPreviewViewMode] = useState<'grid' | 'full'>('grid');
   
+  // Sidebar
+  const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
   // Upload Progress
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -948,14 +950,16 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
-      <div className="w-80 bg-white border-r border-gray-100">
+      <div className={`bg-white border-r border-gray-100 flex-shrink-0 transition-[width] duration-200 ${isSidebarCollapsed ? 'w-16' : 'w-72'}`}>
         <Sidebar 
           config={config}
           selectedBrand={selectedBrand}
           selectedMarket={selectedMarket}
           selectedModel={selectedModel}
           user={currentUser!}
-          onSelectBrand={setSelectedBrand}
+          isCollapsed={isSidebarCollapsed}
+          onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
+          onSelectBrand={(b) => { setSelectedBrand(b); setSelectedModel('All'); }}
           onSelectMarket={setSelectedMarket}
           onSelectModel={setSelectedModel}
           onOpenAdmin={() => setIsAdminPanelOpen(true)}
