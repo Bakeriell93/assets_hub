@@ -81,4 +81,17 @@ export interface SystemConfig {
   markets: Market[];
   models: CarModel[];
   platforms: Platform[];
+  /** When set, models are per-brand (BYD / Denza). Editors can add models and assign to brand. */
+  modelsByBrand?: Partial<Record<Brand, CarModel[]>>;
+}
+
+/** Models for a given brand; when brand is All or modelsByBrand unused, returns all models. */
+export function getModelsForBrand(config: SystemConfig, brand: Brand | 'All'): CarModel[] {
+  if (brand !== 'All' && config.modelsByBrand?.[brand]?.length) return config.modelsByBrand[brand];
+  if (config.modelsByBrand) {
+    const byd = config.modelsByBrand.BYD ?? [];
+    const denza = config.modelsByBrand.Denza ?? [];
+    return [...new Set([...byd, ...denza])];
+  }
+  return config.models;
 }

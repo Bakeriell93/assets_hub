@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { Asset, Collection, Brand, BRANDS, MARKETS, Market, PLATFORMS, Platform, CAR_MODELS, CarModel, OBJECTIVES, AssetObjective, USAGE_RIGHTS, UsageRights, SystemConfig } from '../types';
+import { Asset, Collection, Brand, BRANDS, MARKETS, Market, PLATFORMS, Platform, CAR_MODELS, CarModel, OBJECTIVES, AssetObjective, USAGE_RIGHTS, UsageRights, SystemConfig, getModelsForBrand } from '../types';
 
 interface BulkEditModalProps {
   isOpen: boolean;
@@ -16,7 +16,8 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, onSave, 
   const [market, setMarket] = useState<string>(AS_IS);
   const [platform, setPlatform] = useState<string>(AS_IS);
   const [carModelsAsIs, setCarModelsAsIs] = useState(true);
-  const [carModel, setCarModel] = useState<CarModel>(config.models[0] || CAR_MODELS[0]);
+  const modelsList = getModelsForBrand(config, 'All');
+  const [carModel, setCarModel] = useState<CarModel>(modelsList[0] || CAR_MODELS[0]);
   const [selectedCarModels, setSelectedCarModels] = useState<CarModel[]>([]);
   const [customCarModel, setCustomCarModel] = useState('');
   const [objectivesAsIs, setObjectivesAsIs] = useState(true);
@@ -32,7 +33,7 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, onSave, 
       setMarket(AS_IS);
       setPlatform(AS_IS);
       setCarModelsAsIs(true);
-      setCarModel(config.models[0] || CAR_MODELS[0]);
+      setCarModel(getModelsForBrand(config, 'All')[0] || CAR_MODELS[0]);
       setSelectedCarModels([]);
       setCustomCarModel('');
       setObjectivesAsIs(true);
@@ -156,7 +157,7 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, onSave, 
                     <>
                       <div className="fixed inset-0 z-40" onClick={() => setIsCarModelsDropdownOpen(false)} />
                       <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto p-2">
-                        {(config.models.length ? config.models : CAR_MODELS).map(m => (
+                        {(modelsList.length ? modelsList : CAR_MODELS).map(m => (
                           <label key={m} className="flex items-center gap-3 p-2 hover:bg-gray-50 rounded-lg cursor-pointer">
                             <input type="checkbox" checked={selectedCarModels.includes(m)} onChange={() => toggleCarModel(m)} className="w-4 h-4 rounded text-blue-600" />
                             <span className="text-sm font-bold">{m}</span>

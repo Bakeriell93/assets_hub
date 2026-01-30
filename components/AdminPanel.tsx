@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, Asset, SystemConfig } from '../types';
+import { User, UserRole, Asset, SystemConfig, Brand, BRANDS } from '../types';
 import { storageService, SecurityLog } from '../services/storageService';
 import { storage } from '../services/firebase';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
@@ -20,7 +20,8 @@ const isSuperAdmin = (user: User | null): boolean => {
 };
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users, currentUser }) => {
-  const [activeTab, setActiveTab] = useState<'users' | 'config' | 'stats' | 'security'>('users');
+  const isEditor = currentUser.role === 'Editor';
+  const [activeTab, setActiveTab] = useState<'users' | 'config' | 'stats' | 'security'>(isEditor ? 'config' : 'users');
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isAddingConfig, setIsAddingConfig] = useState<keyof SystemConfig | null>(null);
@@ -37,6 +38,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   // Form states
   const [newUser, setNewUser] = useState({ fullName: '', username: '', password: '', role: 'Viewer' as UserRole });
   const [newConfigValue, setNewConfigValue] = useState('');
+  const [addingModelForBrand, setAddingModelForBrand] = useState<Brand | null>(null);
+  const [newModelValue, setNewModelValue] = useState('');
 
   useEffect(() => {
     const unsubLogs = storageService.subscribeToSecurityLogs(setSecurityLogs);
@@ -203,6 +206,49 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     }
   };
 
+  const modelsForBrand = (b: Brand): string[] =>
+    config.modelsByBrand?.[b] ?? config.models;
+
+  const handleAddModelForBrand = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!addingModelForBrand || !newModelValue.trim()) return;
+    const trimmed = newModelValue.trim();
+    const list = modelsForBrand(addingModelForBrand);
+    if (list.includes(trimmed)) {
+      setNewModelValue('');
+      setAddingModelForBrand(null);
+      return;
+    }
+    const nextByBrand: Record<Brand, string[]> = {
+      BYD: [...(config.modelsByBrand?.BYD ?? config.models)],
+      Denza: [...(config.modelsByBrand?.Denza ?? config.models)],
+    };
+    nextByBrand[addingModelForBrand] = [...nextByBrand[addingModelForBrand], trimmed];
+    const allModels = [...new Set([...config.models, trimmed])];
+    await storageService.saveSystemConfig({
+      ...config,
+      models: allModels,
+      modelsByBrand: nextByBrand,
+    });
+    setNewModelValue('');
+    setAddingModelForBrand(null);
+  };
+
+  const handleRemoveModelFromBrand = async (brand: Brand, model: string) => {
+    const nextByBrand: Record<Brand, string[]> = {
+      BYD: [...(config.modelsByBrand?.BYD ?? config.models)],
+      Denza: [...(config.modelsByBrand?.Denza ?? config.models)],
+    };
+    nextByBrand[brand] = nextByBrand[brand].filter(m => m !== model);
+    const inOther = nextByBrand[brand === 'BYD' ? 'Denza' : 'BYD'].includes(model);
+    const allModels = inOther ? config.models : config.models.filter(m => m !== model);
+    await storageService.saveSystemConfig({
+      ...config,
+      models: allModels,
+      modelsByBrand: nextByBrand,
+    });
+  };
+
   const totalBytes = assets.reduce((acc, asset) => acc + (asset.size || resolvedAssetSizes[asset.id] || 0), 0);
   const storageFormatted = formatSize(totalBytes);
 
@@ -224,12 +270,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
 
         <div className="flex flex-1 overflow-hidden">
           <aside className="w-80 bg-gray-50/50 border-r border-gray-100 p-10 space-y-4">
-            {[
+            {([
               { id: 'users', label: 'Team Identities', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
               { id: 'config', label: 'System Metadata', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
               { id: 'stats', label: 'Live Telemetry', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 01-2 2h22a2 2 0 01-2-2v-6a2 2 0 00-2-2h-2a2 2 0 00-2 2v6' },
               { id: 'security', label: 'Threat Monitor', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' }
-            ].map(tab => (
+            ] as const).filter(tab => !isEditor || tab.id === 'config').map(tab => (
               <button
                 key={tab.id}
                 onClick={() => setActiveTab(tab.id as any)}
@@ -399,18 +445,19 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
 
             {activeTab === 'config' && (
               <div className="space-y-12 animate-in fade-in duration-500">
-                {(['markets', 'models', 'platforms'] as const).map(type => (
+                {(['markets', 'platforms'] as const).map(type => (
                    <div key={type} className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
                       <div className="flex items-center justify-between mb-10">
                           <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">{type} Node Registry</h4>
-                          {!isAddingConfig || isAddingConfig !== type ? (
+                          {!isEditor && (!isAddingConfig || isAddingConfig !== type) && (
                             <button 
                               onClick={() => setIsAddingConfig(type)} 
                               className="px-6 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                             >
                               + Register {type.slice(0, -1)}
                             </button>
-                          ) : (
+                          )}
+                          {!isEditor && isAddingConfig === type && (
                             <form onSubmit={handleAddConfigSubmit} className="flex gap-3">
                                <input 
                                   autoFocus
@@ -429,19 +476,68 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                          {config[type].map(item => (
                            <div key={item} className="group relative px-6 py-4 bg-white border border-gray-200 rounded-3xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-5 hover:border-blue-500 hover:shadow-2xl hover:shadow-blue-50 transition-all">
                               {item}
-                              <button onClick={() => {
-                                  storageService.saveSystemConfig({
-                                      ...config,
-                                      [type]: config[type].filter(i => i !== item)
-                                  });
-                              }} className="text-gray-200 hover:text-red-500 transition-colors">
-                                  <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                              </button>
+                              {!isEditor && (
+                                <button onClick={() => {
+                                    storageService.saveSystemConfig({
+                                        ...config,
+                                        [type]: config[type].filter(i => i !== item)
+                                    });
+                                }} className="text-gray-200 hover:text-red-500 transition-colors">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                </button>
+                              )}
                            </div>
                          ))}
                       </div>
                    </div>
                 ))}
+                <div className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
+                  <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Models by brand</h4>
+                  <p className="text-xs text-gray-500 mb-8">Add car models and assign them to BYD or Denza. Editors and Admins can manage models.</p>
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
+                    {BRANDS.map(brand => (
+                      <div key={brand} className="bg-white p-8 rounded-3xl border border-gray-200">
+                        <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-6">{brand} models</h5>
+                        {addingModelForBrand === brand ? (
+                          <form onSubmit={handleAddModelForBrand} className="flex gap-3 mb-6">
+                            <input
+                              autoFocus
+                              type="text"
+                              value={newModelValue}
+                              onChange={e => setNewModelValue(e.target.value)}
+                              className="flex-1 px-4 py-3 bg-gray-50 border-2 border-blue-500 rounded-2xl outline-none text-xs font-black"
+                              placeholder="New model name..."
+                            />
+                            <button type="submit" className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg></button>
+                            <button type="button" onClick={() => { setAddingModelForBrand(null); setNewModelValue(''); }} className="p-3 bg-gray-100 text-gray-500 rounded-2xl"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                          </form>
+                        ) : (
+                          <button
+                            type="button"
+                            onClick={() => setAddingModelForBrand(brand)}
+                            className="mb-6 px-4 py-2 bg-blue-50 text-blue-600 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-600 hover:text-white transition-all"
+                          >
+                            + Add model to {brand}
+                          </button>
+                        )}
+                        <div className="flex flex-wrap gap-3">
+                          {modelsForBrand(brand).map(model => (
+                            <div key={model} className="group relative px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-3">
+                              {model}
+                              <button
+                                type="button"
+                                onClick={() => handleRemoveModelFromBrand(brand, model)}
+                                className="text-gray-300 hover:text-red-500 transition-colors"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                              </button>
+                            </div>
+                          ))}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </div>
               </div>
             )}
 

@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Asset, CAR_MODELS, CarModel, Collection, MARKETS, Market, PLATFORMS, Platform, AssetType, USAGE_RIGHTS, UsageRights, OBJECTIVES, AssetObjective, SystemConfig, Brand, BRANDS } from '../types';
+import { Asset, CAR_MODELS, CarModel, Collection, MARKETS, Market, PLATFORMS, Platform, AssetType, USAGE_RIGHTS, UsageRights, OBJECTIVES, AssetObjective, SystemConfig, Brand, BRANDS, getModelsForBrand } from '../types';
 import { storageService } from '../services/storageService';
 
 // Fixed: Added config to props interface to match App.tsx usage
@@ -22,7 +22,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   // Fixed: Initialized state using config with fallback to constants
   const [market, setMarket] = useState<Market>(config.markets[0] || MARKETS[0]);
   const [platform, setPlatform] = useState<Platform>(config.platforms[0] || PLATFORMS[0]);
-  const [carModel, setCarModel] = useState<CarModel>(config.models[0] || CAR_MODELS[0]);
+  const [carModel, setCarModel] = useState<CarModel>(getModelsForBrand(config, 'BYD')[0] || CAR_MODELS[0]);
   const [selectedCarModels, setSelectedCarModels] = useState<CarModel[]>([]);
   const [customCarModel, setCustomCarModel] = useState<string>('');
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
@@ -43,6 +43,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [isCarModelsDropdownOpen, setIsCarModelsDropdownOpen] = useState(false);
   const [brand, setBrand] = useState<Brand>('BYD');
   const [packageNote, setPackageNote] = useState('');
+  const modelsList = getModelsForBrand(config, brand);
   const [selectedPackageTypes, setSelectedPackageTypes] = useState<AssetType[]>(['image', 'video']);
   
   const [ctr, setCtr] = useState<string>('');
@@ -59,14 +60,15 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setMarket(editingAsset.market);
       setPlatform(editingAsset.platform);
       // Support both old (carModel) and new (carModels) format
+      const editModelsList = getModelsForBrand(config, editingAsset.brand || 'BYD');
       if (editingAsset.carModels && editingAsset.carModels.length > 0) {
         setSelectedCarModels(editingAsset.carModels);
-        setCarModel(config.models[0] || CAR_MODELS[0]);
+        setCarModel(editModelsList[0] || CAR_MODELS[0]);
         setCustomCarModel('');
       } else {
         setCarModel(editingAsset.carModel);
         // Check if the model is not in the standard list, treat it as custom
-        const isCustomModel = !(config.models.length > 0 ? config.models : CAR_MODELS).includes(editingAsset.carModel);
+        const isCustomModel = !(editModelsList.length > 0 ? editModelsList : CAR_MODELS).includes(editingAsset.carModel);
         if (isCustomModel) {
           setCustomCarModel(editingAsset.carModel);
           setCarModel('Other' as CarModel);
@@ -117,7 +119,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setType('image');
       setMarket('Global' as Market);
       setPlatform(config.platforms[0] || PLATFORMS[0]);
-      setCarModel(config.models[0] || CAR_MODELS[0]);
+      setCarModel(getModelsForBrand(config, 'BYD')[0] || CAR_MODELS[0]);
       setSelectedCarModels([]);
       setCustomCarModel('');
       setSelectedObjectives([]);
@@ -534,7 +536,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                                     />
                                     <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-64 overflow-y-auto">
                                         <div className="p-2 space-y-1">
-                                            {(config.models.length > 0 ? config.models : CAR_MODELS).map(m => (
+                                            {(modelsList.length > 0 ? modelsList : CAR_MODELS).map(m => (
                                                 <label
                                                     key={m}
                                                     className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer transition-colors"

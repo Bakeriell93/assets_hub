@@ -1,6 +1,6 @@
 
 import React from 'react';
-import { Market, CarModel, User, SystemConfig, Brand, BRANDS } from '../types';
+import { Market, CarModel, User, SystemConfig, Brand, BRANDS, getModelsForBrand } from '../types';
 
 interface SidebarProps {
   selectedMarket: Market | 'All';
@@ -27,7 +27,8 @@ const Sidebar: React.FC<SidebarProps> = ({
   onOpenAdmin,
   onLogout
 }) => {
-  const isAdmin = user.role === 'Admin';
+  const canOpenCommandCenter = user.role === 'Admin' || user.role === 'Editor';
+  const modelsToShow = getModelsForBrand(config, selectedBrand);
 
   return (
     <div className="flex flex-col h-full">
@@ -39,9 +40,9 @@ const Sidebar: React.FC<SidebarProps> = ({
           <h1 className="text-xl font-black text-gray-900 tracking-tighter uppercase">BYD Assets</h1>
         </div>
 
-        {isAdmin && (
+        {canOpenCommandCenter && (
           <button onClick={onOpenAdmin} className="w-full mb-10 flex items-center gap-3 px-4 py-3 bg-gray-900 text-white rounded-2xl text-[10px] font-black uppercase tracking-widest hover:bg-black transition-all">
-            <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
+            <svg className="w-4 h-4 text-blue-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4" /></svg>
             Command Center
           </button>
         )}
@@ -71,7 +72,7 @@ const Sidebar: React.FC<SidebarProps> = ({
           <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Models</h3>
           <div className="space-y-1">
             <button onClick={() => onSelectModel('All')} className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${selectedModel === 'All' ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>All Models</button>
-            {config.models.map(m => (
+            {modelsToShow.map(m => (
               <button key={m} onClick={() => onSelectModel(m)} className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${selectedModel === m ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>{m}</button>
             ))}
           </div>
