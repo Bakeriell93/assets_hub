@@ -10,6 +10,9 @@ export const PLATFORMS: Platform[] = ['Google', 'Meta', 'Video', 'DOOH', 'Banner
 export type AssetType = 'image' | 'video' | 'text' | 'design';
 export type AssetStatus = 'Draft' | 'Review' | 'Approved';
 
+export type Brand = 'BYD' | 'Denza';
+export const BRANDS: Brand[] = ['BYD', 'Denza'];
+
 export type UsageRights = 'Fully Owned' | 'Licensed' | 'Royalty Free' | 'Social Only' | 'Internal Only';
 export const USAGE_RIGHTS: UsageRights[] = ['Fully Owned', 'Licensed', 'Royalty Free', 'Social Only', 'Internal Only'];
 
@@ -33,6 +36,7 @@ export interface Collection {
   name: string;
   description?: string;
   assetIds: string[];
+  parentId?: string | null; // null/undefined = top-level project; set for subfolders
   createdAt: number;
 }
 
@@ -65,6 +69,10 @@ export interface Asset {
   packageId?: string; // If set, this asset is part of a package
   packageOrder?: number; // Order within package
   packagePreviewAssetId?: string; // ID of the asset to use as package card preview thumbnail
+  packageNote?: string; // Description of package contents (shown on card)
+  packageAssetTypes?: AssetType[]; // Types included in package (e.g. image + video)
+  // Brand
+  brand?: Brand;
   // Soft delete (trash)
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
 }

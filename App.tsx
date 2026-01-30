@@ -11,7 +11,7 @@ import BulkUploadModal from './components/BulkUploadModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
-import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, MARKETS, CAR_MODELS, PLATFORMS } from './types';
+import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, MARKETS, CAR_MODELS, PLATFORMS } from './types';
 
 type SortOption = 'newest' | 'ctr' | 'cr' | 'cpl';
 type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
@@ -505,9 +505,13 @@ function App() {
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isAddingCollection, setIsAddingCollection] = useState(false);
   const [newCollectionName, setNewCollectionName] = useState('');
+  const [collectionParentIdForCreate, setCollectionParentIdForCreate] = useState<string | null>(null);
+  const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
+  const [editingCollectionName, setEditingCollectionName] = useState('');
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
 
   // Filter States
+  const [selectedBrand, setSelectedBrand] = useState<Brand | 'All'>('All');
   const [selectedMarket, setSelectedMarket] = useState<Market | 'All'>('All');
   const [selectedModel, setSelectedModel] = useState<CarModel | 'All'>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
@@ -760,12 +764,48 @@ function App() {
       await storageService.saveCollection({
         name: trimmed,
         assetIds: [],
+        parentId: collectionParentIdForCreate ?? undefined,
         createdAt: Date.now()
       });
       setIsAddingCollection(false);
       setNewCollectionName('');
+      setCollectionParentIdForCreate(null);
     }
   };
+
+  const handleUpdateCollection = async (id: string, name: string) => {
+    const trimmed = name.trim();
+    if (trimmed) {
+      await storageService.updateCollection(id, { name: trimmed });
+      setEditingCollectionId(null);
+      setEditingCollectionName('');
+    }
+  };
+
+  const handleDeleteCollection = async (id: string) => {
+    const c = collections.find(x => x.id === id);
+    if (!c) return;
+    const count = assets.filter(a => (a.collectionIds || []).includes(id)).length;
+    const subCount = collections.filter(x => x.parentId === id).length;
+    const msg = subCount > 0
+      ? `Delete "${c.name}" and ${subCount} subfolder(s)? Assets in this folder will be unlinked (not deleted).`
+      : count > 0
+        ? `Delete "${c.name}"? ${count} asset(s) will be unlinked from this folder.`
+        : `Delete "${c.name}"?`;
+    if (!window.confirm(msg)) return;
+    await storageService.deleteCollection(id);
+  };
+
+  const buildCollectionTree = (parentId: string | null | undefined): Collection[] =>
+    collections.filter(c => (c.parentId ?? null) === parentId);
+
+  const getCollectionAndDescendantIds = (id: string): Set<string> => {
+    const set = new Set<string>([id]);
+    collections.filter(c => c.parentId === id).forEach(c => getCollectionAndDescendantIds(c.id).forEach(x => set.add(x)));
+    return set;
+  };
+
+  const canManageCollections = currentUser?.role === 'Editor' || currentUser?.role === 'Admin';
 
   const normalize = (s: any) => String(s || '').toLowerCase();
   const matchesSearch = (a: Asset, rawQuery: string) => {
@@ -781,6 +821,8 @@ function App() {
       a.market,
       a.platform,
       a.carModel,
+      a.brand,
+      a.packageNote,
       ...(a.carModels ? { carModels: a.carModels } : {}),
       ...(a.objectives || []),
       a.uploadedBy,
@@ -802,15 +844,16 @@ function App() {
       if (a.deletedAt) return false; // Deleted, don't show in main views
     }
     
+    const brandMatch = selectedBrand === 'All' || a.brand === selectedBrand;
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || 
       a.carModel === selectedModel || 
       (a.carModels && a.carModels.includes(selectedModel));
     const pMatch = selectedPlatform === 'All' || a.platform === selectedPlatform;
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
-    const cMatch = !activeCollectionId || (a.collectionIds || []).includes(activeCollectionId);
+    const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
-    return mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch;
+    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch;
   });
 
   // Group assets by packageId - show only the first asset of each package, or standalone assets
@@ -865,9 +908,11 @@ function App() {
       <div className="w-80 bg-white border-r border-gray-100">
         <Sidebar 
           config={config}
+          selectedBrand={selectedBrand}
           selectedMarket={selectedMarket}
           selectedModel={selectedModel}
           user={currentUser!}
+          onSelectBrand={setSelectedBrand}
           onSelectMarket={setSelectedMarket}
           onSelectModel={setSelectedModel}
           onOpenAdmin={() => setIsAdminPanelOpen(true)}
@@ -1143,49 +1188,88 @@ function App() {
                     <h2 className="text-6xl font-black text-gray-900 tracking-tighter uppercase leading-none">PROJECT FOLDERS</h2>
                     <p className="text-[12px] font-black text-gray-400 mt-4 uppercase tracking-[0.4em]">Multi-Market Campaign Containers</p>
                   </div>
-                  <button onClick={() => setIsAddingCollection(true)} className="px-10 py-5 bg-[#111111] text-white text-[11px] font-black uppercase tracking-[0.3em] rounded-[28px] shadow-2xl hover:bg-black transition-all">NEW PROJECT</button>
+                  {canManageCollections && (
+                    <button onClick={() => { setCollectionParentIdForCreate(null); setNewCollectionName(''); setIsAddingCollection(true); }} className="px-10 py-5 bg-[#111111] text-white text-[11px] font-black uppercase tracking-[0.3em] rounded-[28px] shadow-2xl hover:bg-black transition-all">NEW PROJECT</button>
+                  )}
                 </div>
 
                 {isAddingCollection && (
                   <div className="fixed inset-0 z-[150] flex items-center justify-center p-6">
-                    <div className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-md" onClick={() => setIsAddingCollection(false)}></div>
+                    <div className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-md" onClick={() => { setIsAddingCollection(false); setCollectionParentIdForCreate(null); }}></div>
                     <form onSubmit={handleCreateCollection} className="relative w-full max-w-lg bg-white p-12 rounded-[56px] shadow-2xl space-y-8 border border-white/20">
-                      <h3 className="text-3xl font-black text-gray-900 tracking-tight">Project Identification</h3>
+                      <h3 className="text-3xl font-black text-gray-900 tracking-tight">{collectionParentIdForCreate ? 'New Subfolder' : 'Project Identification'}</h3>
                       <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Collection Title</label>
-                        <input autoFocus required type="text" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} className="w-full px-8 py-6 bg-gray-50 border-2 border-transparent focus:border-blue-600 rounded-3xl outline-none font-black text-gray-900" placeholder="e.g. Geneva Motorshow 2025" />
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">{collectionParentIdForCreate ? 'Subfolder Name' : 'Collection Title'}</label>
+                        <input autoFocus required type="text" value={newCollectionName} onChange={e => setNewCollectionName(e.target.value)} className="w-full px-8 py-6 bg-gray-50 border-2 border-transparent focus:border-blue-600 rounded-3xl outline-none font-black text-gray-900" placeholder={collectionParentIdForCreate ? 'e.g. Q1 Assets' : 'e.g. Geneva Motorshow 2025'} />
                       </div>
                       <div className="flex gap-4">
-                        <button type="submit" className="flex-1 py-5 bg-blue-600 text-white rounded-3xl text-[11px] font-black uppercase tracking-widest">Initialize Node</button>
-                        <button type="button" onClick={() => setIsAddingCollection(false)} className="px-10 py-5 bg-gray-100 text-gray-400 rounded-3xl text-[11px] font-black uppercase">Cancel</button>
+                        <button type="submit" className="flex-1 py-5 bg-blue-600 text-white rounded-3xl text-[11px] font-black uppercase tracking-widest">{collectionParentIdForCreate ? 'Create Subfolder' : 'Initialize Node'}</button>
+                        <button type="button" onClick={() => { setIsAddingCollection(false); setCollectionParentIdForCreate(null); }} className="px-10 py-5 bg-gray-100 text-gray-400 rounded-3xl text-[11px] font-black uppercase">Cancel</button>
                       </div>
                     </form>
                   </div>
                 )}
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-12">
-                  {collections.map(c => (
-                    <div key={c.id} className="p-12 bg-white rounded-[64px] border-2 border-gray-100 hover:border-blue-500 transition-all shadow-xl group cursor-pointer relative overflow-hidden">
-                      <div className="w-20 h-20 bg-gray-50 rounded-[32px] mb-10 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm">
-                        <svg className="w-10 h-10" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                {editingCollectionId && (
+                  <div className="fixed inset-0 z-[150] flex items-center justify-center p-6">
+                    <div className="absolute inset-0 bg-[#0a0a0a]/80 backdrop-blur-md" onClick={() => { setEditingCollectionId(null); setEditingCollectionName(''); }}></div>
+                    <div className="relative w-full max-w-lg bg-white p-12 rounded-[56px] shadow-2xl space-y-8 border border-white/20">
+                      <h3 className="text-3xl font-black text-gray-900 tracking-tight">Rename Folder</h3>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Name</label>
+                        <input autoFocus type="text" value={editingCollectionName} onChange={e => setEditingCollectionName(e.target.value)} className="w-full px-8 py-6 bg-gray-50 border-2 border-transparent focus:border-blue-600 rounded-3xl outline-none font-black text-gray-900" placeholder="Folder name" />
                       </div>
-                      <h4 className="text-3xl font-black text-gray-900 tracking-tighter mb-3 leading-tight uppercase">{c.name}</h4>
-                      <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] mb-8">
-                        {assets.filter(a => (a.collectionIds || []).includes(c.id)).length} Linked Creatives
-                      </p>
-                      <button
-                        onClick={() => { setActiveCollectionId(c.id); setViewMode('repository'); }}
-                        className="w-full py-5 bg-gray-50 text-gray-900 rounded-[28px] text-[11px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all"
-                      >
-                        ENTER FOLDER
-                      </button>
+                      <div className="flex gap-4">
+                        <button type="button" onClick={() => handleUpdateCollection(editingCollectionId, editingCollectionName)} className="flex-1 py-5 bg-blue-600 text-white rounded-3xl text-[11px] font-black uppercase tracking-widest">Save</button>
+                        <button type="button" onClick={() => { setEditingCollectionId(null); setEditingCollectionName(''); }} className="px-10 py-5 bg-gray-100 text-gray-400 rounded-3xl text-[11px] font-black uppercase">Cancel</button>
+                      </div>
                     </div>
-                  ))}
-                  {collections.length === 0 && (
-                    <div className="col-span-full py-48 text-center border-4 border-dashed border-gray-100 rounded-[64px] bg-gray-50/30">
-                      <p className="text-sm font-black text-gray-300 uppercase tracking-[0.6em]">NO ACTIVE PROJECTS FOUND IN CLOUD REGISTRY</p>
-                    </div>
-                  )}
+                  </div>
+                )}
+
+                <div className="space-y-4">
+                  {(() => {
+                    const renderCollectionCard = (c: Collection, depth: number) => {
+                      const linkedCount = assets.filter(a => (a.collectionIds || []).includes(c.id)).length;
+                      const isEditing = editingCollectionId === c.id;
+                      return (
+                        <div key={c.id} style={{ marginLeft: depth * 24 }} className="p-8 bg-white rounded-[32px] border-2 border-gray-100 hover:border-blue-500 transition-all shadow-xl group">
+                          <div className="flex items-start justify-between gap-4">
+                            <div className="flex-1 min-w-0">
+                              <div className="w-14 h-14 bg-gray-50 rounded-2xl mb-6 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm inline-flex">
+                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                              </div>
+                              <h4 className="text-2xl font-black text-gray-900 tracking-tighter mb-2 leading-tight uppercase">{c.name}</h4>
+                              <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] mb-4">{linkedCount} Linked Creatives</p>
+                              <div className="flex flex-wrap gap-2">
+                                <button type="button" onClick={() => { setActiveCollectionId(c.id); setViewMode('repository'); }} className="px-6 py-3 bg-gray-50 text-gray-900 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">ENTER FOLDER</button>
+                                {canManageCollections && (
+                                  <>
+                                    <button type="button" onClick={() => { setCollectionParentIdForCreate(c.id); setNewCollectionName(''); setIsAddingCollection(true); }} className="px-6 py-3 bg-purple-50 text-purple-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all">Add Subfolder</button>
+                                    <button type="button" onClick={() => { setEditingCollectionId(c.id); setEditingCollectionName(c.name); }} className="px-6 py-3 bg-blue-50 text-blue-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">Rename</button>
+                                    <button type="button" onClick={() => handleDeleteCollection(c.id)} className="px-6 py-3 bg-red-50 text-red-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">Delete</button>
+                                  </>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+                          {buildCollectionTree(c.id).length > 0 && (
+                            <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
+                              {buildCollectionTree(c.id).map(child => renderCollectionCard(child, depth + 1))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    };
+                    const topLevel = buildCollectionTree(null);
+                    return topLevel.length === 0 ? (
+                      <div className="py-48 text-center border-4 border-dashed border-gray-100 rounded-[64px] bg-gray-50/30">
+                        <p className="text-sm font-black text-gray-300 uppercase tracking-[0.6em]">NO ACTIVE PROJECTS FOUND IN CLOUD REGISTRY</p>
+                      </div>
+                    ) : (
+                      topLevel.map(c => renderCollectionCard(c, 0))
+                    );
+                  })()}
                 </div>
               </div>
             )}

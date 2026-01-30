@@ -801,11 +801,17 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       {/* Content */}
       <div className="p-6 flex-1 flex flex-col bg-white">
         <div className="flex flex-wrap gap-2 mb-4">
+            {asset.brand && (
+              <span className="px-2 py-1 rounded-lg bg-amber-50 text-[10px] font-black text-amber-700 uppercase tracking-tight">{asset.brand}</span>
+            )}
             <span className="px-2 py-1 rounded-lg bg-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-tight">{asset.market}</span>
             <span className="px-2 py-1 rounded-lg bg-blue-50 text-[10px] font-black text-blue-600 uppercase tracking-tight">{asset.platform}</span>
         </div>
 
         <h3 className="text-sm font-bold text-gray-900 mb-1.5 tracking-tight leading-tight break-words">{asset.title}</h3>
+        {asset.packageNote && (
+          <p className="text-[10px] text-gray-500 mb-2 line-clamp-2" title={asset.packageNote}>{asset.packageNote}</p>
+        )}
         <div className="flex flex-wrap gap-1.5 mb-3">
           {(asset.carModels && asset.carModels.length > 0 ? asset.carModels : [asset.carModel]).map((model, idx) => (
             <span key={idx} className="text-[10px] text-blue-500/60 font-black uppercase tracking-widest">{model}</span>

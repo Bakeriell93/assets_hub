@@ -1,14 +1,16 @@
 
 import React from 'react';
-import { Market, CarModel, User, SystemConfig } from '../types';
+import { Market, CarModel, User, SystemConfig, Brand, BRANDS } from '../types';
 
 interface SidebarProps {
   selectedMarket: Market | 'All';
   selectedModel: CarModel | 'All';
+  selectedBrand: Brand | 'All';
   user: User;
   config: SystemConfig;
   onSelectMarket: (market: Market | 'All') => void;
   onSelectModel: (model: CarModel | 'All') => void;
+  onSelectBrand: (brand: Brand | 'All') => void;
   onOpenAdmin: () => void;
   onLogout: () => void;
 }
@@ -16,10 +18,12 @@ interface SidebarProps {
 const Sidebar: React.FC<SidebarProps> = ({
   selectedMarket,
   selectedModel,
+  selectedBrand,
   user,
   config,
   onSelectMarket,
   onSelectModel,
+  onSelectBrand,
   onOpenAdmin,
   onLogout
 }) => {
@@ -41,6 +45,16 @@ const Sidebar: React.FC<SidebarProps> = ({
             Command Center
           </button>
         )}
+
+        <div className="mb-10">
+          <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Brand</h3>
+          <div className="space-y-1">
+            <button onClick={() => onSelectBrand('All')} className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${selectedBrand === 'All' ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>All Brands</button>
+            {BRANDS.map(b => (
+              <button key={b} onClick={() => onSelectBrand(b)} className={`w-full text-left px-4 py-3 rounded-xl text-xs font-bold transition-all ${selectedBrand === b ? 'bg-blue-50 text-blue-700' : 'text-gray-500 hover:bg-gray-50'}`}>{b}</button>
+            ))}
+          </div>
+        </div>
 
         <div className="mb-10">
           <h3 className="text-[10px] font-black text-gray-400 uppercase tracking-widest mb-4">Markets</h3>

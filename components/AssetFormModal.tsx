@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Asset, CAR_MODELS, CarModel, Collection, MARKETS, Market, PLATFORMS, Platform, AssetType, USAGE_RIGHTS, UsageRights, OBJECTIVES, AssetObjective, SystemConfig } from '../types';
+import { Asset, CAR_MODELS, CarModel, Collection, MARKETS, Market, PLATFORMS, Platform, AssetType, USAGE_RIGHTS, UsageRights, OBJECTIVES, AssetObjective, SystemConfig, Brand, BRANDS } from '../types';
 import { storageService } from '../services/storageService';
 
 // Fixed: Added config to props interface to match App.tsx usage
@@ -41,6 +41,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [originalTitle, setOriginalTitle] = useState('');
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
   const [isCarModelsDropdownOpen, setIsCarModelsDropdownOpen] = useState(false);
+  const [brand, setBrand] = useState<Brand>('BYD');
+  const [packageNote, setPackageNote] = useState('');
+  const [selectedPackageTypes, setSelectedPackageTypes] = useState<AssetType[]>(['image', 'video']);
   
   const [ctr, setCtr] = useState<string>('');
   const [cpl, setCpl] = useState<string>('');
@@ -81,6 +84,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setCpl(editingAsset.cpl?.toString() || '');
       setComments(editingAsset.comments || '');
       setUsageRights(editingAsset.usageRights || USAGE_RIGHTS[0]);
+      setBrand(editingAsset.brand || 'BYD');
+      setPackageNote(editingAsset.packageNote || '');
+      setSelectedPackageTypes(editingAsset.packageAssetTypes?.length ? editingAsset.packageAssetTypes : ['image', 'video']);
       
       // If editing a package, initialize package asset titles
       if (editingPackageAssets.length > 1) {
@@ -132,6 +138,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setIsChangingPreview(false);
       setIsPackageMode(false);
       setIsCarModelsDropdownOpen(false);
+      setBrand('BYD');
+      setPackageNote('');
+      setSelectedPackageTypes(['image', 'video']);
     }
   }, [editingAsset, isOpen, config]);
 
@@ -160,6 +169,23 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     setSelectedCarModels(prev =>
       prev.includes(model) ? prev.filter(m => m !== model) : [...prev, model]
     );
+  };
+
+  const togglePackageType = (t: AssetType) => {
+    setSelectedPackageTypes(prev =>
+      prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]
+    );
+  };
+
+  const ASSET_TYPES: { value: AssetType; label: string }[] = [
+    { value: 'image', label: 'Image' },
+    { value: 'video', label: 'Video' },
+    { value: 'design', label: 'Design / PSD' },
+    { value: 'text', label: 'Text / Copy' },
+  ];
+
+  const buildCollectionTree = (parentId: string | null | undefined): Collection[] => {
+    return collections.filter(c => (c.parentId ?? null) === parentId);
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -191,6 +217,17 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       const packageId = `pkg_${Date.now()}`;
       const previewAssetIndex = selectedPreviewIndex !== null ? selectedPreviewIndex : 0;
       const packageAssets = files.map((f, idx) => {
+        // Infer asset type per file for package (image, video, or design)
+        let fileType: AssetType = 'design';
+        if (f.type.startsWith('image/')) fileType = 'image';
+        else if (f.type.startsWith('video/')) fileType = 'video';
+        else if (f.type.startsWith('text/')) fileType = 'text';
+        else {
+          const ext = (f.name.split('.').pop() || '').toLowerCase();
+          if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) fileType = 'image';
+          else if (['mp4','webm','mov','avi','mkv','m4v'].includes(ext)) fileType = 'video';
+        }
+
         // Extract platform from filename or use default
         const filename = f.name.toLowerCase();
         let assetPlatform = platform;
@@ -212,7 +249,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         return {
           asset: {
             title: fileTitle,
-            type,
+            type: fileType,
             market,
             platform: assetPlatform,
             carModel: primaryCarModel,
@@ -228,6 +265,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             packageId,
             packageOrder: idx,
             originalFileName: f.name, // Store original Windows filename
+            brand: brand || undefined,
+            packageNote: packageNote.trim() || undefined,
+            packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
             // Store which asset should be used as preview (will be set after upload with actual IDs)
             ...(idx === previewAssetIndex ? { packagePreviewAssetId: 'temp_' + idx } : {})
           } as Omit<Asset, 'id' | 'createdAt'>,
@@ -289,6 +329,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             status: pkgAsset.status,
             createdAt: pkgAsset.createdAt,
             ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+            brand: brand || undefined,
+            packageNote: packageNote.trim() || undefined,
+            packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
             // Update preview asset ID if changed
             ...(newPreviewAssetId !== undefined ? { packagePreviewAssetId: newPreviewAssetId } : {}),
           };
@@ -321,6 +364,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         createdAt: editingAsset.createdAt,
         // Only include collectionIds if it's provided and not undefined
         ...(selectedCollectionIds.length > 0 ? { collectionIds: selectedCollectionIds } : {}),
+        brand: brand || undefined,
       };
       
       onSave(updates, file || undefined);
@@ -342,7 +386,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       ctr: ctr ? parseFloat(ctr) : undefined,
       cpl: cpl ? parseFloat(cpl) : undefined,
       cr: cr ? parseFloat(cr) : undefined,
-      comments: comments || undefined
+      comments: comments || undefined,
+      brand: brand || undefined,
     };
 
     onSave(data, file || undefined);
@@ -397,12 +442,11 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Asset Type</label>
-                        <select value={type} disabled={!!editingAsset} onChange={(e) => setType(e.target.value as AssetType)} className={inputClasses}>
-                            <option className="text-gray-900 bg-white" value="image">Image</option>
-                            <option className="text-gray-900 bg-white" value="video">Video</option>
-                            <option className="text-gray-900 bg-white" value="text">Text / Copy</option>
-                            <option className="text-gray-900 bg-white" value="design">PSD or Other</option>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Brand</label>
+                        <select value={brand} onChange={(e) => setBrand(e.target.value as Brand)} className={inputClasses}>
+                            {BRANDS.map(b => (
+                              <option key={b} className="text-gray-900 bg-white" value={b}>{b}</option>
+                            ))}
                         </select>
                     </div>
                     <div>
@@ -413,6 +457,41 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                         </select>
                     </div>
                 </div>
+
+                {isPackageMode || (editingAsset && editingPackageAssets.length > 1) ? (
+                  <div className="mb-4">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Asset types in this package</label>
+                    <div className="flex flex-wrap gap-2 p-3 bg-gray-50 rounded-xl border-2 border-gray-200">
+                      {ASSET_TYPES.map(({ value, label }) => (
+                        <label key={value} className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={selectedPackageTypes.includes(value)}
+                            onChange={() => togglePackageType(value)}
+                            className="w-4 h-4 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
+                          />
+                          <span className="text-xs font-bold text-gray-900">{label}</span>
+                        </label>
+                      ))}
+                    </div>
+                  </div>
+                ) : (
+                  <div className="mb-4">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Asset Type</label>
+                    <select value={type} disabled={!!editingAsset} onChange={(e) => setType(e.target.value as AssetType)} className={inputClasses}>
+                      {ASSET_TYPES.map(({ value, label }) => (
+                        <option key={value} className="text-gray-900 bg-white" value={value}>{label}</option>
+                      ))}
+                    </select>
+                  </div>
+                )}
+
+                {(isPackageMode || (editingAsset && editingPackageAssets.length > 1)) && (
+                  <div className="mb-4">
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Package note (description on card)</label>
+                    <textarea value={packageNote} onChange={(e) => setPackageNote(e.target.value)} rows={2} className={inputClasses} placeholder="e.g. Launch campaign visuals + videos" />
+                  </div>
+                )}
 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
@@ -538,28 +617,31 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Projects (Optional)</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Project folder (optional)</label>
                     {collections.length === 0 ? (
                       <div className="text-xs text-gray-400 font-bold bg-gray-50 border-2 border-gray-100 rounded-2xl p-4">
                         No projects yet. Create one in the Projects tab to link assets.
                       </div>
                     ) : (
-                      <div className="flex flex-wrap gap-2 mt-1">
-                        {collections.map(c => (
-                          <button
-                            key={c.id}
-                            type="button"
-                            onClick={() => toggleCollection(c.id)}
-                            className={`px-4 py-2 rounded-full text-xs font-black uppercase tracking-widest transition-all ${
-                              selectedCollectionIds.includes(c.id)
-                                ? 'bg-purple-600 text-white shadow-lg shadow-purple-200'
-                                : 'bg-gray-100 text-gray-400 hover:bg-gray-200'
-                            }`}
-                            title={c.name}
-                          >
-                            {c.name}
-                          </button>
-                        ))}
+                      <div className="mt-1 space-y-0 max-h-48 overflow-y-auto border-2 border-gray-100 rounded-xl p-3 bg-gray-50">
+                        {(() => {
+                          const renderCollectionNode = (c: Collection, depth: number) => (
+                            <React.Fragment key={c.id}>
+                              <div style={{ marginLeft: depth * 16 }} className="flex items-center gap-2 py-1">
+                                <input
+                                  type="checkbox"
+                                  id={`col-${c.id}`}
+                                  checked={selectedCollectionIds.includes(c.id)}
+                                  onChange={() => toggleCollection(c.id)}
+                                  className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                                />
+                                <label htmlFor={`col-${c.id}`} className="text-xs font-bold text-gray-900 cursor-pointer truncate flex-1">{c.name}</label>
+                              </div>
+                              {buildCollectionTree(c.id).map(child => renderCollectionNode(child, depth + 1))}
+                            </React.Fragment>
+                          );
+                          return buildCollectionTree(null).map(c => renderCollectionNode(c, 0));
+                        })()}
                       </div>
                     )}
                 </div>
@@ -847,7 +929,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               type="file" 
                               required 
                               multiple
-                              accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : '*/*'} 
+                              accept={selectedPackageTypes.includes('image') || selectedPackageTypes.includes('video') || selectedPackageTypes.includes('design') ? 'image/*,video/*,*/*' : '*/*'} 
                               onChange={async (e) => {
                                 const selectedFiles = Array.from(e.target.files || []);
                                 setFiles(selectedFiles);

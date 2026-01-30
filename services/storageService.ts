@@ -875,17 +875,92 @@ export const storageService = {
     }
   },
 
-  saveCollection: async (collectionData: Omit<Collection, 'id'>): Promise<void> => {
+  saveCollection: async (collectionData: Omit<Collection, 'id'>): Promise<Collection> => {
     try {
+      const payload = {
+        ...collectionData,
+        assetIds: collectionData.assetIds ?? [],
+        createdAt: collectionData.createdAt ?? Date.now(),
+      };
       if (!isCloudEnabled) {
         const existing = readLS<Collection[]>(LS_KEYS.collections, []);
         const id = `collection_${Date.now()}`;
-        writeLS(LS_KEYS.collections, [{ ...(collectionData as any), id } as Collection, ...existing]);
-        return;
+        const newColl = { ...(payload as any), id } as Collection;
+        writeLS(LS_KEYS.collections, [newColl, ...existing]);
+        return newColl;
       }
-      await addDoc(collection(db!, COLLECTIONS_COLLECTION), collectionData);
+      const docRef = await addDoc(collection(db!, COLLECTIONS_COLLECTION), payload);
+      return { ...payload, id: docRef.id } as Collection;
     } catch (error) {
       handleError('saveCollection', error);
+      throw error;
+    }
+  },
+
+  updateCollection: async (id: string, updates: Partial<Collection>): Promise<void> => {
+    try {
+      if (!isCloudEnabled) {
+        const existing = readLS<Collection[]>(LS_KEYS.collections, []);
+        const next = existing.map(c => c.id === id ? ({ ...c, ...updates } as Collection) : c);
+        writeLS(LS_KEYS.collections, next);
+        return;
+      }
+      const clean = Object.fromEntries(Object.entries(updates).filter(([_, v]) => v !== undefined));
+      await updateDoc(doc(db!, COLLECTIONS_COLLECTION, id), clean);
+    } catch (error) {
+      handleError('updateCollection', error);
+      throw error;
+    }
+  },
+
+  deleteCollection: async (id: string): Promise<void> => {
+    try {
+      if (!isCloudEnabled) {
+        const existing = readLS<Collection[]>(LS_KEYS.collections, []);
+        const toDeleteIds = new Set<string>();
+        const collectDescendants = (pid: string | null | undefined) => {
+          existing.filter(c => (c.parentId ?? null) === pid).forEach(c => {
+            toDeleteIds.add(c.id);
+            collectDescendants(c.id);
+          });
+        };
+        toDeleteIds.add(id);
+        collectDescendants(id);
+        const nextCollections = existing.filter(c => !toDeleteIds.has(c.id));
+        writeLS(LS_KEYS.collections, nextCollections);
+        const assets = readLS<Asset[]>(LS_KEYS.assets, []);
+        const nextAssets = assets.map(a => ({
+          ...a,
+          collectionIds: (a.collectionIds || []).filter(cid => !toDeleteIds.has(cid)),
+        }));
+        writeLS(LS_KEYS.assets, nextAssets);
+        return;
+      }
+      const collRef = doc(db!, COLLECTIONS_COLLECTION, id);
+      const collSnap = await getDoc(collRef);
+      if (!collSnap.exists()) return;
+      const allColls = (await getDocs(collection(db!, COLLECTIONS_COLLECTION))).docs.map(d => ({ id: d.id, ...d.data() } as Collection));
+      const toDeleteIds = new Set<string>();
+      const collectDescendants = (pid: string | null | undefined) => {
+        allColls.filter(c => (c.parentId ?? null) === pid).forEach(c => {
+          toDeleteIds.add(c.id);
+          collectDescendants(c.id);
+        });
+      };
+      toDeleteIds.add(id);
+      collectDescendants(id);
+      for (const cid of toDeleteIds) {
+        const assetsQuery = query(collection(db!, ASSETS_COLLECTION), where('collectionIds', 'array-contains', cid));
+        const assetsSnap = await getDocs(assetsQuery);
+        for (const d of assetsSnap.docs) {
+          const data = d.data() as Asset;
+          const nextIds = (data.collectionIds || []).filter(x => x !== cid);
+          await updateDoc(d.ref, { collectionIds: nextIds });
+        }
+        await deleteDoc(doc(db!, COLLECTIONS_COLLECTION, cid));
+      }
+    } catch (error) {
+      handleError('deleteCollection', error);
       throw error;
     }
   },
