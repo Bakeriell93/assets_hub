@@ -811,45 +811,6 @@ function App() {
   const canManageCollections = currentUser?.role === 'Editor' || currentUser?.role === 'Admin';
   const canEdit = currentUser?.role === 'Editor' || currentUser?.role === 'Admin';
 
-  const visibleRepositoryAssets = sortedAssets.slice(0, visibleAssetsCount);
-  const allVisibleSelected = visibleRepositoryAssets.length > 0 && visibleRepositoryAssets.every(a => selectedAssetIds.has(a.id));
-  const toggleSelectAll = () => {
-    if (allVisibleSelected) setSelectedAssetIds(prev => { const next = new Set(prev); visibleRepositoryAssets.forEach(a => next.delete(a.id)); return next; });
-    else setSelectedAssetIds(prev => { const next = new Set(prev); visibleRepositoryAssets.forEach(a => next.add(a.id)); return next; });
-  };
-  const toggleSelectAsset = (id: string) => {
-    setSelectedAssetIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
-  };
-  const handleBulkSave = async (updates: Partial<Asset>) => {
-    const idsToUpdate: string[] = [];
-    selectedAssetIds.forEach(repId => {
-      const asset = assets.find(a => a.id === repId);
-      if (!asset) return;
-      if (asset.packageId) {
-        const pkg = packageMap.get(asset.packageId) || [asset];
-        pkg.forEach(a => idsToUpdate.push(a.id));
-      } else idsToUpdate.push(asset.id);
-    });
-    const unique = Array.from(new Set(idsToUpdate));
-    try {
-      setUploadStatus(`Updating ${unique.length} asset(s)...`);
-      setUploadProgress(0);
-      for (let i = 0; i < unique.length; i++) {
-        await storageService.updateAsset(unique[i], updates);
-        setUploadProgress(((i + 1) / unique.length) * 100);
-      }
-      setUploadProgress(100);
-      setUploadStatus('Bulk update complete');
-      setSelectedAssetIds(new Set());
-      setIsBulkEditOpen(false);
-      setTimeout(() => { setUploadProgress(null); setUploadStatus(''); }, 1500);
-    } catch (err: any) {
-      alert(`Bulk update failed: ${err?.message || 'Unknown error'}`);
-      setUploadProgress(null);
-      setUploadStatus('');
-    }
-  };
-
   const normalize = (s: any) => String(s || '').toLowerCase();
   const matchesSearch = (a: Asset, rawQuery: string) => {
     const q = normalize(rawQuery).trim();
@@ -943,6 +904,45 @@ function App() {
       return b.createdAt - a.createdAt;
     })
   ];
+
+  const visibleRepositoryAssets = sortedAssets.slice(0, visibleAssetsCount);
+  const allVisibleSelected = visibleRepositoryAssets.length > 0 && visibleRepositoryAssets.every(a => selectedAssetIds.has(a.id));
+  const toggleSelectAll = () => {
+    if (allVisibleSelected) setSelectedAssetIds(prev => { const next = new Set(prev); visibleRepositoryAssets.forEach(a => next.delete(a.id)); return next; });
+    else setSelectedAssetIds(prev => { const next = new Set(prev); visibleRepositoryAssets.forEach(a => next.add(a.id)); return next; });
+  };
+  const toggleSelectAsset = (id: string) => {
+    setSelectedAssetIds(prev => { const next = new Set(prev); if (next.has(id)) next.delete(id); else next.add(id); return next; });
+  };
+  const handleBulkSave = async (updates: Partial<Asset>) => {
+    const idsToUpdate: string[] = [];
+    selectedAssetIds.forEach(repId => {
+      const asset = assets.find(a => a.id === repId);
+      if (!asset) return;
+      if (asset.packageId) {
+        const pkg = packageMap.get(asset.packageId) || [asset];
+        pkg.forEach(a => idsToUpdate.push(a.id));
+      } else idsToUpdate.push(asset.id);
+    });
+    const unique = Array.from(new Set(idsToUpdate));
+    try {
+      setUploadStatus(`Updating ${unique.length} asset(s)...`);
+      setUploadProgress(0);
+      for (let i = 0; i < unique.length; i++) {
+        await storageService.updateAsset(unique[i], updates);
+        setUploadProgress(((i + 1) / unique.length) * 100);
+      }
+      setUploadProgress(100);
+      setUploadStatus('Bulk update complete');
+      setSelectedAssetIds(new Set());
+      setIsBulkEditOpen(false);
+      setTimeout(() => { setUploadProgress(null); setUploadStatus(''); }, 1500);
+    } catch (err: any) {
+      alert(`Bulk update failed: ${err?.message || 'Unknown error'}`);
+      setUploadProgress(null);
+      setUploadStatus('');
+    }
+  };
 
   if (!isLoggedIn) return <Login onLogin={handleLogin} />;
 
