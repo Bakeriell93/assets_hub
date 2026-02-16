@@ -877,20 +877,22 @@ export const storageService = {
 
   saveCollection: async (collectionData: Omit<Collection, 'id'>): Promise<Collection> => {
     try {
+      const createdAt = collectionData.createdAt ?? Date.now();
       const payload = {
-        ...collectionData,
+        name: collectionData.name,
         assetIds: collectionData.assetIds ?? [],
-        createdAt: collectionData.createdAt ?? Date.now(),
+        createdAt,
+        ...(collectionData.parentId != null ? { parentId: collectionData.parentId } : {}),
       };
       if (!isCloudEnabled) {
         const existing = readLS<Collection[]>(LS_KEYS.collections, []);
         const id = `collection_${Date.now()}`;
-        const newColl = { ...(payload as any), id } as Collection;
+        const newColl = { ...(payload as any), id, parentId: collectionData.parentId ?? undefined } as Collection;
         writeLS(LS_KEYS.collections, [newColl, ...existing]);
         return newColl;
       }
       const docRef = await addDoc(collection(db!, COLLECTIONS_COLLECTION), payload);
-      return { ...payload, id: docRef.id } as Collection;
+      return { ...payload, id: docRef.id, parentId: collectionData.parentId ?? undefined } as Collection;
     } catch (error) {
       handleError('saveCollection', error);
       throw error;

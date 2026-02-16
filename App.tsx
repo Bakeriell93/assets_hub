@@ -810,6 +810,7 @@ function App() {
     return set;
   };
 
+  // Editor and Admin can create/rename/delete projects and subfolders; changes sync to cloud and are visible to all users (Viewers see read-only).
   const canManageCollections = currentUser?.role === 'Editor' || currentUser?.role === 'Admin';
   const canEdit = currentUser?.role === 'Editor' || currentUser?.role === 'Admin';
 
