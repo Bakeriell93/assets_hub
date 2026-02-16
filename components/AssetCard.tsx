@@ -446,12 +446,11 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         // Trigger download
         a.click();
         console.log('Download link clicked for video/design file');
-        
+        storageService.logDownload(targetAsset.id, targetAsset.title, format);
         // Clean up after a delay
         setTimeout(() => {
           document.body.removeChild(a);
         }, 1000);
-        
         return;
       }
       
@@ -490,7 +489,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         a.remove();
         URL.revokeObjectURL(blobUrl);
       }, 100);
-      
+      storageService.logDownload(targetAsset.id, targetAsset.title, format);
       console.log('Download triggered successfully');
     } catch (err) {
       console.error('Download failed:', err);
@@ -505,6 +504,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         document.body.appendChild(a);
         a.click();
         setTimeout(() => a.remove(), 100);
+        storageService.logDownload(targetAsset.id, targetAsset.title, format);
         console.log('Direct download fallback triggered');
       } catch (fallbackErr) {
         console.error('Fallback download failed:', fallbackErr);
@@ -568,7 +568,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       a.rel = 'noopener';
       document.body.appendChild(a);
       a.click();
-      
+      storageService.logDownload(asset.id, asset.title, 'zip');
       // Cleanup
       setTimeout(() => {
         document.body.removeChild(a);

@@ -34,6 +34,7 @@ const CONFIG_COLLECTION = 'config';
 const USERS_COLLECTION = 'users';
 const COLLECTIONS_COLLECTION = 'collections';
 const SECURITY_LOGS_COLLECTION = 'security_logs';
+const DOWNLOAD_LOGS_COLLECTION = 'download_logs';
 const CONFIG_DOC_ID = 'system_settings';
 
 // -----------------------------
@@ -45,6 +46,7 @@ const LS_KEYS = {
   users: 'byd_assets_hub_users',
   collections: 'byd_assets_hub_collections',
   securityLogs: 'byd_assets_hub_security_logs',
+  downloadLogs: 'byd_assets_hub_download_logs',
 } as const;
 
 function safeParse<T>(raw: string | null, fallback: T): T {
@@ -92,6 +94,16 @@ export interface SecurityLog {
   severity: 'low' | 'medium' | 'high';
   isActionLog?: boolean; // True for manually added action logs
   createdBy?: string; // Username who created this action log
+}
+
+export interface DownloadLog {
+  id: string;
+  timestamp: number;
+  assetId?: string;
+  assetTitle?: string;
+  format?: string;
+  country: string;  // From IP geo (e.g. "Berlin, DE" or "United Kingdom")
+  ip?: string;
 }
 
 const handleError = (context: string, error: any) => {
@@ -221,6 +233,60 @@ export const storageService = {
       snapshot.forEach((doc) => logs.push({ id: doc.id, ...doc.data() } as SecurityLog));
       onUpdate(logs);
     }, (error) => handleError('subscribeToSecurityLogs', error));
+  },
+
+  subscribeToDownloadLogs: (onUpdate: (logs: DownloadLog[]) => void): (() => void) => {
+    if (!isCloudEnabled) {
+      const emit = () => {
+        const logs = readLS<DownloadLog[]>(LS_KEYS.downloadLogs, []);
+        onUpdate([...logs].sort((a, b) => b.timestamp - a.timestamp));
+      };
+      emit();
+      const handler = () => emit();
+      window.addEventListener('storage', handler);
+      window.addEventListener('byd_assets_hub_local_change', handler);
+      return () => {
+        window.removeEventListener('storage', handler);
+        window.removeEventListener('byd_assets_hub_local_change', handler);
+      };
+    }
+    const q = query(collection(db!, DOWNLOAD_LOGS_COLLECTION), orderBy('timestamp', 'desc'));
+    return onSnapshot(q, (snapshot) => {
+      const logs: DownloadLog[] = [];
+      snapshot.forEach((doc) => logs.push({ id: doc.id, ...doc.data() } as DownloadLog));
+      onUpdate(logs);
+    }, (error) => handleError('subscribeToDownloadLogs', error));
+  },
+
+  logDownload: async (assetId?: string, assetTitle?: string, format?: string): Promise<void> => {
+    try {
+      let country = 'Unknown';
+      let ip = 'unknown';
+      try {
+        const ipInfo = await fetch('/api/get-ip-info').then(r => r.json());
+        ip = ipInfo.ip || 'unknown';
+        country = ipInfo.location || 'Unknown';
+      } catch {
+        // keep defaults
+      }
+      const payload: Omit<DownloadLog, 'id'> = {
+        timestamp: Date.now(),
+        country,
+        ip,
+        format: format ?? 'original',
+        ...(assetId != null ? { assetId } : {}),
+        ...(assetTitle != null ? { assetTitle } : {}),
+      };
+      if (!isCloudEnabled) {
+        const existing = readLS<DownloadLog[]>(LS_KEYS.downloadLogs, []);
+        const id = `dl_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        writeLS(LS_KEYS.downloadLogs, [{ ...payload, id }, ...existing].slice(0, 5000));
+        return;
+      }
+      await addDoc(collection(db!, DOWNLOAD_LOGS_COLLECTION), payload);
+    } catch (e) {
+      console.warn('Could not log download:', e);
+    }
   },
 
   logSecurityEvent: async (event: string, severity: 'low' | 'medium' | 'high', ip?: string, location?: string) => {

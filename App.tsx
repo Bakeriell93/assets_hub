@@ -1565,6 +1565,7 @@ function App() {
               document.body.appendChild(a);
               a.click();
               setTimeout(() => document.body.removeChild(a), 1000);
+              storageService.logDownload(asset.id, asset.title, 'original');
               return;
             }
 
@@ -1583,6 +1584,7 @@ function App() {
               a.remove();
               URL.revokeObjectURL(blobUrl);
             }, 100);
+            storageService.logDownload(asset.id, asset.title, 'original');
           } catch (err) {
             console.error('Download failed:', err);
             // Fallback to direct download
@@ -1593,6 +1595,7 @@ function App() {
             document.body.appendChild(a);
             a.click();
             setTimeout(() => a.remove(), 100);
+            storageService.logDownload(asset.id, asset.title, 'original');
           }
         };
 
