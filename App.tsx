@@ -1093,6 +1093,7 @@ function App() {
                         asset={asset}
                         packageAssets={packageAssets}
                         userRole={currentUser?.role!}
+                        username={currentUser?.username}
                         isSelected={selectedAssetIds.has(asset.id)}
                         onToggleSelect={canEdit ? (e) => { e?.stopPropagation(); toggleSelectAsset(asset.id); } : undefined}
                         onPreview={(asset, packageAssets) => {
@@ -1411,6 +1412,7 @@ function App() {
                             asset={asset}
                             packageAssets={packageAssets}
                             userRole={currentUser?.role!}
+                            username={currentUser?.username}
                             onPreview={(asset, packageAssets) => {
                           setPreviewAsset(asset);
                           setPreviewPackageAssets(packageAssets || [asset]);
@@ -1565,7 +1567,7 @@ function App() {
               document.body.appendChild(a);
               a.click();
               setTimeout(() => document.body.removeChild(a), 1000);
-              storageService.logDownload(asset.id, asset.title, 'original');
+              storageService.logDownload(asset.id, asset.title, 'original', currentUser?.username);
               return;
             }
 
@@ -1584,7 +1586,7 @@ function App() {
               a.remove();
               URL.revokeObjectURL(blobUrl);
             }, 100);
-            storageService.logDownload(asset.id, asset.title, 'original');
+            storageService.logDownload(asset.id, asset.title, 'original', currentUser?.username);
           } catch (err) {
             console.error('Download failed:', err);
             // Fallback to direct download
@@ -1595,7 +1597,7 @@ function App() {
             document.body.appendChild(a);
             a.click();
             setTimeout(() => a.remove(), 100);
-            storageService.logDownload(asset.id, asset.title, 'original');
+            storageService.logDownload(asset.id, asset.title, 'original', currentUser?.username);
           }
         };
 

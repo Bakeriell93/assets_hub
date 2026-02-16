@@ -145,6 +145,7 @@ interface AssetCardProps {
   asset: Asset;
   packageAssets?: Asset[]; // All assets in the package (if this is a package)
   userRole: UserRole;
+  username?: string; // For download logs (shared account)
   onPreview: (asset: Asset, packageAssets?: Asset[]) => void;
   onEdit: (asset: Asset) => void;
   onDelete: (id: string) => void;
@@ -154,7 +155,7 @@ interface AssetCardProps {
   onToggleSelect?: (e: React.MouseEvent) => void;
 }
 
-const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, onPreview, onEdit, onDelete, onRestore, isTrashView = false, isSelected = false, onToggleSelect }) => {
+const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, username, onPreview, onEdit, onDelete, onRestore, isTrashView = false, isSelected = false, onToggleSelect }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
@@ -446,7 +447,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         // Trigger download
         a.click();
         console.log('Download link clicked for video/design file');
-        storageService.logDownload(targetAsset.id, targetAsset.title, format);
+        storageService.logDownload(targetAsset.id, targetAsset.title, format, username);
         // Clean up after a delay
         setTimeout(() => {
           document.body.removeChild(a);
@@ -489,7 +490,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         a.remove();
         URL.revokeObjectURL(blobUrl);
       }, 100);
-      storageService.logDownload(targetAsset.id, targetAsset.title, format);
+      storageService.logDownload(targetAsset.id, targetAsset.title, format, username);
       console.log('Download triggered successfully');
     } catch (err) {
       console.error('Download failed:', err);
@@ -504,7 +505,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         document.body.appendChild(a);
         a.click();
         setTimeout(() => a.remove(), 100);
-        storageService.logDownload(targetAsset.id, targetAsset.title, format);
+        storageService.logDownload(targetAsset.id, targetAsset.title, format, username);
         console.log('Direct download fallback triggered');
       } catch (fallbackErr) {
         console.error('Fallback download failed:', fallbackErr);
@@ -568,7 +569,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       a.rel = 'noopener';
       document.body.appendChild(a);
       a.click();
-      storageService.logDownload(asset.id, asset.title, 'zip');
+      storageService.logDownload(asset.id, asset.title, 'zip', username);
       // Cleanup
       setTimeout(() => {
         document.body.removeChild(a);

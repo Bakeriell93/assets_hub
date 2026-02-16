@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import { User, UserRole, Asset, SystemConfig, Brand, BRANDS } from '../types';
-import { storageService, SecurityLog, DownloadLog } from '../services/storageService';
+import { storageService, SecurityLog, DownloadLog, LoginLog } from '../services/storageService';
 import { storage } from '../services/firebase';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
 
@@ -23,6 +23,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   const isEditor = currentUser.role === 'Editor';
   const [activeTab, setActiveTab] = useState<'users' | 'config' | 'stats' | 'security' | 'downloads'>(isEditor ? 'config' : 'users');
   const [downloadLogs, setDownloadLogs] = useState<DownloadLog[]>([]);
+  const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
   const [isAddingUser, setIsAddingUser] = useState(false);
   const [editingUserId, setEditingUserId] = useState<string | null>(null);
   const [isAddingConfig, setIsAddingConfig] = useState<keyof SystemConfig | null>(null);
@@ -50,6 +51,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   useEffect(() => {
     const unsubDownloads = storageService.subscribeToDownloadLogs(setDownloadLogs);
     return () => unsubDownloads();
+  }, []);
+
+  useEffect(() => {
+    const unsubLogins = storageService.subscribeToLoginLogs(setLoginLogs);
+    return () => unsubLogins();
   }, []);
 
   // Initialize action log form when editing
@@ -280,7 +286,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
               { id: 'users', label: 'Team Identities', icon: 'M17 20h5v-2a3 3 0 00-5.356-1.857M17 20H7m10 0v-2c0-.656-.126-1.283-.356-1.857M7 20H2v-2a3 3 0 015.356-1.857M7 20v-2c0-.656.126-1.283.356-1.857m0 0a5.002 5.002 0 019.288 0M15 7a3 3 0 11-6 0 3 3 0 016 0z' },
               { id: 'config', label: 'System Metadata', icon: 'M12 6V4m0 2a2 2 0 100 4m0-4a2 2 0 110 4m-6 8a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4m6 6v10m6-2a2 2 0 100-4m0 4a2 2 0 110-4m0 4v2m0-6V4' },
               { id: 'stats', label: 'Live Telemetry', icon: 'M9 19v-6a2 2 0 00-2-2H5a2 2 0 00-2 2v6a2 2 0 01-2 2h22a2 2 0 01-2-2v-6a2 2 0 00-2-2h-2a2 2 0 00-2 2v6' },
-              { id: 'downloads', label: 'Download Analytics', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' },
+              { id: 'downloads', label: 'Usage & Activity', icon: 'M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4' },
               { id: 'security', label: 'Threat Monitor', icon: 'M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z' }
             ] as const).filter(tab => !isEditor || tab.id === 'config' || tab.id === 'downloads').map(tab => (
               <button
@@ -594,53 +600,171 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
             )}
 
             {activeTab === 'downloads' && (
-              <div className="space-y-10 animate-in fade-in duration-500">
+              <div className="space-y-12 animate-in fade-in duration-500">
                 <div>
-                  <h3 className="text-3xl font-black text-gray-900 tracking-tight uppercase">Download Analytics</h3>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">All-time creative downloads and geographic distribution</p>
+                  <h3 className="text-3xl font-black text-gray-900 tracking-tight uppercase">Usage & Activity</h3>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Logins and downloads — shared account: distinct users inferred by IP</p>
                 </div>
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
-                  <div className="p-10 bg-gray-50 rounded-[48px] border border-gray-100 shadow-sm">
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] mb-2">Total Downloads</p>
-                    <p className="text-5xl font-black text-gray-900 tracking-tighter">{downloadLogs.length.toLocaleString()}</p>
-                    <p className="text-xs text-gray-500 mt-2">Including all past downloads (cloud-synced)</p>
+
+                {/* ——— LOGINS ——— */}
+                <div className="bg-gray-50 p-8 rounded-[40px] border border-gray-100 shadow-sm">
+                  <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Logins</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Total logins</p>
+                      <p className="text-3xl font-black text-gray-900 mt-1">{loginLogs.length.toLocaleString()}</p>
+                    </div>
+                    <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Unique IPs (all time)</p>
+                      <p className="text-3xl font-black text-gray-900 mt-1">{[...new Set(loginLogs.map(l => l.ip))].length.toLocaleString()}</p>
+                      <p className="text-[9px] text-gray-500 mt-0.5">Proxy for distinct users</p>
+                    </div>
+                    <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Logins today</p>
+                      <p className="text-3xl font-black text-gray-900 mt-1">{loginLogs.filter(l => new Date(l.timestamp).toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10)).length}</p>
+                    </div>
+                    <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Unique IPs (last 7 days)</p>
+                      <p className="text-3xl font-black text-gray-900 mt-1">{(() => {
+                        const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000;
+                        const recent = loginLogs.filter(l => l.timestamp >= weekAgo);
+                        return [...new Set(recent.map(l => l.ip))].length;
+                      })()}</p>
+                    </div>
                   </div>
-                  <div className="p-10 bg-gray-50 rounded-[48px] border border-gray-100 shadow-sm">
-                    <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] mb-2">Unique Locations</p>
-                    <p className="text-5xl font-black text-gray-900 tracking-tighter">
-                      {[...new Set(downloadLogs.map(d => d.country || 'Unknown'))].length}
-                    </p>
-                    <p className="text-xs text-gray-500 mt-2">Countries / regions where downloads occurred</p>
-                  </div>
-                </div>
-                <div className="bg-gray-50 p-10 rounded-[48px] border border-gray-100 shadow-sm">
-                  <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Downloads by country / location</h4>
-                  {(() => {
-                    const byCountry = downloadLogs.reduce<Record<string, number>>((acc, log) => {
-                      const key = log.country || 'Unknown';
-                      acc[key] = (acc[key] || 0) + 1;
-                      return acc;
-                    }, {});
-                    const sorted = Object.entries(byCountry).sort((a, b) => b[1] - a[1]);
-                    const maxCount = sorted[0]?.[1] ?? 1;
-                    return sorted.length === 0 ? (
-                      <p className="text-sm font-bold text-gray-400 uppercase tracking-wider">No downloads recorded yet</p>
-                    ) : (
-                      <div className="space-y-4">
-                        {sorted.map(([country, count]) => (
-                          <div key={country} className="flex items-center gap-4">
-                            <div className="flex-1 min-w-0">
-                              <p className="text-sm font-black text-gray-900 truncate">{country}</p>
-                              <div className="mt-1.5 h-2.5 bg-gray-200 rounded-full overflow-hidden">
-                                <div className="h-full bg-blue-600 rounded-full transition-all duration-500" style={{ width: `${(count / maxCount) * 100}%` }} />
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <div>
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-3">Logins per day (last 14 days)</p>
+                      <div className="space-y-2">
+                        {(() => {
+                          const dayKey = (t: number) => new Date(t).toISOString().slice(0, 10);
+                          const days: string[] = [];
+                          for (let i = 13; i >= 0; i--) {
+                            const d = new Date();
+                            d.setDate(d.getDate() - i);
+                            days.push(dayKey(d.getTime()));
+                          }
+                          const byDay = loginLogs.reduce<Record<string, number>>((acc, l) => {
+                            const k = dayKey(l.timestamp);
+                            acc[k] = (acc[k] || 0) + 1;
+                            return acc;
+                          }, {});
+                          const maxDay = Math.max(1, ...Object.values(byDay));
+                          return days.map(d => (
+                            <div key={d} className="flex items-center gap-3">
+                              <span className="text-[10px] font-bold text-gray-500 w-24">{d}</span>
+                              <div className="flex-1 h-5 bg-gray-200 rounded overflow-hidden">
+                                <div className="h-full bg-green-600 rounded" style={{ width: `${((byDay[d] || 0) / maxDay) * 100}%` }} />
                               </div>
+                              <span className="text-xs font-black text-gray-700 w-8 text-right">{byDay[d] || 0}</span>
                             </div>
-                            <span className="text-sm font-black text-gray-700 w-16 text-right">{count.toLocaleString()}</span>
-                          </div>
-                        ))}
+                          ));
+                        })()}
                       </div>
-                    );
-                  })()}
+                    </div>
+                    <div>
+                      <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-3">Recent logins (last 50)</p>
+                      <div className="max-h-64 overflow-y-auto border border-gray-200 rounded-xl bg-white">
+                        <table className="w-full text-left text-[11px]">
+                          <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+                            <tr>
+                              <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Date / Time</th>
+                              <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">User</th>
+                              <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Country</th>
+                              <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">IP</th>
+                            </tr>
+                          </thead>
+                          <tbody className="divide-y divide-gray-100">
+                            {loginLogs.slice(0, 50).map(l => (
+                              <tr key={l.id} className="hover:bg-gray-50">
+                                <td className="px-3 py-2 font-medium text-gray-700">{new Date(l.timestamp).toLocaleString()}</td>
+                                <td className="px-3 py-2 font-bold">{l.username}</td>
+                                <td className="px-3 py-2 text-gray-600">{l.country}</td>
+                                <td className="px-3 py-2 text-gray-500 font-mono text-[10px]">{l.ip}</td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                        {loginLogs.length === 0 && <p className="p-4 text-center text-gray-400 text-xs font-bold">No logins recorded yet</p>}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* ——— DOWNLOADS ——— */}
+                <div className="bg-gray-50 p-8 rounded-[40px] border border-gray-100 shadow-sm">
+                  <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Downloads</h4>
+                  <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
+                    <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Total downloads</p>
+                      <p className="text-3xl font-black text-gray-900 mt-1">{downloadLogs.length.toLocaleString()}</p>
+                    </div>
+                    <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Unique locations</p>
+                      <p className="text-3xl font-black text-gray-900 mt-1">{[...new Set(downloadLogs.map(d => d.country || 'Unknown'))].length}</p>
+                    </div>
+                    <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Downloads today</p>
+                      <p className="text-3xl font-black text-gray-900 mt-1">{downloadLogs.filter(d => new Date(d.timestamp).toISOString().slice(0, 10) === new Date().toISOString().slice(0, 10)).length}</p>
+                    </div>
+                    <div className="p-5 bg-white rounded-2xl border border-gray-100">
+                      <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Unique IPs (downloads)</p>
+                      <p className="text-3xl font-black text-gray-900 mt-1">{[...new Set(downloadLogs.map(d => d.ip))].length}</p>
+                    </div>
+                  </div>
+                  <div className="mb-6">
+                    <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-3">Downloads by country</p>
+                    {(() => {
+                      const byCountry = downloadLogs.reduce<Record<string, number>>((acc, log) => {
+                        const key = log.country || 'Unknown';
+                        acc[key] = (acc[key] || 0) + 1;
+                        return acc;
+                      }, {});
+                      const sorted = Object.entries(byCountry).sort((a, b) => b[1] - a[1]);
+                      const maxCount = sorted[0]?.[1] ?? 1;
+                      return sorted.length === 0 ? (
+                        <p className="text-xs text-gray-400">No downloads yet</p>
+                      ) : (
+                        <div className="flex flex-wrap gap-x-6 gap-y-2">
+                          {sorted.slice(0, 12).map(([country, count]) => (
+                            <div key={country} className="flex items-center gap-2">
+                              <span className="text-xs font-bold text-gray-700 truncate max-w-[120px]">{country}</span>
+                              <span className="text-xs font-black text-blue-600">{count}</span>
+                            </div>
+                          ))}
+                          {sorted.length > 12 && <span className="text-xs text-gray-400">+{sorted.length - 12} more</span>}
+                        </div>
+                      );
+                    })()}
+                  </div>
+                  <p className="text-[10px] font-black text-gray-500 uppercase tracking-wider mb-3">Download history (last 100) — content, user, country</p>
+                  <div className="max-h-72 overflow-y-auto border border-gray-200 rounded-xl bg-white">
+                    <table className="w-full text-left text-[11px]">
+                      <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
+                        <tr>
+                          <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Date / Time</th>
+                          <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Content</th>
+                          <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Format</th>
+                          <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">User</th>
+                          <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Country</th>
+                          <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">IP</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-gray-100">
+                        {downloadLogs.slice(0, 100).map(d => (
+                          <tr key={d.id} className="hover:bg-gray-50">
+                            <td className="px-3 py-2 font-medium text-gray-700 whitespace-nowrap">{new Date(d.timestamp).toLocaleString()}</td>
+                            <td className="px-3 py-2 font-bold text-gray-900 truncate max-w-[180px]" title={d.assetTitle || d.assetId || '—'}>{d.assetTitle || d.assetId || '—'}</td>
+                            <td className="px-3 py-2 text-gray-600">{d.format || 'original'}</td>
+                            <td className="px-3 py-2 text-gray-600">{d.username || '—'}</td>
+                            <td className="px-3 py-2 text-gray-600">{d.country}</td>
+                            <td className="px-3 py-2 text-gray-500 font-mono text-[10px]">{d.ip || '—'}</td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                    {downloadLogs.length === 0 && <p className="p-4 text-center text-gray-400 text-xs font-bold">No downloads recorded yet</p>}
+                  </div>
                 </div>
               </div>
             )}

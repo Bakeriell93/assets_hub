@@ -22,6 +22,7 @@ const Login: React.FC<LoginProps> = ({ onLogin }) => {
     try {
       const verifiedUser = await authService.verify(username, password);
 
+      await storageService.logLogin(verifiedUser.username);
       await storageService.logSecurityEvent(
         `Login Success: ${verifiedUser.username}`,
         verifiedUser.role === 'Admin' ? 'low' : 'medium'
