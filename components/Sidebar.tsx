@@ -102,7 +102,7 @@ const Sidebar: React.FC<SidebarProps> = ({
             {openSections.brand && (
               <div className="p-2 space-y-0.5 bg-white">
                 <button onClick={() => onSelectBrand('All')} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedBrand === 'All' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>All Brands</button>
-                {BRANDS.map(b => (
+                {(config.brands && config.brands.length ? config.brands : BRANDS).map(b => (
                   <button key={b} onClick={() => onSelectBrand(b)} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedBrand === b ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>{b}</button>
                 ))}
               </div>

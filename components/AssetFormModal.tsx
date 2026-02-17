@@ -446,7 +446,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Brand</label>
                         <select value={brand} onChange={(e) => setBrand(e.target.value as Brand)} className={inputClasses}>
-                            {BRANDS.map(b => (
+                            {(config.brands && config.brands.length ? config.brands : BRANDS).map(b => (
                               <option key={b} className="text-gray-900 bg-white" value={b}>{b}</option>
                             ))}
                         </select>

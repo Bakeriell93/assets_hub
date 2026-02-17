@@ -10,7 +10,7 @@ export const PLATFORMS: Platform[] = ['Google', 'Meta', 'Video', 'DOOH', 'Banner
 export type AssetType = 'image' | 'video' | 'text' | 'design';
 export type AssetStatus = 'Draft' | 'Review' | 'Approved';
 
-export type Brand = 'BYD' | 'Denza';
+export type Brand = string; // Configurable via SystemConfig.brands; default BYD, Denza
 export const BRANDS: Brand[] = ['BYD', 'Denza'];
 
 export type UsageRights = 'Fully Owned' | 'Licensed' | 'Royalty Free' | 'Social Only' | 'Internal Only';
@@ -83,17 +83,19 @@ export interface SystemConfig {
   markets: Market[];
   models: CarModel[];
   platforms: Platform[];
-  /** When set, models are per-brand (BYD / Denza). Editors can add models and assign to brand. */
-  modelsByBrand?: Partial<Record<Brand, CarModel[]>>;
+  /** When set, models are per-brand. Editors can add models and assign to brand. */
+  modelsByBrand?: Partial<Record<string, CarModel[]>>;
+  /** Admin-managed brand list (upload panel, filters). Defaults to BRANDS if empty. */
+  brands?: Brand[];
 }
 
 /** Models for a given brand; when brand is All or modelsByBrand unused, returns all models. */
 export function getModelsForBrand(config: SystemConfig, brand: Brand | 'All'): CarModel[] {
   if (brand !== 'All' && config.modelsByBrand?.[brand]?.length) return config.modelsByBrand[brand];
-  if (config.modelsByBrand) {
-    const byd = config.modelsByBrand.BYD ?? [];
-    const denza = config.modelsByBrand.Denza ?? [];
-    return [...new Set([...byd, ...denza])];
+  if (brand !== 'All') return config.models;
+  if (config.modelsByBrand && Object.keys(config.modelsByBrand).length > 0) {
+    const all = Object.values(config.modelsByBrand).flat();
+    return [...new Set(all)];
   }
   return config.models;
 }

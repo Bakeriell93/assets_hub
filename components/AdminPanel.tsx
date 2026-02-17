@@ -40,6 +40,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   // Form states
   const [newUser, setNewUser] = useState<{ fullName: string; username: string; password: string; role: UserRole; allowedMarkets: Market[] }>({ fullName: '', username: '', password: '', role: 'Viewer', allowedMarkets: [] });
   const [newConfigValue, setNewConfigValue] = useState('');
+  const [editingConfigItem, setEditingConfigItem] = useState<{ type: 'markets' | 'platforms'; oldValue: string } | null>(null);
+  const [editingConfigNewValue, setEditingConfigNewValue] = useState('');
   const [addingModelForBrand, setAddingModelForBrand] = useState<Brand | null>(null);
   const [newModelValue, setNewModelValue] = useState('');
 
@@ -221,6 +223,37 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     }
   };
 
+  const handleRenameConfigSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!editingConfigItem || !editingConfigNewValue.trim()) return;
+    const newVal = editingConfigNewValue.trim();
+    const { type, oldValue } = editingConfigItem;
+    if (newVal === oldValue) {
+      setEditingConfigItem(null);
+      setEditingConfigNewValue('');
+      return;
+    }
+    if (config[type].includes(newVal)) {
+      alert(`"${newVal}" already exists in ${type}.`);
+      return;
+    }
+    const nextList = config[type].map(v => v === oldValue ? newVal : v);
+    await storageService.saveSystemConfig({ ...config, [type]: nextList });
+    if (type === 'platforms') {
+      const toUpdate = assets.filter(a => a.platform === oldValue);
+      for (const a of toUpdate) {
+        await storageService.updateAsset(a.id, { platform: newVal });
+      }
+    } else if (type === 'markets') {
+      const toUpdate = assets.filter(a => a.market === oldValue);
+      for (const a of toUpdate) {
+        await storageService.updateAsset(a.id, { market: newVal });
+      }
+    }
+    setEditingConfigItem(null);
+    setEditingConfigNewValue('');
+  };
+
   const modelsForBrand = (b: Brand): string[] =>
     config.modelsByBrand?.[b] ?? config.models;
 
@@ -234,11 +267,10 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
       setAddingModelForBrand(null);
       return;
     }
-    const nextByBrand: Record<Brand, string[]> = {
-      BYD: [...(config.modelsByBrand?.BYD ?? config.models)],
-      Denza: [...(config.modelsByBrand?.Denza ?? config.models)],
-    };
-    nextByBrand[addingModelForBrand] = [...nextByBrand[addingModelForBrand], trimmed];
+    const brandsList = config.brands ?? BRANDS;
+    const nextByBrand: Record<string, string[]> = {};
+    brandsList.forEach(b => { nextByBrand[b] = [...(config.modelsByBrand?.[b] ?? config.models)]; });
+    nextByBrand[addingModelForBrand] = [...(nextByBrand[addingModelForBrand] ?? []), trimmed];
     const allModels = [...new Set([...config.models, trimmed])];
     await storageService.saveSystemConfig({
       ...config,
@@ -250,12 +282,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   };
 
   const handleRemoveModelFromBrand = async (brand: Brand, model: string) => {
-    const nextByBrand: Record<Brand, string[]> = {
-      BYD: [...(config.modelsByBrand?.BYD ?? config.models)],
-      Denza: [...(config.modelsByBrand?.Denza ?? config.models)],
-    };
-    nextByBrand[brand] = nextByBrand[brand].filter(m => m !== model);
-    const inOther = nextByBrand[brand === 'BYD' ? 'Denza' : 'BYD'].includes(model);
+    const brandsList = config.brands ?? BRANDS;
+    const nextByBrand: Record<string, string[]> = {};
+    brandsList.forEach(b => { nextByBrand[b] = [...(config.modelsByBrand?.[b] ?? config.models)]; });
+    nextByBrand[brand] = (nextByBrand[brand] ?? []).filter(m => m !== model);
+    const inOther = brandsList.some(b => b !== brand && (nextByBrand[b] ?? []).includes(model));
     const allModels = inOther ? config.models : config.models.filter(m => m !== model);
     await storageService.saveSystemConfig({
       ...config,
@@ -535,28 +566,102 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                       </div>
                       <div className="flex flex-wrap gap-4">
                          {config[type].map(item => (
-                           <div key={item} className="group relative px-6 py-4 bg-white border border-gray-200 rounded-3xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-5 hover:border-blue-500 hover:shadow-2xl hover:shadow-blue-50 transition-all">
-                              {item}
-                              {!isEditor && (
-                                <button onClick={() => {
-                                    storageService.saveSystemConfig({
-                                        ...config,
-                                        [type]: config[type].filter(i => i !== item)
-                                    });
-                                }} className="text-gray-200 hover:text-red-500 transition-colors">
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                                </button>
+                           <div key={item} className="group relative px-6 py-4 bg-white border border-gray-200 rounded-3xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-3 hover:border-blue-500 hover:shadow-2xl hover:shadow-blue-50 transition-all">
+                              {editingConfigItem?.type === type && editingConfigItem?.oldValue === item ? (
+                                <form onSubmit={handleRenameConfigSubmit} className="flex items-center gap-2">
+                                  <input
+                                    autoFocus
+                                    type="text"
+                                    value={editingConfigNewValue}
+                                    onChange={e => setEditingConfigNewValue(e.target.value)}
+                                    className="px-3 py-2 border-2 border-blue-500 rounded-xl outline-none text-xs font-black w-32"
+                                  />
+                                  <button type="submit" className="p-2 bg-blue-600 text-white rounded-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" /></svg></button>
+                                  <button type="button" onClick={() => { setEditingConfigItem(null); setEditingConfigNewValue(''); }} className="p-2 bg-gray-200 text-gray-600 rounded-xl"><svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                                </form>
+                              ) : (
+                                <>
+                                  {item}
+                                  {!isEditor && (
+                                    <>
+                                      <button onClick={() => { setEditingConfigItem({ type, oldValue: item }); setEditingConfigNewValue(item); }} className="text-gray-300 hover:text-blue-600 transition-colors" title="Rename (updates config and existing assets)">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                      </button>
+                                      <button onClick={() => {
+                                          storageService.saveSystemConfig({
+                                              ...config,
+                                              [type]: config[type].filter(i => i !== item)
+                                          });
+                                      }} className="text-gray-200 hover:text-red-500 transition-colors">
+                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                      </button>
+                                    </>
+                                  )}
+                                </>
                               )}
                            </div>
                          ))}
                       </div>
                    </div>
                 ))}
+
+                {/* Brands Node Registry */}
+                <div className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
+                  <div className="flex items-center justify-between mb-10">
+                    <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">Brands Node Registry</h4>
+                    {!isEditor && (!isAddingConfig || isAddingConfig !== 'brands') && (
+                      <button
+                        onClick={() => setIsAddingConfig('brands')}
+                        className="px-6 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
+                      >
+                        + Register brand
+                      </button>
+                    )}
+                    {!isEditor && isAddingConfig === 'brands' && (
+                      <form onSubmit={async (e) => {
+                        e.preventDefault();
+                        const val = newConfigValue.trim();
+                        const brands = config.brands ?? BRANDS;
+                        if (val && !brands.includes(val)) {
+                          await storageService.saveSystemConfig({ ...config, brands: [...brands, val] });
+                          setIsAddingConfig(null);
+                          setNewConfigValue('');
+                        }
+                      }} className="flex gap-3">
+                        <input
+                          autoFocus
+                          type="text"
+                          value={newConfigValue}
+                          onChange={e => setNewConfigValue(e.target.value)}
+                          className="px-6 py-3 bg-white border-2 border-blue-500 rounded-2xl outline-none text-xs font-black"
+                          placeholder="New brand name..."
+                        />
+                        <button type="submit" className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg></button>
+                        <button type="button" onClick={() => setIsAddingConfig(null)} className="p-3 bg-white text-gray-400 rounded-2xl border border-gray-200"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
+                      </form>
+                    )}
+                  </div>
+                  <div className="flex flex-wrap gap-4">
+                    {(config.brands ?? BRANDS).map(b => (
+                      <div key={b} className="group relative px-6 py-4 bg-white border border-gray-200 rounded-3xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-5 hover:border-blue-500 hover:shadow-2xl transition-all">
+                        {b}
+                        {!isEditor && (
+                          <button onClick={() => {
+                            const brands = (config.brands ?? BRANDS).filter(x => x !== b);
+                            storageService.saveSystemConfig({ ...config, brands: brands.length ? brands : [...BRANDS] });
+                          }} className="text-gray-200 hover:text-red-500 transition-colors">
+                            <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                          </button>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
                 <div className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
                   <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Models by brand</h4>
-                  <p className="text-xs text-gray-500 mb-8">Add car models and assign them to BYD or Denza. Editors and Admins can manage models.</p>
+                  <p className="text-xs text-gray-500 mb-8">Add car models and assign them to each brand. Editors and Admins can manage models.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
-                    {BRANDS.map(brand => (
+                    {(config.brands ?? BRANDS).map(brand => (
                       <div key={brand} className="bg-white p-8 rounded-3xl border border-gray-200">
                         <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-6">{brand} models</h5>
                         {addingModelForBrand === brand ? (

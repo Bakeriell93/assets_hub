@@ -115,7 +115,7 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, onSave, 
               <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Brand</label>
               <select value={brand} onChange={(e) => setBrand(e.target.value as Brand | '')} className={inputClasses}>
                 <option value="">— As is —</option>
-                {BRANDS.map(b => <option key={b} value={b}>{b}</option>)}
+                {(config.brands && config.brands.length ? config.brands : BRANDS).map(b => <option key={b} value={b}>{b}</option>)}
               </select>
             </div>
 
