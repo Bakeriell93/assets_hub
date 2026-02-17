@@ -354,45 +354,43 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                         </select>
                       </div>
                     </div>
-                    <div className="flex gap-4 pt-4">
-                      <button type="submit" className="px-10 py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl shadow-2xl shadow-blue-200">
-                        {editingUserId ? 'Update Identity' : 'Commit Identity'}
-                      </button>
-                      <div className="space-y-3">
-                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Market access (view)</label>
-                        <p className="text-[9px] text-gray-500">Leave all unchecked for access to all markets. Or select specific markets this user can view.</p>
-                        <div className="flex flex-wrap gap-3 pt-1">
-                          <label className="flex items-center gap-2 cursor-pointer">
+
+                    <div className="space-y-3 pt-2">
+                      <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Assigned markets (view access)</label>
+                      <p className="text-xs text-gray-600">Choose which markets this user can see. Leave &quot;All markets&quot; checked for full access, or uncheck it and select specific markets.</p>
+                      <div className="p-5 bg-white rounded-2xl border border-gray-200 flex flex-wrap gap-4">
+                        <label className="flex items-center gap-2 cursor-pointer">
+                          <input
+                            type="checkbox"
+                            checked={newUser.allowedMarkets.length === 0}
+                            onChange={(e) => setNewUser({ ...newUser, allowedMarkets: e.target.checked ? [] : (config.markets.length ? [config.markets[0]] : ['Global']) })}
+                            className="w-4 h-4 rounded text-blue-600"
+                          />
+                          <span className="text-sm font-bold">All markets</span>
+                        </label>
+                        {['Global', ...config.markets].map(m => (
+                          <label key={m} className="flex items-center gap-2 cursor-pointer">
                             <input
                               type="checkbox"
-                              checked={newUser.allowedMarkets.length === 0}
-                              onChange={(e) => setNewUser({ ...newUser, allowedMarkets: e.target.checked ? [] : (config.markets.length ? [config.markets[0]] : ['Global']) })}
+                              checked={newUser.allowedMarkets.length > 0 && newUser.allowedMarkets.includes(m)}
+                              onChange={() => {
+                                if (newUser.allowedMarkets.length === 0) {
+                                  setNewUser({ ...newUser, allowedMarkets: [m] });
+                                } else if (newUser.allowedMarkets.includes(m)) {
+                                  const next = newUser.allowedMarkets.filter(x => x !== m);
+                                  setNewUser({ ...newUser, allowedMarkets: next });
+                                } else {
+                                  setNewUser({ ...newUser, allowedMarkets: [...newUser.allowedMarkets, m] });
+                                }
+                              }}
                               className="w-4 h-4 rounded text-blue-600"
                             />
-                            <span className="text-xs font-bold">All markets</span>
+                            <span className="text-sm font-bold">{m}</span>
                           </label>
-                          {['Global', ...config.markets].map(m => (
-                            <label key={m} className="flex items-center gap-2 cursor-pointer">
-                              <input
-                                type="checkbox"
-                                checked={newUser.allowedMarkets.length > 0 && newUser.allowedMarkets.includes(m)}
-                                onChange={() => {
-                                  if (newUser.allowedMarkets.length === 0) {
-                                    setNewUser({ ...newUser, allowedMarkets: [m] });
-                                  } else if (newUser.allowedMarkets.includes(m)) {
-                                    const next = newUser.allowedMarkets.filter(x => x !== m);
-                                    setNewUser({ ...newUser, allowedMarkets: next });
-                                  } else {
-                                    setNewUser({ ...newUser, allowedMarkets: [...newUser.allowedMarkets, m] });
-                                  }
-                                }}
-                                className="w-4 h-4 rounded text-blue-600"
-                              />
-                              <span className="text-xs font-bold">{m}</span>
-                            </label>
-                          ))}
-                        </div>
+                        ))}
                       </div>
+                    </div>
+
                     <div className="flex gap-4 pt-4">
                       <button type="submit" className="px-10 py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl shadow-2xl shadow-blue-200">
                         {editingUserId ? 'Update Identity' : 'Commit Identity'}
