@@ -29,6 +29,8 @@ export interface User {
   password?: string;
   createdAt?: number;
   isSuperAdmin?: boolean; // True for permanent super admin (fakhri)
+  /** If set, user has view access only to these markets. Empty/undefined = all markets. */
+  allowedMarkets?: Market[];
 }
 
 export interface Collection {

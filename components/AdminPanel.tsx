@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, Asset, SystemConfig, Brand, BRANDS } from '../types';
+import { User, UserRole, Asset, SystemConfig, Brand, BRANDS, Market } from '../types';
 import { storageService, SecurityLog, DownloadLog, LoginLog } from '../services/storageService';
 import { storage } from '../services/firebase';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
@@ -38,7 +38,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   const [newActionLog, setNewActionLog] = useState({ event: '', severity: 'medium' as 'low' | 'medium' | 'high' });
 
   // Form states
-  const [newUser, setNewUser] = useState({ fullName: '', username: '', password: '', role: 'Viewer' as UserRole });
+  const [newUser, setNewUser] = useState<{ fullName: string; username: string; password: string; role: UserRole; allowedMarkets: Market[] }>({ fullName: '', username: '', password: '', role: 'Viewer', allowedMarkets: [] });
   const [newConfigValue, setNewConfigValue] = useState('');
   const [addingModelForBrand, setAddingModelForBrand] = useState<Brand | null>(null);
   const [newModelValue, setNewModelValue] = useState('');
@@ -153,10 +153,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
         fullName: newUser.fullName,
         role: newUser.role,
         password: newUser.password,
-        createdAt: Date.now()
+        createdAt: Date.now(),
+        allowedMarkets: newUser.allowedMarkets.length > 0 ? newUser.allowedMarkets : undefined,
       });
       setIsAddingUser(false);
-      setNewUser({ fullName: '', username: '', password: '', role: 'Viewer' });
+      setNewUser({ fullName: '', username: '', password: '', role: 'Viewer', allowedMarkets: [] });
     }
   };
 
@@ -182,10 +183,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
         username: newUser.username.toLowerCase(),
         role: newUser.role,
         password: newUser.password || userToEdit.password, // Keep existing password if not changed
+        allowedMarkets: newUser.allowedMarkets.length > 0 ? newUser.allowedMarkets : undefined,
       });
       await storageService.logSecurityEvent(`User updated: ${userToEdit.username} by ${currentUser.username}`, 'low');
       setEditingUserId(null);
-      setNewUser({ fullName: '', username: '', password: '', role: 'Viewer' });
+      setNewUser({ fullName: '', username: '', password: '', role: 'Viewer', allowedMarkets: [] });
     } catch (err: any) {
       alert(err.message || 'Failed to update user');
     }
@@ -201,6 +203,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
           username: userToEdit.username,
           password: '', // Don't pre-fill password for security
           role: userToEdit.role,
+          allowedMarkets: userToEdit.allowedMarkets && userToEdit.allowedMarkets.length > 0 ? [...userToEdit.allowedMarkets] : [],
         });
       }
     }
@@ -309,7 +312,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                   <h3 className="text-3xl font-black text-gray-900 tracking-tight">Access Control Registry</h3>
                   {!isAddingUser && (
                     <button 
-                      onClick={() => setIsAddingUser(true)} 
+                      onClick={() => { setNewUser({ fullName: '', username: '', password: '', role: 'Viewer', allowedMarkets: [] }); setEditingUserId(null); setIsAddingUser(true); }} 
                       className="px-8 py-4 bg-blue-600 text-white text-[10px] font-black uppercase tracking-widest rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all"
                     >
                       Provision New User
@@ -355,10 +358,49 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                       <button type="submit" className="px-10 py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl shadow-2xl shadow-blue-200">
                         {editingUserId ? 'Update Identity' : 'Commit Identity'}
                       </button>
+                      <div className="space-y-3">
+                        <label className="text-[10px] font-black text-gray-400 uppercase tracking-widest ml-1">Market access (view)</label>
+                        <p className="text-[9px] text-gray-500">Leave all unchecked for access to all markets. Or select specific markets this user can view.</p>
+                        <div className="flex flex-wrap gap-3 pt-1">
+                          <label className="flex items-center gap-2 cursor-pointer">
+                            <input
+                              type="checkbox"
+                              checked={newUser.allowedMarkets.length === 0}
+                              onChange={(e) => setNewUser({ ...newUser, allowedMarkets: e.target.checked ? [] : (config.markets.length ? [config.markets[0]] : ['Global']) })}
+                              className="w-4 h-4 rounded text-blue-600"
+                            />
+                            <span className="text-xs font-bold">All markets</span>
+                          </label>
+                          {['Global', ...config.markets].map(m => (
+                            <label key={m} className="flex items-center gap-2 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={newUser.allowedMarkets.length > 0 && newUser.allowedMarkets.includes(m)}
+                                onChange={() => {
+                                  if (newUser.allowedMarkets.length === 0) {
+                                    setNewUser({ ...newUser, allowedMarkets: [m] });
+                                  } else if (newUser.allowedMarkets.includes(m)) {
+                                    const next = newUser.allowedMarkets.filter(x => x !== m);
+                                    setNewUser({ ...newUser, allowedMarkets: next });
+                                  } else {
+                                    setNewUser({ ...newUser, allowedMarkets: [...newUser.allowedMarkets, m] });
+                                  }
+                                }}
+                                className="w-4 h-4 rounded text-blue-600"
+                              />
+                              <span className="text-xs font-bold">{m}</span>
+                            </label>
+                          ))}
+                        </div>
+                      </div>
+                    <div className="flex gap-4 pt-4">
+                      <button type="submit" className="px-10 py-5 bg-blue-600 text-white text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl shadow-2xl shadow-blue-200">
+                        {editingUserId ? 'Update Identity' : 'Commit Identity'}
+                      </button>
                       <button type="button" onClick={() => {
                         setIsAddingUser(false);
                         setEditingUserId(null);
-                        setNewUser({ fullName: '', username: '', password: '', role: 'Viewer' });
+                        setNewUser({ fullName: '', username: '', password: '', role: 'Viewer', allowedMarkets: [] });
                       }} className="px-10 py-5 bg-white text-gray-400 text-[11px] font-black uppercase tracking-[0.2em] rounded-3xl border border-gray-200">
                         Abort
                       </button>
@@ -372,6 +414,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                       <tr className="bg-gray-100/30">
                         <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Authorized Identity</th>
                         <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Permission</th>
+                        <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Market access</th>
                         <th className="px-10 py-8 text-[11px] font-black text-gray-400 uppercase tracking-widest">Actions</th>
                       </tr>
                     </thead>
@@ -393,6 +436,13 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                                   u.role === 'Editor' ? 'bg-blue-50 border-blue-100 text-blue-600' :
                                   'bg-gray-100 border-gray-200 text-gray-500'
                               }`}>{u.role}</span>
+                            )}
+                          </td>
+                          <td className="px-10 py-8">
+                            {!u.allowedMarkets || u.allowedMarkets.length === 0 ? (
+                              <span className="text-[10px] font-bold text-gray-500">All markets</span>
+                            ) : (
+                              <span className="text-[10px] font-bold text-gray-700">{u.allowedMarkets.join(', ')}</span>
                             )}
                           </td>
                           <td className="px-10 py-8">

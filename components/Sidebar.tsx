@@ -121,10 +121,21 @@ const Sidebar: React.FC<SidebarProps> = ({
             {openSections.markets && (
               <div className="p-2 space-y-0.5 bg-white max-h-48 overflow-y-auto">
                 <button onClick={() => onSelectMarket('All')} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedMarket === 'All' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>All Assets</button>
-                <button onClick={() => onSelectMarket('Global')} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedMarket === 'Global' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>Global</button>
-                {config.markets.map(m => (
-                  <button key={m} onClick={() => onSelectMarket(m)} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedMarket === m ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>{m}</button>
-                ))}
+                {(() => {
+                  const allowed = user.allowedMarkets && user.allowedMarkets.length > 0 ? user.allowedMarkets : null;
+                  const showGlobal = !allowed || allowed.includes('Global');
+                  const marketsToList = allowed ? config.markets.filter(m => allowed.includes(m)) : config.markets;
+                  return (
+                    <>
+                      {showGlobal && (
+                        <button onClick={() => onSelectMarket('Global')} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedMarket === 'Global' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>Global</button>
+                      )}
+                      {marketsToList.map(m => (
+                        <button key={m} onClick={() => onSelectMarket(m)} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedMarket === m ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>{m}</button>
+                      ))}
+                    </>
+                  );
+                })()}
               </div>
             )}
           </div>

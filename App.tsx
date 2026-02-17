@@ -850,7 +850,10 @@ function App() {
     } else {
       if (a.deletedAt) return false; // Deleted, don't show in main views
     }
-    
+
+    // Restrict by user's market access (view)
+    if (currentUser?.allowedMarkets && currentUser.allowedMarkets.length > 0 && !currentUser.allowedMarkets.includes(a.market)) return false;
+
     const brandMatch = selectedBrand === 'All' || a.brand === selectedBrand;
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || 
