@@ -73,8 +73,13 @@ export interface Asset {
   packagePreviewAssetId?: string; // ID of the asset to use as package card preview thumbnail
   packageNote?: string; // Description of package contents (shown on card)
   packageAssetTypes?: AssetType[]; // Types included in package (e.g. image + video)
-  // Brand
+  // Brand (single for backward compat; use brands when multiple)
   brand?: Brand;
+  brands?: Brand[];
+  // Platforms when asset applies to multiple
+  platforms?: Platform[];
+  // Asset types (e.g. tagged as image + video); type is primary
+  assetTypes?: AssetType[];
   // Soft delete (trash)
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
 }

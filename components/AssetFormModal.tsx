@@ -41,9 +41,19 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [originalTitle, setOriginalTitle] = useState('');
   const [usageRights, setUsageRights] = useState<UsageRights>(USAGE_RIGHTS[0]);
   const [isCarModelsDropdownOpen, setIsCarModelsDropdownOpen] = useState(false);
+  const [isBrandsDropdownOpen, setIsBrandsDropdownOpen] = useState(false);
+  const [isPlatformsDropdownOpen, setIsPlatformsDropdownOpen] = useState(false);
+  const [isAssetTypesDropdownOpen, setIsAssetTypesDropdownOpen] = useState(false);
   const [brand, setBrand] = useState<Brand>('BYD');
+  const [selectedBrands, setSelectedBrands] = useState<Brand[]>(['BYD']);
+  const [selectedPlatforms, setSelectedPlatforms] = useState<Platform[]>([]);
+  const [selectedAssetTypes, setSelectedAssetTypes] = useState<AssetType[]>(['image']);
   const [packageNote, setPackageNote] = useState('');
-  const modelsList = getModelsForBrand(config, brand);
+  const brandsList = (config.brands && config.brands.length ? config.brands : BRANDS);
+  const platformsList = config.platforms?.length ? config.platforms : PLATFORMS;
+  const modelsList = selectedBrands.length > 0
+    ? [...new Set(selectedBrands.flatMap(b => getModelsForBrand(config, b)))]
+    : getModelsForBrand(config, brand);
   const [selectedPackageTypes, setSelectedPackageTypes] = useState<AssetType[]>(['image', 'video']);
   
   const [ctr, setCtr] = useState<string>('');
@@ -87,6 +97,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setComments(editingAsset.comments || '');
       setUsageRights(editingAsset.usageRights || USAGE_RIGHTS[0]);
       setBrand(editingAsset.brand || 'BYD');
+      setSelectedBrands(editingAsset.brands?.length ? editingAsset.brands : (editingAsset.brand ? [editingAsset.brand] : ['BYD']));
+      setSelectedPlatforms(editingAsset.platforms?.length ? editingAsset.platforms : (editingAsset.platform ? [editingAsset.platform] : [config.platforms?.[0] || PLATFORMS[0]]));
+      setSelectedAssetTypes(editingAsset.assetTypes?.length ? editingAsset.assetTypes : [editingAsset.type]);
       setPackageNote(editingAsset.packageNote || '');
       setSelectedPackageTypes(editingAsset.packageAssetTypes?.length ? editingAsset.packageAssetTypes : ['image', 'video']);
       
@@ -141,6 +154,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setIsPackageMode(false);
       setIsCarModelsDropdownOpen(false);
       setBrand('BYD');
+      setSelectedBrands([(config.brands && config.brands.length ? config.brands[0] : 'BYD')]);
+      setSelectedPlatforms([config.platforms?.[0] || PLATFORMS[0]]);
+      setSelectedAssetTypes(['image']);
       setPackageNote('');
       setSelectedPackageTypes(['image', 'video']);
     }
@@ -178,6 +194,17 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]
     );
   };
+  const toggleBrand = (b: Brand) => {
+    setSelectedBrands(prev => prev.includes(b) ? prev.filter(x => x !== b) : [...prev, b]);
+    if (!selectedBrands.includes(b)) setBrand(b);
+  };
+  const togglePlatform = (p: Platform) => {
+    setSelectedPlatforms(prev => prev.includes(p) ? prev.filter(x => x !== p) : [...prev, p]);
+  };
+  const toggleAssetType = (t: AssetType) => {
+    setSelectedAssetTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
+    if (!selectedAssetTypes.includes(t)) setType(t);
+  };
 
   const ASSET_TYPES: { value: AssetType; label: string }[] = [
     { value: 'image', label: 'Image' },
@@ -200,6 +227,18 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       alert("Please select at least one car model.");
       return;
     }
+    if (selectedBrands.length === 0) {
+      alert("Please select at least one brand.");
+      return;
+    }
+    if (selectedPlatforms.length === 0) {
+      alert("Please select at least one platform.");
+      return;
+    }
+    if (!isPackageMode && !editingAsset && selectedAssetTypes.length === 0) {
+      alert("Please select at least one asset type.");
+      return;
+    }
 
     // Skip file validation when editing existing asset (only updating metadata)
     if (!editingAsset) {
@@ -208,7 +247,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         return;
       }
 
-      if (!isPackageMode && !file && type !== 'text' && !content) {
+      const primaryAssetType = selectedAssetTypes[0] || type;
+      if (!isPackageMode && !file && primaryAssetType !== 'text' && !content) {
         alert("Please select a file to upload.");
         return;
       }
@@ -232,7 +272,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
 
         // Extract platform from filename or use default
         const filename = f.name.toLowerCase();
-        let assetPlatform = platform;
+        let assetPlatform = selectedPlatforms[0] || platform;
         if (filename.includes('google') || filename.includes('gads')) assetPlatform = 'Google';
         else if (filename.includes('meta') || filename.includes('facebook') || filename.includes('instagram')) assetPlatform = 'Meta';
         else if (filename.includes('video') || filename.includes('youtube')) assetPlatform = 'Video';
@@ -267,10 +307,11 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             packageId,
             packageOrder: idx,
             originalFileName: f.name, // Store original Windows filename
-            brand: brand || undefined,
+            brand: selectedBrands[0] || undefined,
+            brands: selectedBrands.length ? selectedBrands : undefined,
+            platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
             packageNote: packageNote.trim() || undefined,
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
-            // Store which asset should be used as preview (will be set after upload with actual IDs)
             ...(idx === previewAssetIndex ? { packagePreviewAssetId: 'temp_' + idx } : {})
           } as Omit<Asset, 'id' | 'createdAt'>,
           file: f
@@ -315,7 +356,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             // Preserve other fields
             type: pkgAsset.type,
             market,
-            platform,
+            platform: (selectedPlatforms[0] || platform) as Platform,
+            platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
             carModel: primaryCarModel,
             ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
             objectives: selectedObjectives,
@@ -331,10 +373,10 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             status: pkgAsset.status,
             createdAt: pkgAsset.createdAt,
             collectionIds: selectedCollectionIds,
-            brand: brand || undefined,
+            brand: selectedBrands[0] || undefined,
+            brands: selectedBrands.length ? selectedBrands : undefined,
             packageNote: packageNote.trim() || undefined,
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
-            // Update preview asset ID if changed
             ...(newPreviewAssetId !== undefined ? { packagePreviewAssetId: newPreviewAssetId } : {}),
           };
           await storageService.updateAsset(pkgAsset.id, updates);
@@ -344,11 +386,14 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       }
       
       // Regular single asset edit
+      const primaryType = selectedAssetTypes[0] || type;
       const updates: Partial<Asset> = {
         title,
-        type,
+        type: primaryType,
+        assetTypes: selectedAssetTypes.length ? selectedAssetTypes : undefined,
         market,
-        platform,
+        platform: (selectedPlatforms[0] || platform) as Platform,
+        platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
         carModel: primaryCarModel,
         ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
         objectives: selectedObjectives,
@@ -359,37 +404,40 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         cr: cr ? parseFloat(cr) : undefined,
         comments: comments || undefined,
         content: content || undefined,
-        // Preserve these fields from original asset
         url: editingAsset.url,
         size: editingAsset.size,
         status: editingAsset.status,
         createdAt: editingAsset.createdAt,
-        // Always send collectionIds so folder filter updates correctly (including empty to clear)
         collectionIds: selectedCollectionIds,
-        brand: brand || undefined,
+        brand: selectedBrands[0] || undefined,
+        brands: selectedBrands.length ? selectedBrands : undefined,
       };
       
       onSave(updates, file || undefined);
       return;
     }
 
+    const primaryType = selectedAssetTypes[0] || type;
     const data = {
       title,
-      type,
+      type: primaryType,
+      assetTypes: selectedAssetTypes.length ? selectedAssetTypes : undefined,
       market,
-      platform,
+      platform: (selectedPlatforms[0] || platform) as Platform,
+      platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
       carModel: primaryCarModel,
       ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
       usageRights,
       objectives: selectedObjectives,
       collectionIds: selectedCollectionIds,
-      content: type === 'text' ? content : undefined,
+      content: primaryType === 'text' ? content : undefined,
       uploadedBy: uploaderName || 'Anonymous',
       ctr: ctr ? parseFloat(ctr) : undefined,
       cpl: cpl ? parseFloat(cpl) : undefined,
       cr: cr ? parseFloat(cr) : undefined,
       comments: comments || undefined,
-      brand: brand || undefined,
+      brand: selectedBrands[0] || undefined,
+      brands: selectedBrands.length ? selectedBrands : undefined,
     };
 
     onSave(data, file || undefined);
@@ -444,12 +492,30 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Brand</label>
-                        <select value={brand} onChange={(e) => setBrand(e.target.value as Brand)} className={inputClasses}>
-                            {(config.brands && config.brands.length ? config.brands : BRANDS).map(b => (
-                              <option key={b} className="text-gray-900 bg-white" value={b}>{b}</option>
-                            ))}
-                        </select>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Brands (select all that apply)</label>
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => { setIsBrandsDropdownOpen(!isBrandsDropdownOpen); setIsPlatformsDropdownOpen(false); setIsAssetTypesDropdownOpen(false); }}
+                                className={`w-full rounded-xl border-gray-300 border-2 p-3 focus:border-blue-500 bg-white text-gray-900 outline-none transition-all font-medium shadow-sm cursor-pointer text-left flex items-center justify-between ${selectedBrands.length === 0 ? 'text-gray-400' : ''}`}
+                            >
+                                <span>{selectedBrands.length === 0 ? 'Select brands...' : selectedBrands.length === 1 ? selectedBrands[0] : `${selectedBrands.length} brands selected`}</span>
+                                <svg className={`w-5 h-5 text-gray-400 transition-transform ${isBrandsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {isBrandsDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsBrandsDropdownOpen(false)} />
+                                    <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                                        {brandsList.map(b => (
+                                            <label key={b} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
+                                                <input type="checkbox" checked={selectedBrands.includes(b)} onChange={() => toggleBrand(b)} className="w-5 h-5 rounded border-gray-300 text-blue-600" />
+                                                <span className="text-sm font-bold text-gray-900">{b}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Market</label>
@@ -479,12 +545,31 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                   </div>
                 ) : (
                   <div className="mb-4">
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Asset Type</label>
-                    <select value={type} disabled={!!editingAsset} onChange={(e) => setType(e.target.value as AssetType)} className={inputClasses}>
-                      {ASSET_TYPES.map(({ value, label }) => (
-                        <option key={value} className="text-gray-900 bg-white" value={value}>{label}</option>
-                      ))}
-                    </select>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Asset types (select all that apply)</label>
+                    <div className="relative">
+                      <button
+                        type="button"
+                        disabled={!!editingAsset}
+                        onClick={() => { setIsAssetTypesDropdownOpen(!isAssetTypesDropdownOpen); setIsBrandsDropdownOpen(false); setIsPlatformsDropdownOpen(false); }}
+                        className={`w-full rounded-xl border-gray-300 border-2 p-3 focus:border-blue-500 bg-white text-gray-900 outline-none transition-all font-medium shadow-sm cursor-pointer text-left flex items-center justify-between ${selectedAssetTypes.length === 0 ? 'text-gray-400' : ''} ${editingAsset ? 'opacity-60 cursor-not-allowed' : ''}`}
+                      >
+                        <span>{selectedAssetTypes.length === 0 ? 'Select types...' : selectedAssetTypes.length === 1 ? ASSET_TYPES.find(x => x.value === selectedAssetTypes[0])?.label : `${selectedAssetTypes.length} types selected`}</span>
+                        <svg className={`w-5 h-5 text-gray-400 transition-transform ${isAssetTypesDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                      </button>
+                      {isAssetTypesDropdownOpen && !editingAsset && (
+                        <>
+                          <div className="fixed inset-0 z-40" onClick={() => setIsAssetTypesDropdownOpen(false)} />
+                          <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl">
+                            {ASSET_TYPES.map(({ value, label }) => (
+                              <label key={value} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
+                                <input type="checkbox" checked={selectedAssetTypes.includes(value)} onChange={() => toggleAssetType(value)} className="w-5 h-5 rounded border-gray-300 text-blue-600" />
+                                <span className="text-sm font-bold text-gray-900">{label}</span>
+                              </label>
+                            ))}
+                          </div>
+                        </>
+                      )}
+                    </div>
                   </div>
                 )}
 
@@ -497,10 +582,30 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
 
                 <div className="grid grid-cols-2 gap-4">
                     <div>
-                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Platform</label>
-                        <select value={platform} onChange={(e) => setPlatform(e.target.value as Platform)} className={inputClasses}>
-                            {(config.platforms.length > 0 ? config.platforms : PLATFORMS).map(p => <option className="text-gray-900 bg-white" key={p} value={p}>{p}</option>)}
-                        </select>
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Platforms (select all that apply)</label>
+                        <div className="relative">
+                            <button
+                                type="button"
+                                onClick={() => { setIsPlatformsDropdownOpen(!isPlatformsDropdownOpen); setIsBrandsDropdownOpen(false); setIsAssetTypesDropdownOpen(false); }}
+                                className={`w-full rounded-xl border-gray-300 border-2 p-3 focus:border-blue-500 bg-white text-gray-900 outline-none transition-all font-medium shadow-sm cursor-pointer text-left flex items-center justify-between ${selectedPlatforms.length === 0 ? 'text-gray-400' : ''}`}
+                            >
+                                <span>{selectedPlatforms.length === 0 ? 'Select platforms...' : selectedPlatforms.length === 1 ? selectedPlatforms[0] : `${selectedPlatforms.length} platforms selected`}</span>
+                                <svg className={`w-5 h-5 text-gray-400 transition-transform ${isPlatformsDropdownOpen ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                            </button>
+                            {isPlatformsDropdownOpen && (
+                                <>
+                                    <div className="fixed inset-0 z-40" onClick={() => setIsPlatformsDropdownOpen(false)} />
+                                    <div className="absolute z-50 w-full mt-2 bg-white border-2 border-gray-200 rounded-xl shadow-xl max-h-48 overflow-y-auto">
+                                        {platformsList.map(p => (
+                                            <label key={p} className="flex items-center gap-3 p-3 hover:bg-gray-50 rounded-lg cursor-pointer">
+                                                <input type="checkbox" checked={selectedPlatforms.includes(p)} onChange={() => togglePlatform(p)} className="w-5 h-5 rounded border-gray-300 text-blue-600" />
+                                                <span className="text-sm font-bold text-gray-900">{p}</span>
+                                            </label>
+                                        ))}
+                                    </div>
+                                </>
+                            )}
+                        </div>
                     </div>
                     <div>
                         <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Car Models (Select all that apply)</label>
@@ -1194,7 +1299,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                         </div>
                     ) : (
                         <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center hover:border-blue-400 bg-gray-50/50 transition-colors relative">
-                            <input type="file" required accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : '*/*'} onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                            <input type="file" required accept={(selectedAssetTypes[0] || type) === 'image' ? 'image/*' : (selectedAssetTypes[0] || type) === 'video' ? 'video/*' : '*/*'} onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
                             <div className="space-y-2 pointer-events-none">
                                 <p className="text-sm font-bold text-gray-600">{file ? file.name : `Select ${type} file`}</p>
                                 <p className="text-xs text-gray-400">High quality recommended</p>

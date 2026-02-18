@@ -159,6 +159,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
+  const [packageSectionCollapsed, setPackageSectionCollapsed] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const isPackage = packageAssets.length > 1;
   
@@ -809,11 +810,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       {/* Content */}
       <div className="p-6 flex-1 flex flex-col bg-white">
         <div className="flex flex-wrap gap-2 mb-4">
-            {asset.brand && (
-              <span className="px-2 py-1 rounded-lg bg-amber-50 text-[10px] font-black text-amber-700 uppercase tracking-tight">{asset.brand}</span>
-            )}
+            {(asset.brands && asset.brands.length ? asset.brands : (asset.brand ? [asset.brand] : [])).map(b => (
+              <span key={b} className="px-2 py-1 rounded-lg bg-amber-50 text-[10px] font-black text-amber-700 uppercase tracking-tight">{b}</span>
+            ))}
             <span className="px-2 py-1 rounded-lg bg-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-tight">{asset.market}</span>
-            <span className="px-2 py-1 rounded-lg bg-blue-50 text-[10px] font-black text-blue-600 uppercase tracking-tight">{asset.platform}</span>
+            {(asset.platforms && asset.platforms.length ? asset.platforms : (asset.platform ? [asset.platform] : [])).map(p => (
+              <span key={p} className="px-2 py-1 rounded-lg bg-blue-50 text-[10px] font-black text-blue-600 uppercase tracking-tight">{p}</span>
+            ))}
         </div>
 
         <h3 className="text-sm font-bold text-gray-900 mb-1.5 tracking-tight leading-tight break-words">{asset.title}</h3>
@@ -861,56 +864,52 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             <span className="truncate max-w-[80px] bg-gray-50 px-2 py-1 rounded-md">{asset.uploadedBy}</span>
         </div>
 
-        {/* Package Info - Show below card content */}
+        {/* Package Info - Collapsible, slightly reduced size */}
         {isPackage && (
-          <div className="mt-3 pt-3 border-t-2 border-purple-200 bg-purple-50/50 px-6 pb-4 -mx-6 -mb-6 rounded-b-[32px]">
-            <div className="flex items-center justify-between mb-3">
-              <span className="text-[10px] font-black text-purple-700 uppercase tracking-widest">
+          <div className="mt-2 pt-2 border-t border-purple-200 bg-purple-50/40 px-4 pb-3 -mx-6 -mb-6 rounded-b-[32px]">
+            <button
+              type="button"
+              onClick={(e) => { e.stopPropagation(); setPackageSectionCollapsed(prev => !prev); }}
+              className="w-full flex items-center justify-between text-left py-1.5"
+            >
+              <span className="text-[9px] font-black text-purple-700 uppercase tracking-widest">
                 {packageAssets.length} {packageAssets.length === 1 ? 'Asset' : 'Assets'} in Package
               </span>
-            </div>
-            <div className="space-y-2 max-h-40 overflow-y-auto">
-              {packageAssets.map((pkgAsset, idx) => {
-                const fileName = getDisplayFilename(pkgAsset);
-                return (
-                  <div key={pkgAsset.id} className="flex items-center gap-2 group/item">
-                    <span className="text-purple-600 font-black text-[8px] min-w-[18px]">{idx + 1}.</span>
-                    <span className="text-gray-700 font-medium text-[8px] truncate flex-1" title={fileName}>
-                      {fileName}
-                    </span>
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        handleDownload('original', pkgAsset.id);
-                      }}
-                      className="opacity-0 group-hover/item:opacity-100 p-1.5 bg-purple-100 hover:bg-purple-200 rounded-lg transition-all flex-shrink-0"
-                      title="Download"
-                    >
-                      <svg className="w-3 h-3 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
-                      </svg>
-                    </button>
-                  </div>
-                );
-              })}
-            </div>
-            {/* Download All as ZIP button */}
-            {isPackage && (
-              <div className="mt-3 pt-3 border-t border-purple-200">
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    handleDownloadAllAsZip();
-                  }}
-                  className="w-full px-4 py-2.5 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[10px] font-black uppercase tracking-widest transition-all shadow-lg flex items-center justify-center gap-2"
-                  title="Download all package files as ZIP"
-                >
-                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
-                  </svg>
-                  Download All as ZIP
-                </button>
-              </div>
+              <svg className={`w-4 h-4 text-purple-600 transition-transform ${packageSectionCollapsed ? '' : 'rotate-180'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {!packageSectionCollapsed && (
+              <>
+                <div className="space-y-1 max-h-28 overflow-y-auto mt-1">
+                  {packageAssets.map((pkgAsset, idx) => {
+                    const fileName = getDisplayFilename(pkgAsset);
+                    return (
+                      <div key={pkgAsset.id} className="flex items-center gap-1.5 group/item">
+                        <span className="text-purple-600 font-black text-[7px] min-w-[14px]">{idx + 1}.</span>
+                        <span className="text-gray-700 font-medium text-[7px] truncate flex-1" title={fileName}>
+                          {fileName}
+                        </span>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); handleDownload('original', pkgAsset.id); }}
+                          className="opacity-0 group-hover/item:opacity-100 p-1 bg-purple-100 hover:bg-purple-200 rounded transition-all flex-shrink-0"
+                          title="Download"
+                        >
+                          <svg className="w-2.5 h-2.5 text-purple-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="mt-2 pt-2 border-t border-purple-200/80">
+                  <button
+                    onClick={(e) => { e.stopPropagation(); handleDownloadAllAsZip(); }}
+                    className="w-full px-3 py-2 bg-purple-600 hover:bg-purple-700 text-white rounded-lg text-[9px] font-black uppercase tracking-widest transition-all flex items-center justify-center gap-1.5"
+                    title="Download all as ZIP"
+                  >
+                    <svg className="w-3.5 h-3.5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 10v6m0 0l-3-3m3 3l3-3m2 8H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" /></svg>
+                    Download All as ZIP
+                  </button>
+                </div>
+              </>
             )}
           </div>
         )}

@@ -510,6 +510,7 @@ function App() {
   const [editingCollectionId, setEditingCollectionId] = useState<string | null>(null);
   const [editingCollectionName, setEditingCollectionName] = useState('');
   const [activeCollectionId, setActiveCollectionId] = useState<string | null>(null);
+  const [collapsedCollectionIds, setCollapsedCollectionIds] = useState<Set<string>>(new Set());
 
   // Filter States
   const [selectedBrand, setSelectedBrand] = useState<Brand | 'All'>('All');
@@ -519,6 +520,7 @@ function App() {
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
+  const [repositoryViewMode, setRepositoryViewMode] = useState<'grid' | 'list'>('grid');
 
   // Modals
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
@@ -854,12 +856,12 @@ function App() {
     // Restrict by user's market access (view)
     if (currentUser?.allowedMarkets && currentUser.allowedMarkets.length > 0 && !currentUser.allowedMarkets.includes(a.market)) return false;
 
-    const brandMatch = selectedBrand === 'All' || a.brand === selectedBrand;
+    const brandMatch = selectedBrand === 'All' || (a.brands && a.brands.length ? a.brands.includes(selectedBrand) : (a.brand === selectedBrand));
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || 
       a.carModel === selectedModel || 
       (a.carModels && a.carModels.includes(selectedModel));
-    const pMatch = selectedPlatform === 'All' || a.platform === selectedPlatform;
+    const pMatch = selectedPlatform === 'All' || (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
@@ -1060,22 +1062,43 @@ function App() {
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end gap-3">
-                    <div className="flex items-center gap-2">
-                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Sort</span>
-                      <button
-                        type="button"
-                        onClick={() => setSortBy('newest')}
-                        className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border-2 ${sortBy === 'newest' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500 hover:border-blue-200'}`}
-                      >
-                        Most recent
-                      </button>
-                      <button
-                        type="button"
-                        onClick={() => setSortBy('alphabetical')}
-                        className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border-2 ${sortBy === 'alphabetical' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500 hover:border-blue-200'}`}
-                      >
-                        A–Z
-                      </button>
+                    <div className="flex items-center gap-4 flex-wrap">
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">View</span>
+                        <button
+                          type="button"
+                          onClick={() => setRepositoryViewMode('grid')}
+                          className={`p-2 rounded-lg transition-all border-2 ${repositoryViewMode === 'grid' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500 hover:border-blue-200'}`}
+                          title="Grid view"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2V6zM14 6a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2zM4 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2H6a2 2 0 01-2-2v-2zM14 16a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" /></svg>
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setRepositoryViewMode('list')}
+                          className={`p-2 rounded-lg transition-all border-2 ${repositoryViewMode === 'list' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500 hover:border-blue-200'}`}
+                          title="List view"
+                        >
+                          <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 10h16M4 14h16M4 18h16" /></svg>
+                        </button>
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Sort</span>
+                        <button
+                          type="button"
+                          onClick={() => setSortBy('newest')}
+                          className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border-2 ${sortBy === 'newest' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500 hover:border-blue-200'}`}
+                        >
+                          Most recent
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setSortBy('alphabetical')}
+                          className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border-2 ${sortBy === 'alphabetical' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500 hover:border-blue-200'}`}
+                        >
+                          A–Z
+                        </button>
+                      </div>
                     </div>
                     <p className="text-7xl font-black text-blue-600 leading-none tracking-tighter">{sortedAssets.length}</p>
                     <p className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mt-3">Active Creative Nodes</p>
@@ -1095,39 +1118,91 @@ function App() {
                   </div>
                 </div>
 
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
-                  {visibleRepositoryAssets.map(asset => {
-                    const packageAssets = asset.packageId 
-                      ? packageMap.get(asset.packageId) || [asset]
-                      : [asset];
-                    return (
-                      <AssetCard 
-                        key={asset.id}
-                        asset={asset}
-                        packageAssets={packageAssets}
-                        userRole={currentUser?.role!}
-                        username={currentUser?.username}
-                        isSelected={selectedAssetIds.has(asset.id)}
-                        onToggleSelect={canEdit ? (e) => { e?.stopPropagation(); toggleSelectAsset(asset.id); } : undefined}
-                        onPreview={(asset, packageAssets) => {
-                          setPreviewAsset(asset);
-                          setPreviewPackageAssets(packageAssets || [asset]);
-                          setCurrentPreviewIndex(0);
-                        }}
-                        onEdit={(a) => { 
-                          setEditingAsset(a);
-                          // Get package assets if this is part of a package
-                          const pkgAssets = a.packageId ? (packageMap.get(a.packageId) || [a]) : [a];
-                          setEditingPackageAssets(pkgAssets);
-                          setIsAssetModalOpen(true); 
-                        }}
-                        onDelete={viewMode === 'trash' && currentUser?.role === 'Admin' ? storageService.permanentlyDeleteAsset : storageService.deleteAsset}
-                        onRestore={storageService.restoreAsset}
-                        isTrashView={viewMode === 'trash'}
-                      />
-                    );
-                  })}
-                </div>
+                {repositoryViewMode === 'list' ? (
+                  <div className="bg-white rounded-2xl border-2 border-gray-100 overflow-hidden shadow-lg">
+                    <table className="w-full text-left">
+                      <thead>
+                        <tr className="border-b border-gray-200 bg-gray-50/80 text-[10px] font-black text-gray-500 uppercase tracking-widest">
+                          {canEdit && <th className="w-10 px-4 py-3" />}
+                          <th className="px-4 py-3 w-12">Type</th>
+                          <th className="px-4 py-3">Name</th>
+                          <th className="px-4 py-3">Brand</th>
+                          <th className="px-4 py-3">Market</th>
+                          <th className="px-4 py-3">Platform</th>
+                          <th className="px-4 py-3">Date</th>
+                          <th className="px-4 py-3">Uploaded by</th>
+                        </tr>
+                      </thead>
+                      <tbody>
+                        {visibleRepositoryAssets.map(asset => {
+                          const packageAssets = asset.packageId ? packageMap.get(asset.packageId) || [asset] : [asset];
+                          const brandDisplay = (asset.brands && asset.brands.length ? asset.brands : (asset.brand ? [asset.brand] : [])).join(', ') || '—';
+                          const platformDisplay = (asset.platforms && asset.platforms.length ? asset.platforms : (asset.platform ? [asset.platform] : [])).join(', ') || '—';
+                          return (
+                            <tr
+                              key={asset.id}
+                              className={`border-b border-gray-100 hover:bg-blue-50/50 transition-colors cursor-pointer ${selectedAssetIds.has(asset.id) ? 'bg-amber-50' : ''}`}
+                              onClick={() => {
+                                setPreviewAsset(asset);
+                                setPreviewPackageAssets(packageAssets);
+                                setCurrentPreviewIndex(0);
+                              }}
+                            >
+                              {canEdit && (
+                                <td className="px-4 py-2" onClick={e => { e.stopPropagation(); toggleSelectAsset(asset.id); }}>
+                                  <input type="checkbox" checked={selectedAssetIds.has(asset.id)} onChange={() => {}} className="w-4 h-4 rounded border-gray-300 text-amber-500" />
+                                </td>
+                              )}
+                              <td className="px-4 py-2">
+                                <span className="inline-flex px-2 py-0.5 rounded-md bg-gray-100 text-[9px] font-black uppercase">{asset.type}</span>
+                                {asset.packageId && packageAssets.length > 1 && <span className="ml-1 text-purple-600 text-[8px] font-black">({packageAssets.length})</span>}
+                              </td>
+                              <td className="px-4 py-2 font-semibold text-gray-900 text-sm truncate max-w-[200px]" title={asset.title}>{asset.title}</td>
+                              <td className="px-4 py-2 text-xs text-gray-600">{brandDisplay}</td>
+                              <td className="px-4 py-2 text-xs text-gray-600">{asset.market}</td>
+                              <td className="px-4 py-2 text-xs text-gray-600">{platformDisplay}</td>
+                              <td className="px-4 py-2 text-[11px] text-gray-500">{new Date(asset.createdAt).toLocaleDateString()}</td>
+                              <td className="px-4 py-2 text-[11px] text-gray-500 truncate max-w-[100px]">{asset.uploadedBy}</td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-12">
+                    {visibleRepositoryAssets.map(asset => {
+                      const packageAssets = asset.packageId 
+                        ? packageMap.get(asset.packageId) || [asset]
+                        : [asset];
+                      return (
+                        <AssetCard 
+                          key={asset.id}
+                          asset={asset}
+                          packageAssets={packageAssets}
+                          userRole={currentUser?.role!}
+                          username={currentUser?.username}
+                          isSelected={selectedAssetIds.has(asset.id)}
+                          onToggleSelect={canEdit ? (e) => { e?.stopPropagation(); toggleSelectAsset(asset.id); } : undefined}
+                          onPreview={(asset, packageAssets) => {
+                            setPreviewAsset(asset);
+                            setPreviewPackageAssets(packageAssets || [asset]);
+                            setCurrentPreviewIndex(0);
+                          }}
+                          onEdit={(a) => { 
+                            setEditingAsset(a);
+                            const pkgAssets = a.packageId ? (packageMap.get(a.packageId) || [a]) : [a];
+                            setEditingPackageAssets(pkgAssets);
+                            setIsAssetModalOpen(true); 
+                          }}
+                          onDelete={viewMode === 'trash' && currentUser?.role === 'Admin' ? storageService.permanentlyDeleteAsset : storageService.deleteAsset}
+                          onRestore={storageService.restoreAsset}
+                          isTrashView={viewMode === 'trash'}
+                        />
+                      );
+                    })}
+                  </div>
+                )}
                 
                 {/* OPTIMIZATION: Load more button for pagination - reduces initial bandwidth */}
                 {sortedAssets.length > visibleAssetsCount && (
@@ -1306,33 +1381,56 @@ function App() {
 
                 <div className="space-y-4">
                   {(() => {
+                    const toggleCollectionCollapse = (id: string) => {
+                      setCollapsedCollectionIds(prev => {
+                        const next = new Set(prev);
+                        if (next.has(id)) next.delete(id);
+                        else next.add(id);
+                        return next;
+                      });
+                    };
                     const renderCollectionCard = (c: Collection, depth: number) => {
                       const linkedCount = assets.filter(a => (a.collectionIds || []).includes(c.id)).length;
-                      const isEditing = editingCollectionId === c.id;
+                      const children = buildCollectionTree(c.id);
+                      const hasChildren = children.length > 0;
+                      const isCollapsed = collapsedCollectionIds.has(c.id);
                       return (
                         <div key={c.id} style={{ marginLeft: depth * 24 }} className="p-8 bg-white rounded-[32px] border-2 border-gray-100 hover:border-blue-500 transition-all shadow-xl group">
                           <div className="flex items-start justify-between gap-4">
-                            <div className="flex-1 min-w-0">
-                              <div className="w-14 h-14 bg-gray-50 rounded-2xl mb-6 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm inline-flex">
-                                <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
-                              </div>
-                              <h4 className="text-2xl font-black text-gray-900 tracking-tighter mb-2 leading-tight uppercase">{c.name}</h4>
-                              <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] mb-4">{linkedCount} Linked Creatives</p>
-                              <div className="flex flex-wrap gap-2">
-                                <button type="button" onClick={() => { setActiveCollectionId(c.id); setViewMode('repository'); }} className="px-6 py-3 bg-gray-50 text-gray-900 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">ENTER FOLDER</button>
-                                {canManageCollections && (
-                                  <>
-                                    <button type="button" onClick={() => { setCollectionParentIdForCreate(c.id); setNewCollectionName(''); setIsAddingCollection(true); }} className="px-6 py-3 bg-purple-50 text-purple-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all">Add Subfolder</button>
-                                    <button type="button" onClick={() => { setEditingCollectionId(c.id); setEditingCollectionName(c.name); }} className="px-6 py-3 bg-blue-50 text-blue-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">Rename</button>
-                                    <button type="button" onClick={() => handleDeleteCollection(c.id)} className="px-6 py-3 bg-red-50 text-red-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">Delete</button>
-                                  </>
-                                )}
+                            <div className="flex-1 min-w-0 flex items-start gap-3">
+                              {hasChildren && (
+                                <button
+                                  type="button"
+                                  onClick={() => toggleCollectionCollapse(c.id)}
+                                  className="mt-1 p-1.5 rounded-lg text-gray-400 hover:bg-gray-100 hover:text-gray-700 transition-all flex-shrink-0"
+                                  title={isCollapsed ? 'Expand subfolders' : 'Collapse subfolders'}
+                                >
+                                  <svg className={`w-5 h-5 transition-transform ${isCollapsed ? '' : 'rotate-90'}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                                </button>
+                              )}
+                              {!hasChildren && <span className="w-8 flex-shrink-0" />}
+                              <div>
+                                <div className="w-14 h-14 bg-gray-50 rounded-2xl mb-6 flex items-center justify-center group-hover:bg-blue-600 group-hover:text-white transition-all shadow-sm inline-flex">
+                                  <svg className="w-8 h-8" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M3 7v10a2 2 0 002 2h14a2 2 0 002-2V9a2 2 0 00-2-2h-6l-2-2H5a2 2 0 00-2 2z" /></svg>
+                                </div>
+                                <h4 className="text-2xl font-black text-gray-900 tracking-tighter mb-2 leading-tight uppercase">{c.name}</h4>
+                                <p className="text-[11px] font-black text-gray-400 uppercase tracking-[0.4em] mb-4">{linkedCount} Linked Creatives</p>
+                                <div className="flex flex-wrap gap-2">
+                                  <button type="button" onClick={() => { setActiveCollectionId(c.id); setViewMode('repository'); }} className="px-6 py-3 bg-gray-50 text-gray-900 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-gray-900 hover:text-white transition-all">ENTER FOLDER</button>
+                                  {canManageCollections && (
+                                    <>
+                                      <button type="button" onClick={() => { setCollectionParentIdForCreate(c.id); setNewCollectionName(''); setIsAddingCollection(true); }} className="px-6 py-3 bg-purple-50 text-purple-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-purple-600 hover:text-white transition-all">Add Subfolder</button>
+                                      <button type="button" onClick={() => { setEditingCollectionId(c.id); setEditingCollectionName(c.name); }} className="px-6 py-3 bg-blue-50 text-blue-700 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-blue-600 hover:text-white transition-all">Rename</button>
+                                      <button type="button" onClick={() => handleDeleteCollection(c.id)} className="px-6 py-3 bg-red-50 text-red-600 rounded-xl text-[11px] font-black uppercase tracking-widest hover:bg-red-600 hover:text-white transition-all">Delete</button>
+                                    </>
+                                  )}
+                                </div>
                               </div>
                             </div>
                           </div>
-                          {buildCollectionTree(c.id).length > 0 && (
+                          {hasChildren && !isCollapsed && (
                             <div className="mt-6 pt-6 border-t border-gray-100 space-y-4">
-                              {buildCollectionTree(c.id).map(child => renderCollectionCard(child, depth + 1))}
+                              {children.map(child => renderCollectionCard(child, depth + 1))}
                             </div>
                           )}
                         </div>
