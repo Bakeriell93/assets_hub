@@ -14,7 +14,7 @@ import { storageService } from './services/storageService';
 import { authService } from './services/authService';
 import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, MARKETS, CAR_MODELS, PLATFORMS } from './types';
 
-type SortOption = 'newest' | 'ctr' | 'cr' | 'cpl';
+type SortOption = 'newest' | 'alphabetical';
 type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
 
 const SESSION_STORAGE_KEY = 'byd_assets_hub_session';
@@ -881,11 +881,9 @@ function App() {
     }
   });
 
-  // Sort packages by their first asset's createdAt
   const packageGroups = Array.from(packageMap.values())
     .map(pkgAssets => {
       const sorted = pkgAssets.sort((a, b) => (a.packageOrder || 0) - (b.packageOrder || 0));
-      // Use preview asset if specified, otherwise use first asset
       const previewAsset = sorted.find(a => a.packagePreviewAssetId && pkgAssets.some(pa => pa.id === a.packagePreviewAssetId));
       const representative = previewAsset || sorted[0];
       return {
@@ -893,23 +891,18 @@ function App() {
         assets: sorted,
         representative
       };
-    })
-    .sort((a, b) => b.representative.createdAt - a.representative.createdAt);
+    });
 
-  const sortedAssets = [
-    ...packageGroups.map(g => g.representative),
-    ...standaloneAssets.sort((a, b) => {
-      // In trash view, sort by deletedAt (most recently deleted first)
-      if (viewMode === 'trash') {
-        return (b.deletedAt || 0) - (a.deletedAt || 0);
-      }
-      // In other views, use normal sorting
-      if (sortBy === 'ctr') return (b.ctr || 0) - (a.ctr || 0);
-      if (sortBy === 'cr') return (b.cr || 0) - (a.cr || 0);
-      if (sortBy === 'cpl') return (a.cpl || 999) - (b.cpl || 999);
-      return b.createdAt - a.createdAt;
-    })
-  ];
+  const allDisplayAssets = [...packageGroups.map(g => g.representative), ...standaloneAssets];
+  const sortedAssets = [...allDisplayAssets].sort((a, b) => {
+    if (viewMode === 'trash') {
+      return (b.deletedAt || 0) - (a.deletedAt || 0);
+    }
+    if (sortBy === 'alphabetical') {
+      return (a.title || '').localeCompare(b.title || '', undefined, { sensitivity: 'base' });
+    }
+    return b.createdAt - a.createdAt;
+  });
 
   const visibleRepositoryAssets = sortedAssets.slice(0, visibleAssetsCount);
   const allVisibleSelected = visibleRepositoryAssets.length > 0 && visibleRepositoryAssets.every(a => selectedAssetIds.has(a.id));
@@ -1067,6 +1060,23 @@ function App() {
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end gap-3">
+                    <div className="flex items-center gap-2">
+                      <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest mr-1">Sort</span>
+                      <button
+                        type="button"
+                        onClick={() => setSortBy('newest')}
+                        className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border-2 ${sortBy === 'newest' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500 hover:border-blue-200'}`}
+                      >
+                        Most recent
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setSortBy('alphabetical')}
+                        className={`px-4 py-2 rounded-full text-[11px] font-black uppercase tracking-widest transition-all border-2 ${sortBy === 'alphabetical' ? 'bg-blue-600 border-blue-600 text-white' : 'bg-white border-gray-100 text-gray-500 hover:border-blue-200'}`}
+                      >
+                        A–Z
+                      </button>
+                    </div>
                     <p className="text-7xl font-black text-blue-600 leading-none tracking-tighter">{sortedAssets.length}</p>
                     <p className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mt-3">Active Creative Nodes</p>
                     {canEdit && (
