@@ -1157,7 +1157,64 @@ function App() {
                                 <span className="inline-flex px-2 py-0.5 rounded-md bg-gray-100 text-[9px] font-black uppercase">{asset.type}</span>
                                 {asset.packageId && packageAssets.length > 1 && <span className="ml-1 text-purple-600 text-[8px] font-black">({packageAssets.length})</span>}
                               </td>
-                              <td className="px-4 py-2 font-semibold text-gray-900 text-sm truncate max-w-[200px]" title={asset.title}>{asset.title}</td>
+                              <td className="px-4 py-2">
+                                <div className="flex items-center gap-2 max-w-[220px]">
+                                  <span className="font-semibold text-gray-900 text-sm truncate flex-1 min-w-0" title={asset.title}>{asset.title}</span>
+                                  {asset.url && (asset.type === 'image' || asset.type === 'video' || asset.type === 'design') && (
+                                    <button
+                                      type="button"
+                                      onClick={async (e) => {
+                                        e.stopPropagation();
+                                        if (!asset.url) return;
+                                        try {
+                                          const filename = asset.title || 'asset';
+                                          const urlParts = asset.url.split('.');
+                                          const ext = urlParts.length > 1 ? urlParts[urlParts.length - 1].split('?')[0] : 'jpg';
+                                          const downloadFilename = `${filename}.${ext}`;
+                                          if (asset.type === 'video' || asset.type === 'design') {
+                                            const a = document.createElement('a');
+                                            a.href = asset.url;
+                                            a.download = downloadFilename;
+                                            a.rel = 'noopener';
+                                            a.style.display = 'none';
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            setTimeout(() => document.body.removeChild(a), 1000);
+                                          } else {
+                                            const res = await fetch(asset.url, { method: 'GET' });
+                                            if (!res.ok) throw new Error('Fetch failed');
+                                            const blob = await res.blob();
+                                            const blobUrl = URL.createObjectURL(blob);
+                                            const a = document.createElement('a');
+                                            a.href = blobUrl;
+                                            a.download = downloadFilename;
+                                            a.rel = 'noopener';
+                                            document.body.appendChild(a);
+                                            a.click();
+                                            setTimeout(() => { a.remove(); URL.revokeObjectURL(blobUrl); }, 100);
+                                          }
+                                          storageService.logDownload(asset.id, asset.title, 'original', currentUser?.username);
+                                        } catch (err) {
+                                          const a = document.createElement('a');
+                                          a.href = asset.url!;
+                                          a.download = asset.title || 'asset';
+                                          a.target = '_blank';
+                                          document.body.appendChild(a);
+                                          a.click();
+                                          setTimeout(() => a.remove(), 100);
+                                          storageService.logDownload(asset.id, asset.title, 'original', currentUser?.username);
+                                        }
+                                      }}
+                                      className="p-1.5 rounded-lg text-gray-500 hover:bg-blue-100 hover:text-blue-600 transition-all flex-shrink-0"
+                                      title="Download"
+                                    >
+                                      <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" />
+                                      </svg>
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
                               <td className="px-4 py-2 text-xs text-gray-600">{brandDisplay}</td>
                               <td className="px-4 py-2 text-xs text-gray-600">{asset.market}</td>
                               <td className="px-4 py-2 text-xs text-gray-600">{platformDisplay}</td>
@@ -1756,8 +1813,8 @@ function App() {
                 </button>
               </div>
               
-              {/* Download button for full view - positioned at top-left when in full view to avoid overlap */}
-              {isPackage && previewViewMode === 'full' && (
+              {/* Download button - show for package full view or single-asset video/image/design */}
+              {currentAsset.url && (currentAsset.type === 'image' || currentAsset.type === 'video' || currentAsset.type === 'design') && (
                 <button
                   onClick={(e) => handleDownloadAsset(currentAsset, e)}
                   className="absolute top-16 left-4 p-3 bg-white/90 hover:bg-white rounded-full shadow-lg transition-all z-20"
