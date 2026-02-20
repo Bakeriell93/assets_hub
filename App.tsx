@@ -877,7 +877,9 @@ function App() {
     const modelMatch = selectedModel === 'All' || 
       a.carModel === selectedModel || 
       (a.carModels && a.carModels.includes(selectedModel));
-    const pMatch = selectedPlatform === 'All' || (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
+    const platformMatch = (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
+    const videoContentMatch = selectedPlatform === 'Video' && assetMatchesType(a, 'video');
+    const pMatch = selectedPlatform === 'All' || platformMatch || videoContentMatch;
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
