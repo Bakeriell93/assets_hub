@@ -586,6 +586,18 @@ function App() {
     loadCache();
   }, []);
 
+  // Projects/subfolders collapsed by default: when collections load, collapse every folder that has children
+  useEffect(() => {
+    if (collections.length === 0) return;
+    setCollapsedCollectionIds(prev => {
+      if (prev.size > 0) return prev; // user has already toggled; don't overwrite
+      const idsWithChildren = new Set(
+        collections.filter(c => collections.some(x => (x.parentId ?? null) === c.id)).map(c => c.id)
+      );
+      return idsWithChildren;
+    });
+  }, [collections]);
+
   useEffect(() => {
     if (isLoggedIn) {
       const unsubAssets = storageService.subscribeToAssets(setAssets);
