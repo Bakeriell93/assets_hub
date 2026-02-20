@@ -12,10 +12,15 @@ import BulkEditModal from './components/BulkEditModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
-import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, MARKETS, CAR_MODELS, PLATFORMS, DEFAULT_ASSET_TYPES, assetHasType, getAssetBrands, getAssetPlatforms } from './types';
+import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, AssetType, MARKETS, CAR_MODELS, PLATFORMS } from './types';
 
 type SortOption = 'newest' | 'alphabetical';
 type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
+
+/** True if asset should appear in a filter/count for the given type (primary type or assetTypes). */
+function assetMatchesType(a: Asset, type: AssetType): boolean {
+  return a.type === type || (a.assetTypes != null && a.assetTypes.includes(type));
+}
 
 const SESSION_STORAGE_KEY = 'byd_assets_hub_session';
 
@@ -517,11 +522,11 @@ function App() {
   const [selectedMarket, setSelectedMarket] = useState<Market | 'All'>('All');
   const [selectedModel, setSelectedModel] = useState<CarModel | 'All'>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
-  const [selectedAssetType, setSelectedAssetType] = useState<string | 'All'>('All');
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [repositoryViewMode, setRepositoryViewMode] = useState<'grid' | 'list'>('grid');
+  const [selectedAssetType, setSelectedAssetType] = useState<AssetType | 'All'>('All');
 
   // Modals
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
@@ -869,17 +874,17 @@ function App() {
     // Restrict by user's market access (view)
     if (currentUser?.allowedMarkets && currentUser.allowedMarkets.length > 0 && !currentUser.allowedMarkets.includes(a.market)) return false;
 
-    const brandMatch = selectedBrand === 'All' || getAssetBrands(a).includes(selectedBrand);
+    const brandMatch = selectedBrand === 'All' || (a.brands && a.brands.length ? a.brands.includes(selectedBrand) : (a.brand === selectedBrand));
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || 
       a.carModel === selectedModel || 
       (a.carModels && a.carModels.includes(selectedModel));
-    const pMatch = selectedPlatform === 'All' || getAssetPlatforms(a).includes(selectedPlatform);
-    const typeMatch = selectedAssetType === 'All' || assetHasType(a, selectedAssetType);
+    const pMatch = selectedPlatform === 'All' || (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
+    const typeMatch = selectedAssetType === 'All' || assetMatchesType(a, selectedAssetType);
     const sMatch = matchesSearch(a, searchQuery);
-    return brandMatch && mMatch && modelMatch && pMatch && typeMatch && objMatch && cMatch && sMatch;
+    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && typeMatch && sMatch;
   });
 
   // Group assets by packageId - show only the first asset of each package, or standalone assets
@@ -1029,13 +1034,14 @@ function App() {
           {viewMode === 'repository' && (
             <>
               <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-                {['All', ...(config.assetTypes ?? DEFAULT_ASSET_TYPES)].map(t => (
+                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest self-center pr-1">Type</span>
+                {(['All', 'image', 'video', 'design', 'text'] as const).map(t => (
                   <button
                     key={t}
                     onClick={() => setSelectedAssetType(t)}
-                    className={`whitespace-nowrap px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-full transition-all border-2 ${selectedAssetType === t ? 'bg-blue-600 border-blue-600 text-white shadow-lg' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-300'}`}
+                    className={`whitespace-nowrap px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-full transition-all border-2 ${selectedAssetType === t ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-300'}`}
                   >
-                    {t === 'All' ? 'All' : t.charAt(0).toUpperCase() + t.slice(1)}
+                    {t === 'All' ? 'All' : t === 'image' ? 'Image' : t === 'video' ? 'Video' : t === 'design' ? 'Design' : 'Text'}
                   </button>
                 ))}
               </div>
@@ -1163,8 +1169,8 @@ function App() {
                       <tbody>
                         {visibleRepositoryAssets.map(asset => {
                           const packageAssets = asset.packageId ? packageMap.get(asset.packageId) || [asset] : [asset];
-                          const brandDisplay = getAssetBrands(asset).join(', ') || '—';
-                          const platformDisplay = getAssetPlatforms(asset).join(', ') || '—';
+                          const brandDisplay = (asset.brands && asset.brands.length ? asset.brands : (asset.brand ? [asset.brand] : [])).join(', ') || '—';
+                          const platformDisplay = (asset.platforms && asset.platforms.length ? asset.platforms : (asset.platform ? [asset.platform] : [])).join(', ') || '—';
                           return (
                             <tr
                               key={asset.id}
@@ -1314,7 +1320,7 @@ function App() {
                        Total Assets: {assets.length}
                      </span>
                      <span className="px-4 py-2 rounded-full bg-blue-50 border border-blue-100 text-[10px] font-black uppercase tracking-widest text-blue-700">
-                       Images: {assets.filter(a => assetHasType(a, 'image')).length}
+                       Images: {assets.filter(a => assetMatchesType(a, 'image')).length}
                      </span>
                    </div>
                  </div>
@@ -1327,7 +1333,7 @@ function App() {
                               const modelAssets = assets.filter(a => 
                                 a.carModel === m || (a.carModels && a.carModels.includes(m))
                               );
-                              const modelImageCount = modelAssets.filter(a => assetHasType(a, 'image')).length;
+                              const modelImageCount = modelAssets.filter(a => assetMatchesType(a, 'image')).length;
                               const avgCtr = modelAssets.length ? modelAssets.reduce((sum, a) => sum + (a.ctr || 0), 0) / modelAssets.length : 0;
                               return (
                                 <div key={m} className="space-y-3">
@@ -1380,9 +1386,9 @@ function App() {
                           const modelAssets = assets.filter(a => 
                             a.carModel === m || (a.carModels && a.carModels.includes(m))
                           );
-                          const img = modelAssets.filter(a => assetHasType(a, 'image')).length;
-                          const vid = modelAssets.filter(a => assetHasType(a, 'video')).length;
-                          const txt = modelAssets.filter(a => assetHasType(a, 'text')).length;
+                          const img = modelAssets.filter(a => assetMatchesType(a, 'image')).length;
+                          const vid = modelAssets.filter(a => assetMatchesType(a, 'video')).length;
+                          const txt = modelAssets.filter(a => assetMatchesType(a, 'text')).length;
                           const other = Math.max(0, modelAssets.length - img - vid - txt);
                           return (
                             <div key={m} className="p-6 bg-gray-50/50 rounded-[28px] border border-gray-100">

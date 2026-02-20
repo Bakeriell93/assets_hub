@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, Asset, SystemConfig, Brand, BRANDS, Market, DEFAULT_ASSET_TYPES } from '../types';
+import { User, UserRole, Asset, SystemConfig, Brand, BRANDS, Market } from '../types';
 import { storageService, SecurityLog, DownloadLog, LoginLog } from '../services/storageService';
 import { storage } from '../services/firebase';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
@@ -40,7 +40,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   // Form states
   const [newUser, setNewUser] = useState<{ fullName: string; username: string; password: string; role: UserRole; allowedMarkets: Market[] }>({ fullName: '', username: '', password: '', role: 'Viewer', allowedMarkets: [] });
   const [newConfigValue, setNewConfigValue] = useState('');
-  const [editingConfigItem, setEditingConfigItem] = useState<{ type: 'markets' | 'platforms' | 'assetTypes'; oldValue: string } | null>(null);
+  const [editingConfigItem, setEditingConfigItem] = useState<{ type: 'markets' | 'platforms'; oldValue: string } | null>(null);
   const [editingConfigNewValue, setEditingConfigNewValue] = useState('');
   const [addingModelForBrand, setAddingModelForBrand] = useState<Brand | null>(null);
   const [newModelValue, setNewModelValue] = useState('');
@@ -211,25 +211,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     }
   }, [editingUserId, users]);
 
-  const getConfigArray = (type: 'markets' | 'platforms' | 'assetTypes'): string[] =>
-    type === 'assetTypes' ? (config.assetTypes ?? DEFAULT_ASSET_TYPES) : (config[type] as string[]);
-
   const handleAddConfigSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (!isAddingConfig || !newConfigValue.trim()) return;
-    const type = isAddingConfig as 'markets' | 'platforms' | 'assetTypes';
-    const arr = type === 'assetTypes' ? (config.assetTypes ?? DEFAULT_ASSET_TYPES) : (config[type] as string[]);
-    if (arr.includes(newConfigValue.trim())) {
+    if (isAddingConfig && newConfigValue && !config[isAddingConfig].includes(newConfigValue)) {
+      await storageService.saveSystemConfig({
+        ...config,
+        [isAddingConfig]: [...config[isAddingConfig], newConfigValue]
+      });
       setIsAddingConfig(null);
       setNewConfigValue('');
-      return;
     }
-    await storageService.saveSystemConfig({
-      ...config,
-      [type]: [...arr, newConfigValue.trim()]
-    });
-    setIsAddingConfig(null);
-    setNewConfigValue('');
   };
 
   const handleRenameConfigSubmit = async (e: React.FormEvent) => {
@@ -242,12 +233,11 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
       setEditingConfigNewValue('');
       return;
     }
-    const list = type === 'assetTypes' ? (config.assetTypes ?? DEFAULT_ASSET_TYPES) : (config[type] as string[]);
-    if (list.includes(newVal)) {
+    if (config[type].includes(newVal)) {
       alert(`"${newVal}" already exists in ${type}.`);
       return;
     }
-    const nextList = list.map(v => v === oldValue ? newVal : v);
+    const nextList = config[type].map(v => v === oldValue ? newVal : v);
     await storageService.saveSystemConfig({ ...config, [type]: nextList });
     if (type === 'platforms') {
       const toUpdate = assets.filter(a => a.platform === oldValue);
@@ -258,12 +248,6 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
       const toUpdate = assets.filter(a => a.market === oldValue);
       for (const a of toUpdate) {
         await storageService.updateAsset(a.id, { market: newVal });
-      }
-    } else if (type === 'assetTypes') {
-      const toUpdate = assets.filter(a => a.type === oldValue);
-      for (const a of toUpdate) {
-        const nextAssetTypes = a.assetTypes?.map(t => t === oldValue ? newVal : t) ?? (a.type === oldValue ? [newVal] : undefined);
-        await storageService.updateAsset(a.id, { type: a.type === oldValue ? newVal : a.type, assetTypes: nextAssetTypes });
       }
     }
     setEditingConfigItem(null);
@@ -553,19 +537,16 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
 
             {activeTab === 'config' && (
               <div className="space-y-12 animate-in fade-in duration-500">
-                {(['markets', 'platforms', 'assetTypes'] as const).map(type => {
-                  const label = type === 'assetTypes' ? 'Asset Types' : type;
-                  const list = getConfigArray(type);
-                  return (
+                {(['markets', 'platforms'] as const).map(type => (
                    <div key={type} className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
                       <div className="flex items-center justify-between mb-10">
-                          <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">{label} Node Registry</h4>
+                          <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">{type} Node Registry</h4>
                           {!isEditor && (!isAddingConfig || isAddingConfig !== type) && (
                             <button 
                               onClick={() => setIsAddingConfig(type)} 
                               className="px-6 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
                             >
-                              + Register {type === 'assetTypes' ? 'type' : type.slice(0, -1)}
+                              + Register {type.slice(0, -1)}
                             </button>
                           )}
                           {!isEditor && isAddingConfig === type && (
@@ -576,7 +557,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                                   value={newConfigValue} 
                                   onChange={e => setNewConfigValue(e.target.value)} 
                                   className="px-6 py-3 bg-white border-2 border-blue-500 rounded-2xl outline-none text-xs font-black" 
-                                  placeholder={type === 'assetTypes' ? 'New type (e.g. image, video)...' : `New ${type.slice(0, -1)} Entry...`} 
+                                  placeholder={`New ${type.slice(0, -1)} Entry...`} 
                                />
                                <button type="submit" className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg></button>
                                <button type="button" onClick={() => setIsAddingConfig(null)} className="p-3 bg-white text-gray-400 rounded-2xl border border-gray-200"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
@@ -584,7 +565,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                           )}
                       </div>
                       <div className="flex flex-wrap gap-4">
-                         {list.map(item => (
+                         {config[type].map(item => (
                            <div key={item} className="group relative px-6 py-4 bg-white border border-gray-200 rounded-3xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-3 hover:border-blue-500 hover:shadow-2xl hover:shadow-blue-50 transition-all">
                               {editingConfigItem?.type === type && editingConfigItem?.oldValue === item ? (
                                 <form onSubmit={handleRenameConfigSubmit} className="flex items-center gap-2">
@@ -607,10 +588,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                                         <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
                                       </button>
                                       <button onClick={() => {
-                                          const next = list.filter(i => i !== item);
                                           storageService.saveSystemConfig({
                                               ...config,
-                                              [type]: type === 'assetTypes' && next.length === 0 ? [...DEFAULT_ASSET_TYPES] : next
+                                              [type]: config[type].filter(i => i !== item)
                                           });
                                       }} className="text-gray-200 hover:text-red-500 transition-colors">
                                           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
@@ -623,7 +603,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                          ))}
                       </div>
                    </div>
-                ); })}
+                ))}
 
                 {/* Brands Node Registry */}
                 <div className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">

@@ -8,7 +8,6 @@ export const CAR_MODELS: CarModel[] = ['Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i'
 export const PLATFORMS: Platform[] = ['Google', 'Meta', 'Video', 'DOOH', 'Banner'];
 
 export type AssetType = 'image' | 'video' | 'text' | 'design';
-export const DEFAULT_ASSET_TYPES: string[] = ['image', 'video', 'text', 'design'];
 export type AssetStatus = 'Draft' | 'Review' | 'Approved';
 
 export type Brand = string; // Configurable via SystemConfig.brands; default BYD, Denza
@@ -47,8 +46,7 @@ export interface Asset {
   id: string;
   title: string;
   description?: string;
-  /** Primary type; must be one of config.assetTypes (admin-editable). */
-  type: string;
+  type: AssetType;
   status: AssetStatus;
   url?: string; 
   content?: string; 
@@ -74,47 +72,36 @@ export interface Asset {
   packageOrder?: number; // Order within package
   packagePreviewAssetId?: string; // ID of the asset to use as package card preview thumbnail
   packageNote?: string; // Description of package contents (shown on card)
-  packageAssetTypes?: string[]; // Types included in package (from config.assetTypes)
-  // Brand (single for backward compat; existing assets may only have brand)
+  packageAssetTypes?: AssetType[]; // Types included in package (e.g. image + video)
+  // Brand (single for backward compat; use brands when multiple)
   brand?: Brand;
   brands?: Brand[];
-  // Platforms when asset applies to multiple (existing assets may only have platform)
+  // Platforms when asset applies to multiple
   platforms?: Platform[];
-  // Asset types (e.g. tagged as image + video); type is primary (values from config.assetTypes)
-  assetTypes?: string[];
+  // Asset types (e.g. tagged as image + video); type is primary
+  assetTypes?: AssetType[];
   // Soft delete (trash)
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
-}
-
-/** Whether an asset is considered to be of type t. Works for existing assets (type only) and new ones (type + assetTypes). */
-export function assetHasType(asset: Asset, t: string): boolean {
-  return asset.type === t || !!(asset.assetTypes && asset.assetTypes.length && asset.assetTypes.includes(t));
-}
-
-/** Effective brands for display/filter: brands array or single brand. Works for existing and new assets. */
-export function getAssetBrands(asset: Asset): string[] {
-  if (asset.brands && asset.brands.length) return asset.brands;
-  if (asset.brand) return [asset.brand];
-  return [];
-}
-
-/** Effective platforms for display/filter: platforms array or single platform. Works for existing and new assets. */
-export function getAssetPlatforms(asset: Asset): string[] {
-  if (asset.platforms && asset.platforms.length) return asset.platforms;
-  if (asset.platform) return [asset.platform];
-  return [];
 }
 
 export interface SystemConfig {
   markets: Market[];
   models: CarModel[];
   platforms: Platform[];
-  /** Admin-managed asset types (upload panel, type filter). Defaults to DEFAULT_ASSET_TYPES. */
-  assetTypes?: string[];
   /** When set, models are per-brand. Editors can add models and assign to brand. */
   modelsByBrand?: Partial<Record<string, CarModel[]>>;
   /** Admin-managed brand list (upload panel, filters). Defaults to BRANDS if empty. */
   brands?: Brand[];
+}
+
+/** Brands for display/filter: asset.brands or [asset.brand] when set. */
+export function getAssetBrands(a: { brand?: Brand; brands?: Brand[] }): Brand[] {
+  return (a.brands && a.brands.length ? a.brands : (a.brand ? [a.brand] : []));
+}
+
+/** Platforms for display/filter: asset.platforms or [asset.platform] when set. */
+export function getAssetPlatforms(a: { platform?: Platform; platforms?: Platform[] }): Platform[] {
+  return (a.platforms && a.platforms.length ? a.platforms : (a.platform ? [a.platform] : []));
 }
 
 /** Models for a given brand; when brand is All or modelsByBrand unused, returns all models. */

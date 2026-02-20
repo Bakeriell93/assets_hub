@@ -27,7 +27,7 @@ import {
   limit
 } from "firebase/firestore";
 import { ref, uploadBytes, uploadBytesResumable, getDownloadURL, deleteObject } from "firebase/storage";
-import { Asset, AssetStatus, Market, CarModel, Platform, User, SystemConfig, MARKETS, CAR_MODELS, PLATFORMS, BRANDS, DEFAULT_ASSET_TYPES, Collection } from '../types';
+import { Asset, AssetStatus, Market, CarModel, Platform, User, SystemConfig, MARKETS, CAR_MODELS, PLATFORMS, BRANDS, Collection } from '../types';
 
 const ASSETS_COLLECTION = 'assets';
 const CONFIG_COLLECTION = 'config';
@@ -72,7 +72,7 @@ function writeLS<T>(key: string, value: T) {
   window.dispatchEvent(new Event('byd_assets_hub_local_change'));
 }
 
-const DEFAULT_CONFIG: SystemConfig = { markets: MARKETS, models: CAR_MODELS, platforms: PLATFORMS, assetTypes: [...DEFAULT_ASSET_TYPES], brands: [...BRANDS] };
+const DEFAULT_CONFIG: SystemConfig = { markets: MARKETS, models: CAR_MODELS, platforms: PLATFORMS, brands: [...BRANDS] };
 
 async function fileToDataUrl(file: File): Promise<string> {
   return await new Promise((resolve, reject) => {
