@@ -12,7 +12,7 @@ import BulkEditModal from './components/BulkEditModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
-import { Asset, AssetType, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, MARKETS, CAR_MODELS, PLATFORMS, assetHasType, getAssetBrands, getAssetPlatforms } from './types';
+import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, MARKETS, CAR_MODELS, PLATFORMS, DEFAULT_ASSET_TYPES, assetHasType, getAssetBrands, getAssetPlatforms } from './types';
 
 type SortOption = 'newest' | 'alphabetical';
 type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
@@ -517,7 +517,7 @@ function App() {
   const [selectedMarket, setSelectedMarket] = useState<Market | 'All'>('All');
   const [selectedModel, setSelectedModel] = useState<CarModel | 'All'>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
-  const [selectedAssetType, setSelectedAssetType] = useState<AssetType | 'All'>('All');
+  const [selectedAssetType, setSelectedAssetType] = useState<string | 'All'>('All');
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -1029,7 +1029,7 @@ function App() {
           {viewMode === 'repository' && (
             <>
               <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-                {(['All', 'image', 'video', 'design', 'text'] as const).map(t => (
+                {['All', ...(config.assetTypes ?? DEFAULT_ASSET_TYPES)].map(t => (
                   <button
                     key={t}
                     onClick={() => setSelectedAssetType(t)}

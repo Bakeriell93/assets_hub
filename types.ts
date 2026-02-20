@@ -8,6 +8,7 @@ export const CAR_MODELS: CarModel[] = ['Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i'
 export const PLATFORMS: Platform[] = ['Google', 'Meta', 'Video', 'DOOH', 'Banner'];
 
 export type AssetType = 'image' | 'video' | 'text' | 'design';
+export const DEFAULT_ASSET_TYPES: string[] = ['image', 'video', 'text', 'design'];
 export type AssetStatus = 'Draft' | 'Review' | 'Approved';
 
 export type Brand = string; // Configurable via SystemConfig.brands; default BYD, Denza
@@ -46,7 +47,8 @@ export interface Asset {
   id: string;
   title: string;
   description?: string;
-  type: AssetType;
+  /** Primary type; must be one of config.assetTypes (admin-editable). */
+  type: string;
   status: AssetStatus;
   url?: string; 
   content?: string; 
@@ -72,20 +74,20 @@ export interface Asset {
   packageOrder?: number; // Order within package
   packagePreviewAssetId?: string; // ID of the asset to use as package card preview thumbnail
   packageNote?: string; // Description of package contents (shown on card)
-  packageAssetTypes?: AssetType[]; // Types included in package (e.g. image + video)
+  packageAssetTypes?: string[]; // Types included in package (from config.assetTypes)
   // Brand (single for backward compat; existing assets may only have brand)
   brand?: Brand;
   brands?: Brand[];
   // Platforms when asset applies to multiple (existing assets may only have platform)
   platforms?: Platform[];
-  // Asset types (e.g. tagged as image + video); type is primary (existing assets may only have type)
-  assetTypes?: AssetType[];
+  // Asset types (e.g. tagged as image + video); type is primary (values from config.assetTypes)
+  assetTypes?: string[];
   // Soft delete (trash)
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
 }
 
 /** Whether an asset is considered to be of type t. Works for existing assets (type only) and new ones (type + assetTypes). */
-export function assetHasType(asset: Asset, t: AssetType): boolean {
+export function assetHasType(asset: Asset, t: string): boolean {
   return asset.type === t || !!(asset.assetTypes && asset.assetTypes.length && asset.assetTypes.includes(t));
 }
 
@@ -107,6 +109,8 @@ export interface SystemConfig {
   markets: Market[];
   models: CarModel[];
   platforms: Platform[];
+  /** Admin-managed asset types (upload panel, type filter). Defaults to DEFAULT_ASSET_TYPES. */
+  assetTypes?: string[];
   /** When set, models are per-brand. Editors can add models and assign to brand. */
   modelsByBrand?: Partial<Record<string, CarModel[]>>;
   /** Admin-managed brand list (upload panel, filters). Defaults to BRANDS if empty. */
