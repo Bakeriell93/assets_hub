@@ -526,8 +526,6 @@ function App() {
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
   const [repositoryViewMode, setRepositoryViewMode] = useState<'grid' | 'list'>('grid');
-  const [selectedAssetType, setSelectedAssetType] = useState<AssetType | 'All'>('All');
-
   // Modals
   const [isAssetModalOpen, setIsAssetModalOpen] = useState(false);
   const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
@@ -882,9 +880,8 @@ function App() {
     const pMatch = selectedPlatform === 'All' || (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
-    const typeMatch = selectedAssetType === 'All' || assetMatchesType(a, selectedAssetType);
     const sMatch = matchesSearch(a, searchQuery);
-    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && typeMatch && sMatch;
+    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch;
   });
 
   // Group assets by packageId - show only the first asset of each package, or standalone assets
@@ -1032,21 +1029,8 @@ function App() {
           </div>
           
           {viewMode === 'repository' && (
-            <>
-              <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest self-center pr-1">Type</span>
-                {(['All', 'image', 'video', 'design', 'text'] as const).map(t => (
-                  <button
-                    key={t}
-                    onClick={() => setSelectedAssetType(t)}
-                    className={`whitespace-nowrap px-5 py-2.5 text-[10px] font-black uppercase tracking-widest rounded-full transition-all border-2 ${selectedAssetType === t ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-300'}`}
-                  >
-                    {t === 'All' ? 'All' : t === 'image' ? 'Image' : t === 'video' ? 'Video' : t === 'design' ? 'Design' : 'Text'}
-                  </button>
-                ))}
-              </div>
-              <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
-                {['All', ...config.platforms].map(p => (
+            <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+              {['All', ...config.platforms].map(p => (
                   <button 
                     key={p} 
                     onClick={() => setSelectedPlatform(p)}
@@ -1055,8 +1039,7 @@ function App() {
                     {p}
                   </button>
                 ))}
-              </div>
-            </>
+            </div>
           )}
         </header>
 
