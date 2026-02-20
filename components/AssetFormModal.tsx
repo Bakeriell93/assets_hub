@@ -279,8 +279,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         else if (filename.includes('dooh') || filename.includes('display')) assetPlatform = 'DOOH';
         else if (filename.includes('banner')) assetPlatform = 'Banner';
 
-        // Use custom per-file title if provided, otherwise use main title field, otherwise use filename
-        const fileTitle = fileTitles[idx] || title || f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+        // First asset uses main title if user entered one; otherwise per-file title or filename
+        const fileTitle = (idx === 0 && title.trim() ? title.trim() : '') || fileTitles[idx] || title || f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
 
         // Handle car models: if "Other" is selected, use customCarModel
         const processedCarModels = selectedCarModels.length > 0 
@@ -1040,10 +1040,10 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               onChange={async (e) => {
                                 const selectedFiles = Array.from(e.target.files || []);
                                 setFiles(selectedFiles);
-                                // Initialize titles with default (filename without extension)
+                                // First file uses main title if set, so package card shows user's title; others use filename
                                 const initialTitles: Record<number, string> = {};
                                 selectedFiles.forEach((f, idx) => {
-                                  initialTitles[idx] = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                                  initialTitles[idx] = (idx === 0 && title.trim()) ? title.trim() : f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
                                 });
                                 setFileTitles(initialTitles);
                                 
