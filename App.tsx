@@ -1029,7 +1029,6 @@ function App() {
           {viewMode === 'repository' && (
             <>
               <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
-                <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest self-center pr-1">Type:</span>
                 {(['All', 'image', 'video', 'design', 'text'] as const).map(t => (
                   <button
                     key={t}
