@@ -33,7 +33,7 @@ const Sidebar: React.FC<SidebarProps> = ({
   const canOpenCommandCenter = user.role === 'Admin' || user.role === 'Editor';
   const modelsToShow = getModelsForBrand(config, selectedBrand);
 
-  const [openSections, setOpenSections] = useState({ brand: true, markets: true, models: true });
+  const [openSections, setOpenSections] = useState({ brand: true, markets: false, models: true });
   const toggleSection = (key: keyof typeof openSections) => {
     setOpenSections(prev => ({ ...prev, [key]: !prev[key] }));
   };
@@ -109,7 +109,26 @@ const Sidebar: React.FC<SidebarProps> = ({
             )}
           </div>
 
-          {/* Markets */}
+          {/* Models — resets to "All" when brand changes so switching brand shows assets immediately */}
+          <div className="rounded-xl border border-gray-100 overflow-hidden">
+            <button
+              onClick={() => toggleSection('models')}
+              className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50/80 hover:bg-gray-50 text-left"
+            >
+              <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Models</span>
+              <svg className={`w-4 h-4 text-gray-400 transition-transform ${openSections.models ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+            </button>
+            {openSections.models && (
+              <div className="p-2 space-y-0.5 bg-white max-h-48 overflow-y-auto">
+                <button onClick={() => onSelectModel('All')} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedModel === 'All' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>All Models</button>
+                {modelsToShow.map(m => (
+                  <button key={m} onClick={() => onSelectModel(m)} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedModel === m ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>{m}</button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          {/* Markets — last in nav, collapsed by default */}
           <div className="rounded-xl border border-gray-100 overflow-hidden">
             <button
               onClick={() => toggleSection('markets')}
@@ -136,25 +155,6 @@ const Sidebar: React.FC<SidebarProps> = ({
                     </>
                   );
                 })()}
-              </div>
-            )}
-          </div>
-
-          {/* Models — resets to "All" when brand changes so switching brand shows assets immediately */}
-          <div className="rounded-xl border border-gray-100 overflow-hidden">
-            <button
-              onClick={() => toggleSection('models')}
-              className="w-full flex items-center justify-between px-3 py-2.5 bg-gray-50/80 hover:bg-gray-50 text-left"
-            >
-              <span className="text-[10px] font-black text-gray-500 uppercase tracking-wider">Models</span>
-              <svg className={`w-4 h-4 text-gray-400 transition-transform ${openSections.models ? 'rotate-180' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-            </button>
-            {openSections.models && (
-              <div className="p-2 space-y-0.5 bg-white max-h-48 overflow-y-auto">
-                <button onClick={() => onSelectModel('All')} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedModel === 'All' ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>All Models</button>
-                {modelsToShow.map(m => (
-                  <button key={m} onClick={() => onSelectModel(m)} className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold transition-all ${selectedModel === m ? 'bg-blue-50 text-blue-700' : 'text-gray-600 hover:bg-gray-50'}`}>{m}</button>
-                ))}
               </div>
             )}
           </div>
