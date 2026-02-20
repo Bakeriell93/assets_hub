@@ -12,12 +12,7 @@ import BulkEditModal from './components/BulkEditModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
-import { Asset, AssetType, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, MARKETS, CAR_MODELS, PLATFORMS } from './types';
-
-/** True if asset is considered to be of type t (primary type or in assetTypes). */
-function assetHasType(asset: Asset, t: AssetType): boolean {
-  return asset.type === t || !!(asset.assetTypes && asset.assetTypes.includes(t));
-}
+import { Asset, AssetType, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, MARKETS, CAR_MODELS, PLATFORMS, assetHasType, getAssetBrands, getAssetPlatforms } from './types';
 
 type SortOption = 'newest' | 'alphabetical';
 type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
@@ -874,12 +869,12 @@ function App() {
     // Restrict by user's market access (view)
     if (currentUser?.allowedMarkets && currentUser.allowedMarkets.length > 0 && !currentUser.allowedMarkets.includes(a.market)) return false;
 
-    const brandMatch = selectedBrand === 'All' || (a.brands && a.brands.length ? a.brands.includes(selectedBrand) : (a.brand === selectedBrand));
+    const brandMatch = selectedBrand === 'All' || getAssetBrands(a).includes(selectedBrand);
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || 
       a.carModel === selectedModel || 
       (a.carModels && a.carModels.includes(selectedModel));
-    const pMatch = selectedPlatform === 'All' || (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
+    const pMatch = selectedPlatform === 'All' || getAssetPlatforms(a).includes(selectedPlatform);
     const typeMatch = selectedAssetType === 'All' || assetHasType(a, selectedAssetType);
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
@@ -1169,8 +1164,8 @@ function App() {
                       <tbody>
                         {visibleRepositoryAssets.map(asset => {
                           const packageAssets = asset.packageId ? packageMap.get(asset.packageId) || [asset] : [asset];
-                          const brandDisplay = (asset.brands && asset.brands.length ? asset.brands : (asset.brand ? [asset.brand] : [])).join(', ') || '—';
-                          const platformDisplay = (asset.platforms && asset.platforms.length ? asset.platforms : (asset.platform ? [asset.platform] : [])).join(', ') || '—';
+                          const brandDisplay = getAssetBrands(asset).join(', ') || '—';
+                          const platformDisplay = getAssetPlatforms(asset).join(', ') || '—';
                           return (
                             <tr
                               key={asset.id}

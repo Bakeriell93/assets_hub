@@ -73,15 +73,34 @@ export interface Asset {
   packagePreviewAssetId?: string; // ID of the asset to use as package card preview thumbnail
   packageNote?: string; // Description of package contents (shown on card)
   packageAssetTypes?: AssetType[]; // Types included in package (e.g. image + video)
-  // Brand (single for backward compat; use brands when multiple)
+  // Brand (single for backward compat; existing assets may only have brand)
   brand?: Brand;
   brands?: Brand[];
-  // Platforms when asset applies to multiple
+  // Platforms when asset applies to multiple (existing assets may only have platform)
   platforms?: Platform[];
-  // Asset types (e.g. tagged as image + video); type is primary
+  // Asset types (e.g. tagged as image + video); type is primary (existing assets may only have type)
   assetTypes?: AssetType[];
   // Soft delete (trash)
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
+}
+
+/** Whether an asset is considered to be of type t. Works for existing assets (type only) and new ones (type + assetTypes). */
+export function assetHasType(asset: Asset, t: AssetType): boolean {
+  return asset.type === t || !!(asset.assetTypes && asset.assetTypes.length && asset.assetTypes.includes(t));
+}
+
+/** Effective brands for display/filter: brands array or single brand. Works for existing and new assets. */
+export function getAssetBrands(asset: Asset): string[] {
+  if (asset.brands && asset.brands.length) return asset.brands;
+  if (asset.brand) return [asset.brand];
+  return [];
+}
+
+/** Effective platforms for display/filter: platforms array or single platform. Works for existing and new assets. */
+export function getAssetPlatforms(asset: Asset): string[] {
+  if (asset.platforms && asset.platforms.length) return asset.platforms;
+  if (asset.platform) return [asset.platform];
+  return [];
 }
 
 export interface SystemConfig {

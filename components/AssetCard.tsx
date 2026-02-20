@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Asset, UserRole } from '../types';
+import { Asset, UserRole, getAssetBrands, getAssetPlatforms } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
 import JSZip from 'jszip';
 import { storageService } from '../services/storageService';
@@ -810,11 +810,11 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       {/* Content */}
       <div className="p-6 flex-1 flex flex-col bg-white">
         <div className="flex flex-wrap gap-2 mb-4">
-            {(asset.brands && asset.brands.length ? asset.brands : (asset.brand ? [asset.brand] : [])).map(b => (
+            {getAssetBrands(asset).map(b => (
               <span key={b} className="px-2 py-1 rounded-lg bg-amber-50 text-[10px] font-black text-amber-700 uppercase tracking-tight">{b}</span>
             ))}
             <span className="px-2 py-1 rounded-lg bg-gray-100 text-[10px] font-black text-gray-500 uppercase tracking-tight">{asset.market}</span>
-            {(asset.platforms && asset.platforms.length ? asset.platforms : (asset.platform ? [asset.platform] : [])).map(p => (
+            {getAssetPlatforms(asset).map(p => (
               <span key={p} className="px-2 py-1 rounded-lg bg-blue-50 text-[10px] font-black text-blue-600 uppercase tracking-tight">{p}</span>
             ))}
         </div>
