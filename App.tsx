@@ -647,14 +647,13 @@ function App() {
     try {
       // Editing should UPDATE, not create a new asset.
       if (editingAsset) {
-        // Build updates object, preserving important fields
+        // Build updates: include every field from the form so all changes persist
         const updates: Partial<Asset> = {
           title: data.title,
           type: data.type,
           market: data.market,
           platform: data.platform,
           carModel: data.carModel,
-          ...(data.carModels ? { carModels: data.carModels } : {}),
           objectives: data.objectives,
           usageRights: data.usageRights,
           uploadedBy: data.uploadedBy,
@@ -663,16 +662,21 @@ function App() {
           cr: data.cr,
           comments: data.comments,
           content: data.content,
-          // Preserve these fields from original asset
           url: editingAsset.url,
           size: editingAsset.size,
           status: editingAsset.status,
           createdAt: editingAsset.createdAt,
-          // Only include collectionIds if it's provided and not undefined
-          ...(data.collectionIds !== undefined ? { collectionIds: data.collectionIds } : {}),
         };
-        
+        if (data.collectionIds !== undefined) updates.collectionIds = data.collectionIds;
+        if (data.carModels !== undefined) updates.carModels = data.carModels;
+        else if (data.carModel !== undefined) updates.carModels = [data.carModel];
+        if (data.brand !== undefined) updates.brand = data.brand;
+        if (data.brands !== undefined) updates.brands = data.brands;
+        if (data.platforms !== undefined) updates.platforms = data.platforms;
+        if (data.assetTypes !== undefined) updates.assetTypes = data.assetTypes;
+
         await storageService.updateAsset(editingAsset.id, updates);
+        setAssets(prev => prev.map(a => a.id === editingAsset.id ? { ...a, ...updates } as Asset : a));
         setEditingAsset(null);
         setIsAssetModalOpen(false);
         return;
