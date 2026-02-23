@@ -449,7 +449,7 @@ const VideoPlayerComponent: React.FC<{
   };
   
   return (
-    <div className="w-full flex items-center justify-center bg-black p-6 relative">
+    <div className="w-full flex-1 min-h-0 flex items-center justify-center bg-black p-4 relative overflow-hidden">
       {videoError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 p-8 text-center">
           <div className="max-w-md">
@@ -475,7 +475,7 @@ const VideoPlayerComponent: React.FC<{
       <video 
         ref={videoRef}
         key={videoUrl}
-        className="plyr__video-embed w-full h-auto max-h-[90vh]"
+        className="plyr__video-embed w-auto h-auto max-w-full max-h-[calc(90vh-12rem)] object-contain"
         playsInline
         preload={originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn') ? 'auto' : 'metadata'}
         muted={false}
@@ -1873,8 +1873,8 @@ function App() {
                 </div>
               )}
               
-              {/* Asset Preview Content */}
-              <div className="flex-1 overflow-y-auto">
+              {/* Asset Preview Content - min-h-0 so flex shrinks and video + controls stay in view */}
+              <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
                 {isPackage && previewViewMode === 'grid' ? (
                   <div className="p-6">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -2028,14 +2028,13 @@ function App() {
               const videoUrl = currentAsset.url;
               
               return (
-                <div className="relative w-full flex items-center justify-center bg-black p-6">
+                <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden p-4">
                   <video 
                     key={currentAsset.id}
                     controls 
-                    style={{ width: '100%' }} 
                     preload="auto"
                     playsInline
-                    className="max-h-[90vh]"
+                    className="max-w-full max-h-[calc(90vh-12rem)] w-auto h-auto object-contain"
                   >
                     <source src={videoUrl} type="video/mp4" />
                     Your browser does not support the video tag.
