@@ -7,17 +7,27 @@ import { storageService } from '../services/storageService';
 
 // In-memory caches so switching filters doesn't regenerate thumbnails (survives unmount/remount)
 const imageThumbCache = new Map<string, { thumbnail: string; updatedAt: number }>();
+const imageThumbCacheByUrl = new Map<string, string>(); // URL-based fallback so cache hits across filter switches
 const videoThumbCache = new Map<string, string>();
 
-function getCachedImageThumb(assetId: string, assetUpdatedAt: number): string | null {
+function normalizeTimestamp(v: number | unknown): number {
+  if (typeof v === 'number' && !Number.isNaN(v)) return v;
+  if (v && typeof (v as { toMillis?: () => number }).toMillis === 'function') return (v as { toMillis: () => number }).toMillis();
+  if (typeof v === 'string') return parseInt(v, 10) || 0;
+  return 0;
+}
+
+function getCachedImageThumb(assetId: string, assetUpdatedAt: number | unknown): string | null {
+  const ts = normalizeTimestamp(assetUpdatedAt);
   const mem = imageThumbCache.get(assetId);
-  if (mem && mem.updatedAt === assetUpdatedAt) return mem.thumbnail;
+  if (mem && mem.updatedAt === ts) return mem.thumbnail;
   try {
     const raw = localStorage.getItem(`img_thumb_${assetId}`);
     if (!raw) return null;
     const parsed = JSON.parse(raw);
-    if (parsed.updatedAt === assetUpdatedAt && parsed.thumbnail) {
-      imageThumbCache.set(assetId, { thumbnail: parsed.thumbnail, updatedAt: parsed.updatedAt });
+    const parsedTs = normalizeTimestamp(parsed.updatedAt);
+    if (parsedTs === ts && parsed.thumbnail) {
+      imageThumbCache.set(assetId, { thumbnail: parsed.thumbnail, updatedAt: parsedTs });
       return parsed.thumbnail;
     }
   } catch {
@@ -26,25 +36,43 @@ function getCachedImageThumb(assetId: string, assetUpdatedAt: number): string | 
   return null;
 }
 
+function getCachedImageThumbByUrl(imageUrl: string): string | null {
+  return imageThumbCacheByUrl.get(imageUrl) ?? null;
+}
+
 // Image Thumbnail Component - only loads thumbnail, full image on preview
-const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdatedAt: number; title: string }> = ({ imageUrl, assetId, assetUpdatedAt, title }) => {
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(() => getCachedImageThumb(assetId, assetUpdatedAt));
-  const [isLoaded, setIsLoaded] = useState(() => !!getCachedImageThumb(assetId, assetUpdatedAt));
+const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdatedAt: number | unknown; title: string }> = ({ imageUrl, assetId, assetUpdatedAt, title }) => {
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(() =>
+    getCachedImageThumb(assetId, assetUpdatedAt) ?? getCachedImageThumbByUrl(imageUrl)
+  );
+  const [isLoaded, setIsLoaded] = useState(() =>
+    !!(getCachedImageThumb(assetId, assetUpdatedAt) ?? getCachedImageThumbByUrl(imageUrl))
+  );
 
   useEffect(() => {
+    const ts = normalizeTimestamp(assetUpdatedAt);
     const cacheKey = `img_thumb_${assetId}`;
     const fromMem = imageThumbCache.get(assetId);
-    if (fromMem && fromMem.updatedAt === assetUpdatedAt && fromMem.thumbnail) {
+    if (fromMem && fromMem.updatedAt === ts && fromMem.thumbnail) {
       setThumbnailUrl(fromMem.thumbnail);
       setIsLoaded(true);
+      return;
+    }
+    const fromUrl = imageThumbCacheByUrl.get(imageUrl);
+    if (fromUrl) {
+      setThumbnailUrl(fromUrl);
+      setIsLoaded(true);
+      imageThumbCache.set(assetId, { thumbnail: fromUrl, updatedAt: ts });
       return;
     }
     const cacheData = localStorage.getItem(cacheKey);
     if (cacheData) {
       try {
         const cached = JSON.parse(cacheData);
-        if (cached.updatedAt === assetUpdatedAt && cached.thumbnail) {
-          imageThumbCache.set(assetId, { thumbnail: cached.thumbnail, updatedAt: cached.updatedAt });
+        const cachedTs = normalizeTimestamp(cached.updatedAt);
+        if (cachedTs === ts && cached.thumbnail) {
+          imageThumbCache.set(assetId, { thumbnail: cached.thumbnail, updatedAt: cachedTs });
+          imageThumbCacheByUrl.set(imageUrl, cached.thumbnail);
           setThumbnailUrl(cached.thumbnail);
           setIsLoaded(true);
           return;
@@ -108,11 +136,13 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
         const ctx = canvas.getContext('2d');
         if (ctx) {
           const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
-          imageThumbCache.set(assetId, { thumbnail, updatedAt: assetUpdatedAt });
+          const ts = normalizeTimestamp(assetUpdatedAt);
+          imageThumbCache.set(assetId, { thumbnail, updatedAt: ts });
+          imageThumbCacheByUrl.set(imageUrl, thumbnail);
           setThumbnailUrl(thumbnail);
           setIsLoaded(true);
           try {
-            localStorage.setItem(cacheKey, JSON.stringify({ thumbnail, updatedAt: assetUpdatedAt }));
+            localStorage.setItem(cacheKey, JSON.stringify({ thumbnail, updatedAt: ts }));
           } catch (e) {
             console.warn('Failed to cache thumbnail:', e);
           }
