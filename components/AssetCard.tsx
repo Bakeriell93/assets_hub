@@ -173,6 +173,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
   const canDelete = userRole === 'Editor' || userRole === 'Admin'; // Editor can now delete
+  const associatedModels = [...new Set([asset.carModel, ...(asset.carModels || [])].filter(Boolean))];
 
   // Generate video thumbnail - cached in localStorage
   useEffect(() => {
@@ -824,7 +825,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
           <p className="text-[10px] text-gray-500 mb-2 line-clamp-2" title={asset.packageNote}>{asset.packageNote}</p>
         )}
         <div className="flex flex-wrap gap-1.5 mb-3">
-          {(asset.carModels && asset.carModels.length > 0 ? asset.carModels : [asset.carModel]).map((model, idx) => (
+          {associatedModels.map((model, idx) => (
             <span key={idx} className="text-[10px] text-blue-500/60 font-black uppercase tracking-widest">{model}</span>
           ))}
         </div>
@@ -859,7 +860,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         <div className="mt-5 pt-4 border-t border-gray-50 flex items-center justify-between text-[9px] font-black text-gray-400 uppercase tracking-widest">
             <div className="flex items-center gap-1.5">
               <div className="w-1.5 h-1.5 bg-green-500 rounded-full"></div>
-              {new Date(asset.createdAt).toLocaleDateString()}
+              Uploaded {new Date(asset.createdAt).toLocaleDateString()}
             </div>
             <span className="truncate max-w-[80px] bg-gray-50 px-2 py-1 rounded-md">{asset.uploadedBy}</span>
         </div>

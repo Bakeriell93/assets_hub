@@ -154,7 +154,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setIsPackageMode(false);
       setIsCarModelsDropdownOpen(false);
       setBrand('BYD');
-      setSelectedBrands([(config.brands && config.brands.length ? config.brands[0] : 'BYD')]);
+      setSelectedBrands(['BYD']);
       setSelectedPlatforms([config.platforms?.[0] || PLATFORMS[0]]);
       setSelectedAssetTypes(['image']);
       setPackageNote('');

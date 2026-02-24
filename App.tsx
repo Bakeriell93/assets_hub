@@ -12,7 +12,7 @@ import BulkEditModal from './components/BulkEditModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
-import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, AssetType, MARKETS, CAR_MODELS, PLATFORMS } from './types';
+import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, AssetType, MARKETS, CAR_MODELS, PLATFORMS, getAssetBrands } from './types';
 
 type SortOption = 'newest' | 'alphabetical';
 type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
@@ -518,7 +518,7 @@ function App() {
   const [collapsedCollectionIds, setCollapsedCollectionIds] = useState<Set<string>>(new Set());
 
   // Filter States
-  const [selectedBrand, setSelectedBrand] = useState<Brand | 'All'>('All');
+  const [selectedBrand, setSelectedBrand] = useState<Brand | 'All'>('BYD');
   const [selectedMarket, setSelectedMarket] = useState<Market | 'All'>('All');
   const [selectedModel, setSelectedModel] = useState<CarModel | 'All'>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
@@ -833,6 +833,11 @@ function App() {
   const canEdit = currentUser?.role === 'Editor' || currentUser?.role === 'Admin';
 
   const normalize = (s: any) => String(s || '').toLowerCase();
+  const normalizeTag = (s: any) => String(s || '').trim().toLowerCase();
+  const getAssociatedBrands = (a: Asset) =>
+    [...new Set(getAssetBrands(a).map(normalizeTag).filter(Boolean))];
+  const getAssociatedModels = (a: Asset) =>
+    [...new Set([a.carModel, ...(a.carModels || [])].map(normalizeTag).filter(Boolean))];
   const matchesSearch = (a: Asset, rawQuery: string) => {
     const q = normalize(rawQuery).trim();
     if (!q) return true;
@@ -872,11 +877,13 @@ function App() {
     // Restrict by user's market access (view)
     if (currentUser?.allowedMarkets && currentUser.allowedMarkets.length > 0 && !currentUser.allowedMarkets.includes(a.market)) return false;
 
-    const brandMatch = selectedBrand === 'All' || (a.brands && a.brands.length ? a.brands.includes(selectedBrand) : (a.brand === selectedBrand));
+    const selectedBrandNorm = normalizeTag(selectedBrand);
+    const selectedModelNorm = normalizeTag(selectedModel);
+    const assetBrandsNorm = getAssociatedBrands(a);
+    const assetModelsNorm = getAssociatedModels(a);
+    const brandMatch = selectedBrand === 'All' || assetBrandsNorm.includes(selectedBrandNorm);
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
-    const modelMatch = selectedModel === 'All' || 
-      a.carModel === selectedModel || 
-      (a.carModels && a.carModels.includes(selectedModel));
+    const modelMatch = selectedModel === 'All' || assetModelsNorm.includes(selectedModelNorm);
     const platformMatch = (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
     const videoContentMatch = selectedPlatform === 'Video' && assetMatchesType(a, 'video');
     const pMatch = selectedPlatform === 'All' || platformMatch || videoContentMatch;
