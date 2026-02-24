@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { User, UserRole, Asset, SystemConfig, Brand, BRANDS, Market, MARKETS, CAR_MODELS, DENZA_MODELS, getAssetBrands } from '../types';
 import { storageService, SecurityLog, DownloadLog, LoginLog } from '../services/storageService';
 import { storage } from '../services/firebase';
@@ -44,6 +44,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   const [editingConfigNewValue, setEditingConfigNewValue] = useState('');
   const [addingModelForBrand, setAddingModelForBrand] = useState<Brand | null>(null);
   const [newModelValue, setNewModelValue] = useState('');
+  const importFileRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const unsubLogs = storageService.subscribeToSecurityLogs(setSecurityLogs);
@@ -362,6 +363,45 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   const getDefaultModelsForBrand = (brand: Brand): string[] =>
     brand === 'Denza' ? [...DENZA_MODELS] : [...CAR_MODELS];
 
+  /** Download current config as JSON backup file. */
+  const handleBackupMetadata = () => {
+    const payload = { ...config, _backupAt: new Date().toISOString() };
+    const blob = new Blob([JSON.stringify(payload, null, 2)], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `system_metadata_backup_${new Date().toISOString().slice(0, 10)}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+  };
+
+  /** Restore config from a previously backed-up JSON file. */
+  const handleImportMetadata = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    e.target.value = '';
+    if (!file) return;
+    try {
+      const text = await file.text();
+      const parsed = JSON.parse(text) as Record<string, unknown>;
+      if (!Array.isArray(parsed.markets) || !Array.isArray(parsed.models) || !Array.isArray(parsed.platforms)) {
+        alert('Invalid backup file: must contain markets, models, and platforms arrays.');
+        return;
+      }
+      const restored: SystemConfig = {
+        markets: parsed.markets as Market[],
+        models: parsed.models as string[],
+        platforms: parsed.platforms as string[],
+        brands: Array.isArray(parsed.brands) ? (parsed.brands as Brand[]) : config.brands,
+        modelsByBrand: parsed.modelsByBrand && typeof parsed.modelsByBrand === 'object' && !Array.isArray(parsed.modelsByBrand)
+          ? (parsed.modelsByBrand as SystemConfig['modelsByBrand']) : config.modelsByBrand,
+      };
+      await storageService.saveSystemConfig(restored);
+      alert('Metadata restored from backup.');
+    } catch (err) {
+      alert('Import failed: ' + (err instanceof Error ? err.message : 'Invalid file'));
+    }
+  };
+
   /** Restore default markets, models, and fill empty brand model lists (Denza gets Denza models, not BYD). */
   const handleRestoreDefaults = async () => {
     const nextMarkets = [...new Set([...config.markets, ...MARKETS])];
@@ -635,8 +675,29 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                 {!isEditor && (
                   <div className="bg-amber-50/80 p-12 rounded-[56px] border border-amber-200 shadow-sm">
                     <h4 className="text-xs font-black text-amber-900 uppercase tracking-[0.4em] mb-2">Recover metadata</h4>
-                    <p className="text-[11px] text-amber-800 mb-8">Restore missing markets or models (e.g. Denza) from existing assets or from default lists. Existing entries are never removed.</p>
+                    <p className="text-[11px] text-amber-800 mb-8">Backup or restore metadata from a file. You can also recover from assets or restore default markets &amp; models.</p>
+                    <input
+                      ref={importFileRef}
+                      type="file"
+                      accept=".json,application/json"
+                      className="hidden"
+                      onChange={handleImportMetadata}
+                    />
                     <div className="flex flex-wrap gap-4">
+                      <button
+                        type="button"
+                        onClick={handleBackupMetadata}
+                        className="px-6 py-3 bg-gray-100 text-gray-800 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-gray-200 hover:bg-gray-200 transition-all"
+                      >
+                        Backup metadata
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => importFileRef.current?.click()}
+                        className="px-6 py-3 bg-green-50 text-green-800 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-green-200 hover:bg-green-100 transition-all"
+                      >
+                        Import metadata
+                      </button>
                       <button
                         type="button"
                         onClick={handleRecoverFromAssets}
