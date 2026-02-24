@@ -947,7 +947,8 @@ function App() {
     const modelMatch = selectedModel === 'All' || assetModelsNorm.includes(selectedModelNorm);
     const masterMatch = selectedMasterFilter === 'All' || !!a.containsMasterFile;
     const platformMatch = (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
-    const videoContentMatch = selectedPlatform === 'Video' && assetMatchesType(a, 'video');
+    const isVideoLikePlatformSelection = ['video', 'youtube & tv', 'youtube and tv', 'youtube/tv'].includes(normalizeTag(selectedPlatform));
+    const videoContentMatch = isVideoLikePlatformSelection && assetMatchesType(a, 'video');
     const pMatch = selectedPlatform === 'All' || platformMatch || videoContentMatch;
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
