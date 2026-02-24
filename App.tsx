@@ -522,6 +522,7 @@ function App() {
   const [selectedMarket, setSelectedMarket] = useState<Market | 'All'>('All');
   const [selectedModel, setSelectedModel] = useState<CarModel | 'All'>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
+  const [masterFilesOnly, setMasterFilesOnly] = useState(false);
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -818,6 +819,149 @@ function App() {
     }
   };
 
+  const handleUpdatePackage = async (removedIds: string[], newFiles: Array<{ file: File; title: string }>) => {
+    if (!editingAsset?.packageId || editingPackageAssets.length === 0) return;
+    const packageId = editingAsset.packageId;
+    try {
+      setUploadProgress(0);
+      setUploadStatus('Updating package...');
+      const remainingAfterRemove = editingPackageAssets.filter(a => !removedIds.includes(a.id));
+      const previewWasRemoved = removedIds.includes(editingAsset.packagePreviewAssetId || '');
+      for (const id of removedIds) {
+        await storageService.updateAsset(id, { packageId: undefined, packageOrder: undefined, packagePreviewAssetId: undefined });
+      }
+      if (previewWasRemoved && remainingAfterRemove.length > 0) {
+        const newPreviewId = remainingAfterRemove[0].id;
+        for (const a of remainingAfterRemove) {
+          await storageService.updateAsset(a.id, { packagePreviewAssetId: newPreviewId });
+        }
+      }
+      if (newFiles.length > 0) {
+        const maxOrder = Math.max(0, ...editingPackageAssets.filter(a => !removedIds.includes(a.id)).map(a => a.packageOrder ?? 0));
+        const first = editingPackageAssets[0];
+        const sharedMeta = {
+          market: first.market,
+          platform: first.platform,
+          platforms: first.platforms,
+          carModel: first.carModel,
+          carModels: first.carModels,
+          objectives: first.objectives || [],
+          usageRights: first.usageRights,
+          uploadedBy: first.uploadedBy,
+          collectionIds: first.collectionIds,
+          brand: first.brand,
+          brands: first.brands,
+          packageNote: first.packageNote,
+          packageAssetTypes: first.packageAssetTypes,
+          containsMasterFile: first.containsMasterFile,
+        };
+        for (let i = 0; i < newFiles.length; i++) {
+          const { file, title: fileTitle } = newFiles[i];
+          let fileType: AssetType = 'design';
+          if (file.type.startsWith('image/')) fileType = 'image';
+          else if (file.type.startsWith('video/')) fileType = 'video';
+          else {
+            const ext = (file.name.split('.').pop() || '').toLowerCase();
+            if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) fileType = 'image';
+            else if (['mp4','webm','mov','avi','mkv','m4v'].includes(ext)) fileType = 'video';
+          }
+          const assetData: Omit<Asset, 'id' | 'createdAt'> = {
+            title: fileTitle || file.name.replace(/\.[^/.]+$/, ''),
+            type: fileType,
+            ...sharedMeta,
+            packageId,
+            packageOrder: maxOrder + 1 + i,
+            originalFileName: file.name,
+          };
+          const uploaded = await storageService.addAsset(assetData, file, (p) => setUploadProgress((i / newFiles.length) * 100 + (p / newFiles.length) * 100));
+          if (uploaded) setUploadStatus(`Added ${i + 1}/${newFiles.length} to package`);
+        }
+        const remaining = editingPackageAssets.filter(a => !removedIds.includes(a.id));
+        const previewId = editingAsset.packagePreviewAssetId && remaining.some(a => a.id === editingAsset.packagePreviewAssetId)
+          ? editingAsset.packagePreviewAssetId
+          : remaining[0]?.id;
+        if (previewId) {
+          for (const a of remaining) {
+            await storageService.updateAsset(a.id, { packagePreviewAssetId: previewId });
+          }
+        }
+      }
+      setUploadProgress(100);
+      setUploadStatus('Package updated');
+      setIsAssetModalOpen(false);
+      setEditingAsset(null);
+      setEditingPackageAssets([]);
+      setTimeout(() => { setUploadProgress(null); setUploadStatus(''); }, 800);
+    } catch (err: any) {
+      setUploadProgress(null);
+      setUploadStatus('');
+      alert(`Failed to update package: ${err?.message || 'Unknown error'}`);
+    }
+  };
+
+  const handleConvertToPackage = async (newFiles: Array<{ file: File; title: string }>) => {
+    if (!editingAsset || newFiles.length === 0) return;
+    const packageId = `pkg_${Date.now()}`;
+    try {
+      setUploadProgress(0);
+      setUploadStatus('Converting to package...');
+      await storageService.updateAsset(editingAsset.id, {
+        packageId,
+        packageOrder: 0,
+        packagePreviewAssetId: editingAsset.id,
+        packageNote: editingAsset.packageNote,
+        packageAssetTypes: editingAsset.packageAssetTypes || [editingAsset.type],
+      });
+      const first = editingAsset;
+      const sharedMeta = {
+        market: first.market,
+        platform: first.platform,
+        platforms: first.platforms,
+        carModel: first.carModel,
+        carModels: first.carModels,
+        objectives: first.objectives || [],
+        usageRights: first.usageRights,
+        uploadedBy: first.uploadedBy,
+        collectionIds: first.collectionIds,
+        brand: first.brand,
+        brands: first.brands,
+        packageNote: first.packageNote,
+        packageAssetTypes: first.packageAssetTypes || [first.type],
+        containsMasterFile: first.containsMasterFile,
+      };
+      for (let i = 0; i < newFiles.length; i++) {
+        const { file, title: fileTitle } = newFiles[i];
+        let fileType: AssetType = 'design';
+        if (file.type.startsWith('image/')) fileType = 'image';
+        else if (file.type.startsWith('video/')) fileType = 'video';
+        else {
+          const ext = (file.name.split('.').pop() || '').toLowerCase();
+          if (['jpg','jpeg','png','gif','webp','svg','bmp'].includes(ext)) fileType = 'image';
+          else if (['mp4','webm','mov','avi','mkv','m4v'].includes(ext)) fileType = 'video';
+        }
+        const assetData: Omit<Asset, 'id' | 'createdAt'> = {
+          title: fileTitle || file.name.replace(/\.[^/.]+$/, ''),
+          type: fileType,
+          ...sharedMeta,
+          packageId,
+          packageOrder: i + 1,
+          originalFileName: file.name,
+        };
+        await storageService.addAsset(assetData, file, (p) => setUploadProgress(((i + 1) / (newFiles.length + 1)) * 100));
+      }
+      setUploadProgress(100);
+      setUploadStatus('Package created');
+      setIsAssetModalOpen(false);
+      setEditingAsset(null);
+      setEditingPackageAssets([]);
+      setTimeout(() => { setUploadProgress(null); setUploadStatus(''); }, 800);
+    } catch (err: any) {
+      setUploadProgress(null);
+      setUploadStatus('');
+      alert(`Failed to convert to package: ${err?.message || 'Unknown error'}`);
+    }
+  };
+
   const handleCreateCollection = async (e: React.FormEvent) => {
     e.preventDefault();
     const trimmed = newCollectionName.trim();
@@ -950,7 +1094,8 @@ function App() {
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
-    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch;
+    const masterMatch = !masterFilesOnly || !!a.containsMasterFile;
+    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch && masterMatch;
   });
 
   // Group assets by packageId - show only the first asset of each package, or standalone assets
@@ -1098,30 +1243,44 @@ function App() {
           </div>
           
           {viewMode === 'repository' && (
-            <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
-              {['All', ...config.platforms].map(p => (
-                  <button 
-                    key={p} 
-                    onClick={() => setSelectedPlatform(p)}
-                    className={`whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 ${selectedPlatform === p ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-300'}`}
+            <>
+              <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+                {['All', ...config.platforms].map(p => (
+                    <button 
+                      key={p} 
+                      onClick={() => setSelectedPlatform(p)}
+                      className={`whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 ${selectedPlatform === p ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-300'}`}
+                    >
+                      {p}
+                    </button>
+                  ))}
+                {sharedAssetIds && (
+                  <button
+                    onClick={() => {
+                      setSharedAssetIds(null);
+                      const url = new URL(window.location.href);
+                      url.searchParams.delete('shared');
+                      window.history.replaceState({}, '', url.toString());
+                    }}
+                    className="whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
                   >
-                    {p}
+                    Shared view active - clear
                   </button>
-                ))}
-              {sharedAssetIds && (
-                <button
-                  onClick={() => {
-                    setSharedAssetIds(null);
-                    const url = new URL(window.location.href);
-                    url.searchParams.delete('shared');
-                    window.history.replaceState({}, '', url.toString());
-                  }}
-                  className="whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
-                >
-                  Shared view active - clear
-                </button>
-              )}
-            </div>
+                )}
+              </div>
+              <div className="flex items-center gap-3 mt-3">
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={masterFilesOnly}
+                    onChange={(e) => setMasterFilesOnly(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Master files</span>
+                </label>
+                <span className="text-[10px] text-gray-500">Show only assets that contain PSD, ZIP or other non-image/video files</span>
+              </div>
+            </>
           )}
         </header>
 
@@ -1772,6 +1931,8 @@ function App() {
         onClose={() => { setIsAssetModalOpen(false); setEditingAsset(null); setEditingPackageAssets([]); }} 
         onSave={handleSaveAsset}
         onSavePackage={handleSavePackage}
+        onUpdatePackage={handleUpdatePackage}
+        onConvertToPackage={handleConvertToPackage}
         editingAsset={editingAsset}
         editingPackageAssets={editingPackageAssets}
         config={config}
@@ -2168,12 +2329,27 @@ function App() {
                         <p className="text-lg text-gray-700 whitespace-pre-wrap">{currentAsset.content}</p>
                       </div>
                     )}
-                    {currentAsset.type === 'design' && (
-                      <div className="relative p-12 text-center">
-                        <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
-                        <p className="text-gray-600">Design file - download to view</p>
-                      </div>
-                    )}
+                    {currentAsset.type === 'design' && (() => {
+                      const getDesignFilename = (a: Asset) => {
+                        if (a.originalFileName) return a.originalFileName;
+                        if (!a.url) return 'file';
+                        try {
+                          const cleaned = a.url.split('?')[0] || '';
+                          const last = cleaned.split('/').pop() || '';
+                          const decoded = decodeURIComponent(last);
+                          return (decoded.replace(/^\d+-/, '') || decoded || 'file').trim();
+                        } catch { return 'file'; }
+                      };
+                      const filename = getDesignFilename(currentAsset);
+                      return (
+                        <div className="relative p-12 text-center">
+                          <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
+                          <p className="text-lg font-bold text-orange-600 uppercase tracking-wide">Master file</p>
+                          <p className="text-gray-700 mt-1 break-all">{filename}</p>
+                          <p className="text-sm text-gray-500 mt-4">Download to open in your design tool</p>
+                        </div>
+                      );
+                    })()}
                   </>
                 )}
               </div>

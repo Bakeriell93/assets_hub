@@ -9,13 +9,15 @@ interface AssetFormModalProps {
   onClose: () => void;
   onSave: (asset: Omit<Asset, 'id' | 'createdAt'> | Partial<Asset>, file?: File) => void;
   onSavePackage?: (assets: Array<{ asset: Omit<Asset, 'id' | 'createdAt'>; file?: File }>) => void;
+  onUpdatePackage?: (removedIds: string[], newFiles: Array<{ file: File; title: string }>) => void;
+  onConvertToPackage?: (newFiles: Array<{ file: File; title: string }>) => void;
   editingAsset?: Asset | null;
   editingPackageAssets?: Asset[]; // All assets in the package being edited
   config: SystemConfig;
   collections: Collection[];
 }
 
-const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave, onSavePackage, editingAsset, editingPackageAssets = [], config, collections }) => {
+const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave, onSavePackage, onUpdatePackage, onConvertToPackage, editingAsset, editingPackageAssets = [], config, collections }) => {
   const [title, setTitle] = useState('');
   const [uploaderName, setUploaderName] = useState('');
   const [type, setType] = useState<AssetType>('image');
@@ -56,6 +58,12 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     : getModelsForBrand(config, brand);
   const [selectedPackageTypes, setSelectedPackageTypes] = useState<AssetType[]>(['image', 'video']);
   const [containsMasterFile, setContainsMasterFile] = useState(false);
+  const [removedFromPackageIds, setRemovedFromPackageIds] = useState<string[]>([]);
+  const [newPackageFiles, setNewPackageFiles] = useState<File[]>([]);
+  const [newPackageFileTitles, setNewPackageFileTitles] = useState<Record<number, string>>({});
+  const [isConvertToPackage, setIsConvertToPackage] = useState(false);
+  const [newFilesForConvert, setNewFilesForConvert] = useState<File[]>([]);
+  const [newFilesForConvertTitles, setNewFilesForConvertTitles] = useState<Record<number, string>>({});
   
   const [ctr, setCtr] = useState<string>('');
   const [cpl, setCpl] = useState<string>('');
@@ -127,7 +135,16 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       }
       setIsChangingPreview(false);
       setEditPackageThumbnails({});
+      setRemovedFromPackageIds([]);
+      setNewPackageFiles([]);
+      setNewPackageFileTitles({});
     } else {
+      setRemovedFromPackageIds([]);
+      setNewPackageFiles([]);
+      setNewPackageFileTitles({});
+      setIsConvertToPackage(false);
+      setNewFilesForConvert([]);
+      setNewFilesForConvertTitles({});
       setTitle('');
       setOriginalTitle('');
       setUploaderName('');
@@ -162,6 +179,12 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setPackageNote('');
       setSelectedPackageTypes(['image', 'video']);
       setContainsMasterFile(false);
+      setRemovedFromPackageIds([]);
+      setNewPackageFiles([]);
+      setNewPackageFileTitles({});
+      setIsConvertToPackage(false);
+      setNewFilesForConvert([]);
+      setNewFilesForConvertTitles({});
     }
   }, [editingAsset, isOpen, config]);
 
@@ -208,6 +231,11 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     setSelectedAssetTypes(prev => prev.includes(t) ? prev.filter(x => x !== t) : [...prev, t]);
     if (!selectedAssetTypes.includes(t)) setType(t);
   };
+
+  const remainingPackageAssets = editingPackageAssets.filter(a => !removedFromPackageIds.includes(a.id));
+  const remainingPreviewIndex = selectedPreviewIndex !== null && selectedPreviewIndex < remainingPackageAssets.length
+    ? selectedPreviewIndex
+    : remainingPackageAssets.length > 0 ? 0 : null;
 
   const ASSET_TYPES: { value: AssetType; label: string }[] = [
     { value: 'image', label: 'Image' },
@@ -338,19 +366,22 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
 
     // Editing should UPDATE, not create a new asset.
     if (editingAsset) {
-      // If editing a package, update all package assets with new titles
+      // If editing a package, update all package assets with new titles (except removed)
       if (editingPackageAssets.length > 1) {
         const nextMainTitle = title.trim();
         const hasMainTitleChange = nextMainTitle.length > 0 && nextMainTitle !== originalTitle;
+        const remainingAssets = editingPackageAssets.filter(a => !removedFromPackageIds.includes(a.id));
         
-        // Determine the new preview asset ID if preview was changed
+        // Determine the new preview asset ID if preview was changed (use index in remaining list, clamped)
         let newPreviewAssetId: string | undefined = undefined;
-        if (isChangingPreview && selectedPreviewIndex !== null && selectedPreviewIndex < editingPackageAssets.length) {
-          newPreviewAssetId = editingPackageAssets[selectedPreviewIndex].id;
+        if (isChangingPreview && selectedPreviewIndex !== null && remainingAssets.length > 0) {
+          const idx = Math.min(selectedPreviewIndex, remainingAssets.length - 1);
+          newPreviewAssetId = remainingAssets[idx].id;
         }
         
-        // Update all package assets
+        // Update all package assets that are not removed
         for (const pkgAsset of editingPackageAssets) {
+          if (removedFromPackageIds.includes(pkgAsset.id)) continue;
           const perItemTitle = packageAssetTitles[pkgAsset.id] || pkgAsset.title;
           const shouldUseMainTitle =
             hasMainTitleChange && perItemTitle === originalTitle;
@@ -387,6 +418,24 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
           };
           await storageService.updateAsset(pkgAsset.id, updates);
         }
+        if (onUpdatePackage && (removedFromPackageIds.length > 0 || newPackageFiles.length > 0)) {
+          const newFilesPayload = newPackageFiles.map((f, i) => ({
+            file: f,
+            title: newPackageFileTitles[i] ?? f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+          }));
+          await onUpdatePackage(removedFromPackageIds, newFilesPayload);
+        }
+        onClose();
+        return;
+      }
+      
+      // Single asset: convert to package if requested
+      if (isConvertToPackage && newFilesForConvert.length > 0 && onConvertToPackage) {
+        const payload = newFilesForConvert.map((f, i) => ({
+          file: f,
+          title: newFilesForConvertTitles[i] ?? f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' '),
+        }));
+        await onConvertToPackage(payload);
         onClose();
         return;
       }
@@ -589,6 +638,63 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                   </label>
                   <p className="text-[10px] text-gray-500 mt-0.5 ml-6">When checked, a label is shown on the asset card. Tip: upload the master as a ZIP file.</p>
                 </div>
+
+                {editingAsset && editingPackageAssets.length <= 1 && onConvertToPackage && (
+                  <div className="mb-4 p-4 bg-purple-50/50 rounded-xl border-2 border-purple-100">
+                    <label className="flex items-center gap-2 cursor-pointer mb-2">
+                      <input
+                        type="checkbox"
+                        checked={isConvertToPackage}
+                        onChange={(e) => {
+                          setIsConvertToPackage(e.target.checked);
+                          if (!e.target.checked) {
+                            setNewFilesForConvert([]);
+                            setNewFilesForConvertTitles({});
+                          }
+                        }}
+                        className="w-4 h-4 rounded border-gray-300 text-purple-600 focus:ring-purple-500"
+                      />
+                      <span className="text-xs font-bold text-gray-700">Convert to package</span>
+                    </label>
+                    <p className="text-[10px] text-gray-500 mb-2">Add more files to turn this asset into a package. The current asset stays as the first item.</p>
+                    {isConvertToPackage && (
+                      <div className="mt-2">
+                        <input
+                          type="file"
+                          multiple
+                          accept="*/*"
+                          onChange={(e) => {
+                            const selected = Array.from(e.target.files || []);
+                            setNewFilesForConvert(selected);
+                            const titles: Record<number, string> = {};
+                            selected.forEach((f, i) => {
+                              titles[i] = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                            });
+                            setNewFilesForConvertTitles(titles);
+                            e.target.value = '';
+                          }}
+                          className="block w-full text-xs text-gray-600 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-purple-100 file:text-purple-700 file:font-bold"
+                        />
+                        {newFilesForConvert.length > 0 && (
+                          <div className="mt-2 space-y-1">
+                            {newFilesForConvert.map((f, i) => (
+                              <div key={i} className="flex items-center gap-2 text-[10px]">
+                                <span className="truncate flex-1 text-gray-600">{f.name}</span>
+                                <input
+                                  type="text"
+                                  value={newFilesForConvertTitles[i] ?? ''}
+                                  onChange={(e) => setNewFilesForConvertTitles(prev => ({ ...prev, [i]: e.target.value }))}
+                                  placeholder="Title"
+                                  className="w-24 px-2 py-1 border rounded text-gray-900"
+                                />
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {(isPackageMode || (editingAsset && editingPackageAssets.length > 1)) && (
                   <div className="mb-4">
@@ -919,27 +1025,86 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     
                     {!isChangingPreview ? (
                       <div className="space-y-2 max-h-60 overflow-y-auto">
-                        {editingPackageAssets.map((pkgAsset) => (
-                          <div key={pkgAsset.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200">
-                            <div className="flex items-center justify-between mb-2">
-                              <span
-                                className="text-[10px] font-bold text-gray-500 truncate flex-1"
-                                title={getCleanFilename(pkgAsset)}
-                              >
-                                {getCleanFilename(pkgAsset)}
-                              </span>
+                        {remainingPackageAssets.map((pkgAsset) => (
+                          <div key={pkgAsset.id} className="p-3 bg-gray-50 rounded-lg border border-gray-200 flex items-start gap-2">
+                            <div className="flex-1 min-w-0">
+                              <div className="flex items-center justify-between mb-2">
+                                <span
+                                  className="text-[10px] font-bold text-gray-500 truncate flex-1"
+                                  title={getCleanFilename(pkgAsset)}
+                                >
+                                  {getCleanFilename(pkgAsset)}
+                                </span>
+                              </div>
+                              <input
+                                type="text"
+                                value={packageAssetTitles[pkgAsset.id] || pkgAsset.title}
+                                onChange={(e) => {
+                                  setPackageAssetTitles({ ...packageAssetTitles, [pkgAsset.id]: e.target.value });
+                                }}
+                                placeholder="Enter custom name..."
+                                className="w-full px-3 py-2 text-xs font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
+                              />
                             </div>
-                            <input
-                              type="text"
-                              value={packageAssetTitles[pkgAsset.id] || pkgAsset.title}
-                              onChange={(e) => {
-                                setPackageAssetTitles({ ...packageAssetTitles, [pkgAsset.id]: e.target.value });
-                              }}
-                              placeholder="Enter custom name..."
-                              className="w-full px-3 py-2 text-xs font-bold text-gray-900 bg-white border-2 border-gray-200 rounded-lg outline-none focus:border-blue-400 focus:ring-2 focus:ring-blue-100"
-                            />
+                            {onUpdatePackage && (
+                              <button
+                                type="button"
+                                onClick={() => {
+                                  const selectedId = remainingPackageAssets[selectedPreviewIndex ?? 0]?.id;
+                                  setRemovedFromPackageIds(prev => [...prev, pkgAsset.id]);
+                                  setSelectedPreviewIndex((prev) => {
+                                    if (prev === null) return null;
+                                    if (pkgAsset.id === selectedId) return 0;
+                                    const nextRemaining = editingPackageAssets.filter(a => !removedFromPackageIds.includes(a.id) && a.id !== pkgAsset.id);
+                                    const newIdx = nextRemaining.findIndex(a => a.id === selectedId);
+                                    return newIdx >= 0 ? newIdx : 0;
+                                  });
+                                }}
+                                className="p-2 text-red-600 hover:bg-red-50 rounded-lg border border-red-200 shrink-0"
+                                title="Remove from package (asset stays in hub)"
+                              >
+                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 7l-.867 12.142A2 2 0 0116.138 21H7.862a2 2 0 01-1.995-1.858L5 7m5 4v6m4-6v6m1-10V4a1 1 0 00-1-1h-4a1 1 0 00-1 1v3M4 7h16" /></svg>
+                              </button>
+                            )}
                           </div>
                         ))}
+                        {onUpdatePackage && (
+                          <div className="border-2 border-dashed border-gray-300 rounded-xl p-4 mt-2">
+                            <p className="text-[10px] font-bold text-gray-500 uppercase tracking-tighter mb-2">Add more files to package</p>
+                            <input
+                              type="file"
+                              multiple
+                              accept="*/*"
+                              onChange={(e) => {
+                                const selected = Array.from(e.target.files || []);
+                                setNewPackageFiles(selected);
+                                const titles: Record<number, string> = {};
+                                selected.forEach((f, i) => {
+                                  titles[i] = f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
+                                });
+                                setNewPackageFileTitles(titles);
+                                e.target.value = '';
+                              }}
+                              className="block w-full text-xs text-gray-600 file:mr-2 file:py-2 file:px-3 file:rounded-lg file:border-0 file:bg-blue-50 file:text-blue-700 file:font-bold"
+                            />
+                            {newPackageFiles.length > 0 && (
+                              <div className="mt-2 space-y-1">
+                                {newPackageFiles.map((f, i) => (
+                                  <div key={i} className="flex items-center gap-2 text-[10px]">
+                                    <span className="truncate flex-1 text-gray-600">{f.name}</span>
+                                    <input
+                                      type="text"
+                                      value={newPackageFileTitles[i] ?? ''}
+                                      onChange={(e) => setNewPackageFileTitles(prev => ({ ...prev, [i]: e.target.value }))}
+                                      placeholder="Title"
+                                      className="w-24 px-2 py-1 border rounded text-gray-900"
+                                    />
+                                  </div>
+                                ))}
+                              </div>
+                            )}
+                          </div>
+                        )}
                       </div>
                     ) : (
                       <div className="space-y-3">
@@ -961,7 +1126,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                           </div>
                         ) : (
                           <div className="grid grid-cols-4 gap-2 max-h-48 overflow-y-auto">
-                            {editingPackageAssets.map((pkgAsset, idx) => {
+                            {remainingPackageAssets.map((pkgAsset, idx) => {
                               const thumbnail = editPackageThumbnails[pkgAsset.id];
                               const isSelected = selectedPreviewIndex === idx;
                               return (

@@ -740,12 +740,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                </div>
             </div>
         )}
-        {asset.type === 'design' && (
-           <div className="p-10 bg-orange-50/50 flex flex-col items-center justify-center gap-4">
+        {((previewAsset.type === 'design') || (asset.containsMasterFile && previewAsset.type !== 'image' && previewAsset.type !== 'video')) && (
+           <div className="p-10 bg-orange-50/50 flex flex-col items-center justify-center gap-2 text-center">
               <div className="w-16 h-16 bg-white rounded-3xl shadow-lg flex items-center justify-center">
                 <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
               </div>
-              <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Master Source File</span>
+              <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Master file</span>
+              <span className="text-[10px] font-bold text-orange-700 truncate max-w-full px-2" title={getDisplayFilename(previewAsset)}>{getDisplayFilename(previewAsset)}</span>
            </div>
         )}
         {asset.type === 'text' && (
