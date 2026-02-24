@@ -522,7 +522,6 @@ function App() {
   const [selectedMarket, setSelectedMarket] = useState<Market | 'All'>('All');
   const [selectedModel, setSelectedModel] = useState<CarModel | 'All'>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
-  const [selectedMasterFilter, setSelectedMasterFilter] = useState<'All' | 'Master'>('All');
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -584,7 +583,6 @@ function App() {
         setSelectedMarket('All');
         setSelectedModel('All');
         setSelectedPlatform('All');
-        setSelectedMasterFilter('All');
       } catch (e) {
         console.warn('Failed to parse shared URL:', e);
         setSharedAssetIds(null);
@@ -945,7 +943,6 @@ function App() {
     const brandMatch = selectedBrand === 'All' || assetBrandsNorm.includes(selectedBrandNorm);
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || assetModelsNorm.includes(selectedModelNorm);
-    const masterMatch = selectedMasterFilter === 'All' || !!a.containsMasterFile;
     const platformMatch = (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
     const isVideoLikePlatformSelection = ['video', 'youtube & tv', 'youtube and tv', 'youtube/tv'].includes(normalizeTag(selectedPlatform));
     const videoContentMatch = isVideoLikePlatformSelection && assetMatchesType(a, 'video');
@@ -953,7 +950,7 @@ function App() {
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
-    return brandMatch && mMatch && modelMatch && masterMatch && pMatch && objMatch && cMatch && sMatch;
+    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch;
   });
 
   // Group assets by packageId - show only the first asset of each package, or standalone assets
@@ -1111,17 +1108,6 @@ function App() {
                     {p}
                   </button>
                 ))}
-              {(['All', 'Master'] as const).map(v => (
-                <button
-                  key={`master-${v}`}
-                  onClick={() => setSelectedMasterFilter(v)}
-                  className={`whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 ${
-                    selectedMasterFilter === v ? 'bg-purple-600 border-purple-600 text-white shadow-xl' : 'bg-white text-gray-400 border-gray-100 hover:border-purple-300'
-                  }`}
-                >
-                  {v === 'All' ? 'Master files: All' : 'Master files only'}
-                </button>
-              ))}
               {sharedAssetIds && (
                 <button
                   onClick={() => {

@@ -1308,7 +1308,13 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                         </div>
                     ) : (
                         <div className="border-2 border-dashed border-gray-300 rounded-2xl p-6 text-center hover:border-blue-400 bg-gray-50/50 transition-colors relative">
-                            <input type="file" required accept={(selectedAssetTypes[0] || type) === 'image' ? 'image/*' : (selectedAssetTypes[0] || type) === 'video' ? 'video/*' : '*/*'} onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)} className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" />
+                            <input
+                              type="file"
+                              required
+                              accept={selectedAssetTypes.length > 1 ? '*/*' : ((selectedAssetTypes[0] || type) === 'image' ? 'image/*' : (selectedAssetTypes[0] || type) === 'video' ? 'video/*' : '*/*')}
+                              onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
+                              className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
+                            />
                             <div className="space-y-2 pointer-events-none">
                                 <p className="text-sm font-bold text-gray-600">{file ? file.name : `Select ${type} file`}</p>
                                 <p className="text-xs text-gray-400">High quality recommended</p>
