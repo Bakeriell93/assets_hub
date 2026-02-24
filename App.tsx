@@ -1088,10 +1088,11 @@ function App() {
     const brandMatch = selectedBrand === 'All' || assetBrandsNorm.includes(selectedBrandNorm);
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || assetModelsNorm.includes(selectedModelNorm);
+    const platformIsAll = selectedPlatform === 'All' || normalizeTag(selectedPlatform) === 'all';
     const platformMatch = (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
     const isVideoLikePlatformSelection = ['video', 'youtube & tv', 'youtube and tv', 'youtube/tv'].includes(normalizeTag(selectedPlatform));
     const videoContentMatch = isVideoLikePlatformSelection && assetMatchesType(a, 'video');
-    const pMatch = selectedPlatform === 'All' || platformMatch || videoContentMatch;
+    const pMatch = platformIsAll || platformMatch || videoContentMatch;
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
@@ -1138,6 +1139,11 @@ function App() {
   });
 
   const visibleRepositoryAssets = sortedAssets.slice(0, visibleAssetsCount);
+  const cardCount = sortedAssets.length;
+  const singleCardCount = standaloneAssets.length;
+  const packageCardCount = packageGroups.length;
+  const masterFileCardCount = standaloneAssets.filter(a => assetContainsMasterFile(a)).length
+    + packageGroups.filter(g => g.assets.some(a => assetContainsMasterFile(a))).length;
   const allVisibleSelected = visibleRepositoryAssets.length > 0 && visibleRepositoryAssets.every(a => selectedAssetIds.has(a.id));
   const toggleSelectAll = () => {
     if (allVisibleSelected) setSelectedAssetIds(prev => { const next = new Set(prev); visibleRepositoryAssets.forEach(a => next.delete(a.id)); return next; });
@@ -1358,8 +1364,11 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-7xl font-black text-blue-600 leading-none tracking-tighter">{sortedAssets.length}</p>
-                    <p className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mt-3">Active Creative Nodes</p>
+                    <p className="text-7xl font-black text-blue-600 leading-none tracking-tighter">{cardCount}</p>
+                    <p className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mt-3">Cards</p>
+                    <p className="text-[10px] text-gray-500 mt-1.5">
+                      {singleCardCount} single · {packageCardCount} package{packageCardCount === 1 ? '' : 's'} · {masterFileCardCount} master file{masterFileCardCount === 1 ? '' : 's'}
+                    </p>
                     {canEdit && (
                       <div className="flex items-center gap-4 mt-2">
                         <label className="flex items-center gap-2 cursor-pointer text-[11px] font-black uppercase tracking-widest text-gray-500 hover:text-gray-700">

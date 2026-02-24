@@ -5,21 +5,46 @@ import DownloadFormatModal from './DownloadFormatModal';
 import JSZip from 'jszip';
 import { storageService } from '../services/storageService';
 
+// In-memory caches so switching filters doesn't regenerate thumbnails (survives unmount/remount)
+const imageThumbCache = new Map<string, { thumbnail: string; updatedAt: number }>();
+const videoThumbCache = new Map<string, string>();
+
+function getCachedImageThumb(assetId: string, assetUpdatedAt: number): string | null {
+  const mem = imageThumbCache.get(assetId);
+  if (mem && mem.updatedAt === assetUpdatedAt) return mem.thumbnail;
+  try {
+    const raw = localStorage.getItem(`img_thumb_${assetId}`);
+    if (!raw) return null;
+    const parsed = JSON.parse(raw);
+    if (parsed.updatedAt === assetUpdatedAt && parsed.thumbnail) {
+      imageThumbCache.set(assetId, { thumbnail: parsed.thumbnail, updatedAt: parsed.updatedAt });
+      return parsed.thumbnail;
+    }
+  } catch {
+    // ignore
+  }
+  return null;
+}
+
 // Image Thumbnail Component - only loads thumbnail, full image on preview
 const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdatedAt: number; title: string }> = ({ imageUrl, assetId, assetUpdatedAt, title }) => {
-  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [thumbnailUrl, setThumbnailUrl] = useState<string | null>(() => getCachedImageThumb(assetId, assetUpdatedAt));
+  const [isLoaded, setIsLoaded] = useState(() => !!getCachedImageThumb(assetId, assetUpdatedAt));
 
   useEffect(() => {
-    // Check cache first
     const cacheKey = `img_thumb_${assetId}`;
+    const fromMem = imageThumbCache.get(assetId);
+    if (fromMem && fromMem.updatedAt === assetUpdatedAt && fromMem.thumbnail) {
+      setThumbnailUrl(fromMem.thumbnail);
+      setIsLoaded(true);
+      return;
+    }
     const cacheData = localStorage.getItem(cacheKey);
-    
     if (cacheData) {
       try {
         const cached = JSON.parse(cacheData);
-        // Check if asset has been updated since cache
         if (cached.updatedAt === assetUpdatedAt && cached.thumbnail) {
+          imageThumbCache.set(assetId, { thumbnail: cached.thumbnail, updatedAt: cached.updatedAt });
           setThumbnailUrl(cached.thumbnail);
           setIsLoaded(true);
           return;
@@ -82,17 +107,12 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (ctx) {
-          ctx.drawImage(img, 0, 0, width, height);
           const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+          imageThumbCache.set(assetId, { thumbnail, updatedAt: assetUpdatedAt });
           setThumbnailUrl(thumbnail);
           setIsLoaded(true);
-          
-          // Cache the thumbnail
           try {
-            localStorage.setItem(cacheKey, JSON.stringify({
-              thumbnail,
-              updatedAt: assetUpdatedAt
-            }));
+            localStorage.setItem(cacheKey, JSON.stringify({ thumbnail, updatedAt: assetUpdatedAt }));
           } catch (e) {
             console.warn('Failed to cache thumbnail:', e);
           }
@@ -159,35 +179,42 @@ interface AssetCardProps {
 const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, username, onPreview, onShare, onEdit, onDelete, onRestore, isTrashView = false, isSelected = false, onToggleSelect }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
-  const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
-  const [packageSectionCollapsed, setPackageSectionCollapsed] = useState(true);
-  const videoRef = useRef<HTMLVideoElement>(null);
   const isPackage = packageAssets.length > 1;
-  
-  // Get the preview asset for package (use packagePreviewAssetId if set, otherwise first asset)
   const previewAsset = isPackage 
     ? (asset.packagePreviewAssetId 
         ? packageAssets.find(a => a.id === asset.packagePreviewAssetId) || packageAssets[0]
         : packageAssets[0])
     : asset;
+  const [videoThumbnail, setVideoThumbnail] = useState<string | null>(() => {
+    if (previewAsset.type === 'video' && previewAsset.url)
+      return videoThumbCache.get(previewAsset.url) ?? localStorage.getItem(`video_thumb_${previewAsset.url}`);
+    return null;
+  });
+  const [packageSectionCollapsed, setPackageSectionCollapsed] = useState(true);
+  const videoRef = useRef<HTMLVideoElement>(null);
   const isHighPerformer = (asset.ctr && asset.ctr > 2) || (asset.cr && asset.cr > 1.5);
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
   const canDelete = userRole === 'Editor' || userRole === 'Admin'; // Editor can now delete
   const associatedModels = [...new Set([asset.carModel, ...(asset.carModels || [])].filter(Boolean))];
 
-  // Generate video thumbnail - cached in localStorage
+  // Generate video thumbnail - cached in memory + localStorage (so filter switches don't regenerate)
   useEffect(() => {
-    if (previewAsset.type === 'video' && previewAsset.url && videoRef.current) {
-      // Check cache first
-      const cacheKey = `video_thumb_${previewAsset.url}`;
-      const cached = localStorage.getItem(cacheKey);
-      if (cached) {
-        setVideoThumbnail(cached);
-        return;
-      }
-      
-      const video = videoRef.current;
+    if (previewAsset.type !== 'video' || !previewAsset.url) return;
+    const cacheKey = `video_thumb_${previewAsset.url}`;
+    const fromMem = videoThumbCache.get(previewAsset.url);
+    if (fromMem) {
+      setVideoThumbnail(fromMem);
+      return;
+    }
+    const fromLs = localStorage.getItem(cacheKey);
+    if (fromLs) {
+      videoThumbCache.set(previewAsset.url, fromLs);
+      setVideoThumbnail(fromLs);
+      return;
+    }
+    if (!videoRef.current) return;
+    const video = videoRef.current;
       const videoUrl = getThumbnailVideoUrl(previewAsset.url);
       let isMov = false;
       try {
@@ -220,16 +247,14 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             canvas.height = video.videoHeight;
             const ctx = canvas.getContext('2d');
             if (ctx) {
-              ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
               const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+              videoThumbCache.set(previewAsset.url, thumbnailUrl);
               setVideoThumbnail(thumbnailUrl);
-              // Save to cache
               try {
                 localStorage.setItem(cacheKey, thumbnailUrl);
               } catch (e) {
                 console.warn('Failed to cache thumbnail:', e);
               }
-              console.log('Video thumbnail generated and cached');
             }
           }
         } catch (err) {
@@ -384,6 +409,18 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     }
     return 'file';
   };
+
+  // True if file is PSD, ZIP, RAR, etc. - show master file placeholder instead of trying image
+  const isMasterFileExtension = (a: Asset): boolean => {
+    const name = (a.originalFileName || a.url || '').toLowerCase();
+    const ext = name.split('.').pop()?.replace(/\?.*$/, '') || '';
+    return ['zip', 'rar', 'psd', 'ai', 'eps', 'pdf'].includes(ext);
+  };
+
+  const showMasterFilePlaceholder =
+    previewAsset.type === 'design' ||
+    assetContainsMasterFile(asset) ||
+    isMasterFileExtension(previewAsset);
 
   const convertImageFormat = async (imageUrl: string, format: 'webp' | 'png' | 'jpg'): Promise<Blob> => {
     return new Promise((resolve, reject) => {
@@ -671,7 +708,16 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
       {/* Visual Preview */}
       <div className="relative h-56 bg-gray-50 flex items-center justify-center overflow-hidden">
-        {previewAsset.type === 'image' && previewAsset.url && (
+        {showMasterFilePlaceholder && (
+          <div className="p-6 bg-orange-50/50 flex flex-col items-center justify-center gap-3 text-center min-h-full w-full">
+            <div className="w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center flex-shrink-0">
+              <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
+            </div>
+            <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">MASTER FILE</span>
+            <span className="text-[10px] font-bold text-orange-700 truncate max-w-full px-2 break-all text-center" title={getDisplayFilename(previewAsset)}>{getDisplayFilename(previewAsset)}</span>
+          </div>
+        )}
+        {!showMasterFilePlaceholder && previewAsset.type === 'image' && previewAsset.url && (
           <ImageThumbnail 
             imageUrl={previewAsset.url}
             assetId={previewAsset.id}
@@ -679,7 +725,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             title={previewAsset.title}
           />
         )}
-        {previewAsset.type === 'video' && previewAsset.url && (
+        {!showMasterFilePlaceholder && previewAsset.type === 'video' && previewAsset.url && (
             <div className="relative w-full h-full bg-gray-900">
                {videoThumbnail ? (
                  <img 
@@ -740,16 +786,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                </div>
             </div>
         )}
-        {((previewAsset.type === 'design') || (assetContainsMasterFile(asset) && previewAsset.type !== 'image' && previewAsset.type !== 'video')) && (
-           <div className="p-6 bg-orange-50/50 flex flex-col items-center justify-center gap-3 text-center min-h-full">
-              <div className="w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center flex-shrink-0">
-                <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
-              </div>
-              <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">MASTER FILE</span>
-              <span className="text-[10px] font-bold text-orange-700 truncate max-w-full px-2 break-all text-center" title={getDisplayFilename(previewAsset)}>{getDisplayFilename(previewAsset)}</span>
-           </div>
-        )}
-        {asset.type === 'text' && (
+        {!showMasterFilePlaceholder && asset.type === 'text' && (
           <div className="p-8 w-full h-full overflow-hidden relative bg-blue-50/50">
             <p className="text-gray-800 text-sm italic font-serif leading-relaxed line-clamp-5">"{asset.content}"</p>
           </div>
