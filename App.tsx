@@ -1725,9 +1725,12 @@ function App() {
       {/* Preview Modal */}
       {previewAsset && (() => {
         const isPackage = previewPackageAssets.length > 1;
-        const currentAsset = previewPackageAssets[currentPreviewIndex] || previewAsset;
-        const canGoPrev = isPackage && currentPreviewIndex > 0;
-        const canGoNext = isPackage && currentPreviewIndex < previewPackageAssets.length - 1;
+        const safePreviewIndex = isPackage
+          ? Math.min(Math.max(currentPreviewIndex, 0), previewPackageAssets.length - 1)
+          : 0;
+        const currentAsset = previewPackageAssets[safePreviewIndex] || previewAsset;
+        const canGoPrev = isPackage && safePreviewIndex > 0;
+        const canGoNext = isPackage && safePreviewIndex < previewPackageAssets.length - 1;
 
         // Download function for preview modal
         const handleDownloadAsset = async (asset: Asset, e?: React.MouseEvent) => {
@@ -1798,7 +1801,13 @@ function App() {
                   <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
                     {canGoPrev && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setCurrentPreviewIndex(prev => Math.max(0, prev - 1)); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentPreviewIndex(prev => {
+                            const maxIndex = Math.max(0, previewPackageAssets.length - 1);
+                            return Math.min(maxIndex, Math.max(0, prev - 1));
+                          });
+                        }}
                         className="p-1.5 hover:bg-gray-100 rounded-full transition-all"
                         title="Previous asset"
                       >
@@ -1808,11 +1817,17 @@ function App() {
                       </button>
                     )}
                     <span className="text-xs font-black text-gray-700 px-2">
-                      {currentPreviewIndex + 1} / {previewPackageAssets.length}
+                      {safePreviewIndex + 1} / {previewPackageAssets.length}
                     </span>
                     {canGoNext && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setCurrentPreviewIndex(prev => Math.min(previewPackageAssets.length - 1, prev + 1)); }}
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          setCurrentPreviewIndex(prev => {
+                            const maxIndex = Math.max(0, previewPackageAssets.length - 1);
+                            return Math.min(maxIndex, Math.max(0, prev + 1));
+                          });
+                        }}
                         className="p-1.5 hover:bg-gray-100 rounded-full transition-all"
                         title="Next asset"
                       >

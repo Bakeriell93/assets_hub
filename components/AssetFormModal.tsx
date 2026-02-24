@@ -359,7 +359,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             platform: (selectedPlatforms[0] || platform) as Platform,
             platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
             carModel: primaryCarModel,
-            ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
+            // Always send carModels on edit so removed models are persisted.
+            carModels: processedCarModels.length > 1 ? processedCarModels : [],
             objectives: selectedObjectives,
             usageRights,
             uploadedBy: uploaderName || 'Anonymous',
@@ -395,7 +396,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         platform: (selectedPlatforms[0] || platform) as Platform,
         platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
         carModel: primaryCarModel,
-        ...(processedCarModels.length > 1 ? { carModels: processedCarModels } : {}),
+        // Always send carModels on edit so removed models are persisted.
+        carModels: processedCarModels.length > 1 ? processedCarModels : [],
         objectives: selectedObjectives,
         usageRights,
         uploadedBy: uploaderName || 'Anonymous',
