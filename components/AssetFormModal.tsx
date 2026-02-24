@@ -64,6 +64,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [isConvertToPackage, setIsConvertToPackage] = useState(false);
   const [newFilesForConvert, setNewFilesForConvert] = useState<File[]>([]);
   const [newFilesForConvertTitles, setNewFilesForConvertTitles] = useState<Record<number, string>>({});
+  const [projectFoldersExpanded, setProjectFoldersExpanded] = useState(false);
   
   const [ctr, setCtr] = useState<string>('');
   const [cpl, setCpl] = useState<string>('');
@@ -250,10 +251,6 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
-    if (selectedObjectives.length === 0) {
-      alert("Please select at least one campaign objective.");
-      return;
-    }
     if (selectedCarModels.length === 0) {
       alert("Please select at least one car model.");
       return;
@@ -827,7 +824,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Campaign Objectives (Select all that apply)</label>
+                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Campaign objectives (optional)</label>
                     <div className="flex flex-wrap gap-2 mt-1">
                         {OBJECTIVES.map(obj => (
                             <button
@@ -847,12 +844,18 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                 </div>
 
                 <div>
-                    <label className="block text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1">Project folder (optional)</label>
+                    <label
+                      className="flex items-center gap-2 cursor-pointer text-xs font-bold text-gray-500 uppercase tracking-tighter mb-1.5 ml-1"
+                      onClick={() => setProjectFoldersExpanded(prev => !prev)}
+                    >
+                      <svg className={`w-4 h-4 transition-transform ${projectFoldersExpanded ? 'rotate-90' : ''}`} fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" /></svg>
+                      Project folder (optional)
+                    </label>
                     {collections.length === 0 ? (
                       <div className="text-xs text-gray-400 font-bold bg-gray-50 border-2 border-gray-100 rounded-2xl p-4">
                         No projects yet. Create one in the Projects tab to link assets.
                       </div>
-                    ) : (
+                    ) : projectFoldersExpanded ? (
                       <div className="mt-1 space-y-0 max-h-48 overflow-y-auto border-2 border-gray-100 rounded-xl p-3 bg-gray-50">
                         {(() => {
                           const renderCollectionNode = (c: Collection, depth: number) => (
@@ -873,6 +876,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                           return buildCollectionTree(null).map(c => renderCollectionNode(c, 0));
                         })()}
                       </div>
+                    ) : (
+                      <p className="text-[10px] text-gray-400 mt-0.5">Click to expand and select folders</p>
                     )}
                 </div>
 
@@ -881,24 +886,6 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     <select value={usageRights} onChange={(e) => setUsageRights(e.target.value as UsageRights)} className={inputClasses}>
                         {USAGE_RIGHTS.map(r => <option className="text-gray-900 bg-white" key={r} value={r}>{r}</option>)}
                     </select>
-                </div>
-
-                <div className="bg-gray-50 p-5 rounded-2xl border-2 border-gray-100">
-                    <p className="text-[10px] font-black text-blue-600 uppercase tracking-widest mb-4">Performance Metrics</p>
-                    <div className="grid grid-cols-3 gap-4">
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 ml-1">CTR (%)</label>
-                            <input type="number" step="0.01" value={ctr} onChange={(e) => setCtr(e.target.value)} className="w-full rounded-lg border-gray-300 border-2 p-2.5 text-sm font-bold outline-none bg-white text-gray-900 shadow-sm" placeholder="0.00" />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 ml-1">CR (%)</label>
-                            <input type="number" step="0.01" value={cr} onChange={(e) => setCr(e.target.value)} className="w-full rounded-lg border-gray-300 border-2 p-2.5 text-sm font-bold outline-none bg-white text-gray-900 shadow-sm" placeholder="0.00" />
-                        </div>
-                        <div>
-                            <label className="block text-[10px] font-bold text-gray-500 mb-1 ml-1">CPL (€)</label>
-                            <input type="number" step="0.01" value={cpl} onChange={(e) => setCpl(e.target.value)} className="w-full rounded-lg border-gray-300 border-2 p-2.5 text-sm font-bold outline-none bg-white text-gray-900 shadow-sm" placeholder="0.00" />
-                        </div>
-                    </div>
                 </div>
 
                 {/* Show package asset name editor when editing a package */}
