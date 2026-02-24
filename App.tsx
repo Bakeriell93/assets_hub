@@ -449,7 +449,7 @@ const VideoPlayerComponent: React.FC<{
   };
   
   return (
-    <div className="w-full flex-1 min-h-0 flex items-center justify-center bg-black p-4 relative overflow-hidden">
+    <div className="w-full flex items-center justify-center bg-black p-6 relative">
       {videoError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 p-8 text-center">
           <div className="max-w-md">
@@ -475,7 +475,7 @@ const VideoPlayerComponent: React.FC<{
       <video 
         ref={videoRef}
         key={videoUrl}
-        className="plyr__video-embed w-auto h-auto max-w-full max-h-[calc(90vh-12rem)] object-contain"
+        className="plyr__video-embed w-full h-auto max-h-[90vh]"
         playsInline
         preload={originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn') ? 'auto' : 'metadata'}
         muted={false}
@@ -647,12 +647,14 @@ function App() {
     try {
       // Editing should UPDATE, not create a new asset.
       if (editingAsset) {
-        // Build updates: include every field from the form so all changes persist
+        // Build updates object, preserving important fields
         const updates: Partial<Asset> = {
           title: data.title,
           type: data.type,
           market: data.market,
           platform: data.platform,
+          carModel: data.carModel,
+          ...(data.carModels ? { carModels: data.carModels } : {}),
           objectives: data.objectives,
           usageRights: data.usageRights,
           uploadedBy: data.uploadedBy,
@@ -661,30 +663,16 @@ function App() {
           cr: data.cr,
           comments: data.comments,
           content: data.content,
+          // Preserve these fields from original asset
           url: editingAsset.url,
           size: editingAsset.size,
           status: editingAsset.status,
           createdAt: editingAsset.createdAt,
+          // Only include collectionIds if it's provided and not undefined
+          ...(data.collectionIds !== undefined ? { collectionIds: data.collectionIds } : {}),
         };
-        // Normalize models so removing models always overwrites old stored arrays.
-        const normalizedCarModels = Array.isArray(data.carModels)
-          ? data.carModels.filter(Boolean)
-          : (data.carModel ? [data.carModel] : []);
-        if (normalizedCarModels.length > 0) {
-          updates.carModel = normalizedCarModels[0];
-          updates.carModels = normalizedCarModels;
-        } else {
-          if (data.carModel !== undefined) updates.carModel = data.carModel;
-          if (data.carModels !== undefined) updates.carModels = data.carModels;
-        }
-        if (data.collectionIds !== undefined) updates.collectionIds = data.collectionIds;
-        if (data.brand !== undefined) updates.brand = data.brand;
-        if (data.brands !== undefined) updates.brands = data.brands;
-        if (data.platforms !== undefined) updates.platforms = data.platforms;
-        if (data.assetTypes !== undefined) updates.assetTypes = data.assetTypes;
-
+        
         await storageService.updateAsset(editingAsset.id, updates);
-        setAssets(prev => prev.map(a => a.id === editingAsset.id ? { ...a, ...updates } as Asset : a));
         setEditingAsset(null);
         setIsAssetModalOpen(false);
         return;
@@ -1805,42 +1793,39 @@ function App() {
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}></div>
             <div className="relative max-w-6xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
               {/* Header with package navigation - only show in full view */}
-              <div className="absolute top-4 left-4 right-4 z-20 flex items-center justify-between pointer-events-none">
-                <div className="pointer-events-auto flex items-center gap-2">
-                  {isPackage && previewViewMode === 'full' && (
-                    <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
+              <div className="absolute top-4 left-4 right-4 z-10 flex items-center justify-between">
+                {isPackage && previewViewMode === 'full' && (
+                  <div className="flex items-center gap-2 bg-white/90 backdrop-blur-sm rounded-full px-4 py-2 shadow-lg">
+                    {canGoPrev && (
                       <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCurrentPreviewIndex(prev => Math.max(0, prev - 1)); }}
-                        disabled={!canGoPrev}
-                        className="p-1.5 hover:bg-gray-100 rounded-full transition-all disabled:opacity-40 disabled:pointer-events-none"
+                        onClick={(e) => { e.stopPropagation(); setCurrentPreviewIndex(prev => Math.max(0, prev - 1)); }}
+                        className="p-1.5 hover:bg-gray-100 rounded-full transition-all"
                         title="Previous asset"
                       >
                         <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                         </svg>
                       </button>
-                      <span className="text-xs font-black text-gray-700 px-2 min-w-[4rem] text-center">
-                        {currentPreviewIndex + 1} / {previewPackageAssets.length}
-                      </span>
+                    )}
+                    <span className="text-xs font-black text-gray-700 px-2">
+                      {currentPreviewIndex + 1} / {previewPackageAssets.length}
+                    </span>
+                    {canGoNext && (
                       <button
-                        type="button"
-                        onClick={(e) => { e.preventDefault(); e.stopPropagation(); setCurrentPreviewIndex(prev => Math.min(previewPackageAssets.length - 1, prev + 1)); }}
-                        disabled={!canGoNext}
-                        className="p-1.5 hover:bg-gray-100 rounded-full transition-all disabled:opacity-40 disabled:pointer-events-none"
+                        onClick={(e) => { e.stopPropagation(); setCurrentPreviewIndex(prev => Math.min(previewPackageAssets.length - 1, prev + 1)); }}
+                        className="p-1.5 hover:bg-gray-100 rounded-full transition-all"
                         title="Next asset"
                       >
                         <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                           <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 5l7 7-7 7" />
                         </svg>
                       </button>
-                    </div>
-                  )}
-                </div>
-                <button
-                  type="button"
+                    )}
+                  </div>
+                )}
+                <button 
                   onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}
-                  className="pointer-events-auto p-3 bg-white/90 hover:bg-white rounded-full transition-all shadow-lg ml-auto"
+                  className="p-3 bg-white/90 hover:bg-white rounded-full transition-all shadow-lg ml-auto"
                 >
                   <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
                 </button>
@@ -1881,8 +1866,8 @@ function App() {
                 </div>
               )}
               
-              {/* Asset Preview Content - min-h-0 so flex shrinks and video + controls stay in view */}
-              <div className="flex-1 min-h-0 overflow-y-auto flex flex-col">
+              {/* Asset Preview Content */}
+              <div className="flex-1 overflow-y-auto">
                 {isPackage && previewViewMode === 'grid' ? (
                   <div className="p-6">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -2031,23 +2016,18 @@ function App() {
                 }
               };
               
-              // Direct playback - Firebase Storage URLs work when Content-Type is video/mp4
-              // IMPORTANT: Run gsutil command to update existing files metadata first!
-              const videoUrl = currentAsset.url;
-              
+              const videoUrl = getVideoUrl(currentAsset.url);
+              const videoFormat = detectVideoFormat(currentAsset.url);
+              const ext = currentAsset.url.toLowerCase().split('.').pop()?.split('?')[0] || '';
+              const isLikelyUnsupported = ['mov', 'qt', 'apcn', 'avi', 'wmv', 'flv', 'mkv', 'vob', '3gp', '3g2'].includes(ext);
+
               return (
-                <div className="flex-1 min-h-0 flex items-center justify-center bg-black overflow-hidden p-4">
-                  <video 
-                    key={currentAsset.id}
-                    controls 
-                    preload="auto"
-                    playsInline
-                    className="max-w-full max-h-[calc(90vh-12rem)] w-auto h-auto object-contain"
-                  >
-                    <source src={videoUrl} type="video/mp4" />
-                    Your browser does not support the video tag.
-                  </video>
-                </div>
+                <VideoPlayerComponent
+                  videoUrl={videoUrl}
+                  videoFormat={videoFormat}
+                  isLikelyUnsupported={isLikelyUnsupported}
+                  originalUrl={currentAsset.url}
+                />
               );
             })()}
                     {currentAsset.type === 'text' && (

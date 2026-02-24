@@ -295,16 +295,17 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     });
   };
 
-  const handleMoveModel = async (brand: Brand, model: string, direction: 'up' | 'down') => {
-    const list = [...(modelsForBrand(brand))];
-    const idx = list.indexOf(model);
-    if (idx < 0) return;
-    const newIdx = direction === 'up' ? idx - 1 : idx + 1;
-    if (newIdx < 0 || newIdx >= list.length) return;
-    [list[idx], list[newIdx]] = [list[newIdx], list[idx]];
+  const handleMoveModelInBrand = async (brand: Brand, model: string, direction: 'up' | 'down') => {
     const brandsList = config.brands ?? BRANDS;
     const nextByBrand: Record<string, string[]> = {};
-    brandsList.forEach(b => { nextByBrand[b] = b === brand ? list : [...(config.modelsByBrand?.[b] ?? config.models)]; });
+    brandsList.forEach(b => { nextByBrand[b] = [...(config.modelsByBrand?.[b] ?? config.models)]; });
+    const list = [...(nextByBrand[brand] ?? [])];
+    const idx = list.indexOf(model);
+    if (idx < 0) return;
+    const targetIdx = direction === 'up' ? idx - 1 : idx + 1;
+    if (targetIdx < 0 || targetIdx >= list.length) return;
+    [list[idx], list[targetIdx]] = [list[targetIdx], list[idx]];
+    nextByBrand[brand] = list;
     await storageService.saveSystemConfig({
       ...config,
       modelsByBrand: nextByBrand,
@@ -702,32 +703,32 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                             + Add model to {brand}
                           </button>
                         )}
-                        <div className="flex flex-col gap-2">
-                          {modelsForBrand(brand).map((model, idx) => (
-                            <div key={model} className="group relative px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-2">
+                        <div className="flex flex-wrap gap-3">
+                          {modelsForBrand(brand).map((model, idx, arr) => (
+                            <div key={model} className="group relative px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-3">
+                              {model}
                               <button
                                 type="button"
-                                onClick={() => handleMoveModel(brand, model, 'up')}
+                                onClick={() => handleMoveModelInBrand(brand, model, 'up')}
                                 disabled={idx === 0}
-                                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:pointer-events-none"
+                                className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 title="Move up"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleMoveModel(brand, model, 'down')}
-                                disabled={idx === modelsForBrand(brand).length - 1}
-                                className="p-1 rounded-lg text-gray-400 hover:text-gray-700 disabled:opacity-30 disabled:pointer-events-none"
+                                onClick={() => handleMoveModelInBrand(brand, model, 'down')}
+                                disabled={idx === arr.length - 1}
+                                className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
                                 title="Move down"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
                               </button>
-                              <span className="flex-1 min-w-0">{model}</span>
                               <button
                                 type="button"
                                 onClick={() => handleRemoveModelFromBrand(brand, model)}
-                                className="text-gray-300 hover:text-red-500 transition-colors p-1"
+                                className="text-gray-300 hover:text-red-500 transition-colors"
                               >
                                 <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                               </button>
