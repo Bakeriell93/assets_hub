@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { User, UserRole, Asset, SystemConfig, Brand, BRANDS, Market } from '../types';
+import { User, UserRole, Asset, SystemConfig, Brand, BRANDS, Market, MARKETS, CAR_MODELS, DENZA_MODELS, getAssetBrands } from '../types';
 import { storageService, SecurityLog, DownloadLog, LoginLog } from '../services/storageService';
 import { storage } from '../services/firebase';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
@@ -321,6 +321,74 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     });
   };
 
+  /** Recover markets and models from existing assets (adds missing; does not remove). */
+  const handleRecoverFromAssets = async () => {
+    const active = assets.filter(a => !a.deletedAt);
+    const inferredMarkets = [...new Set(active.map(a => a.market).filter(Boolean))];
+    const inferredModels = [...new Set(active.flatMap(a => [a.carModel, ...(a.carModels || [])].filter(Boolean)))];
+    const byBrand: Record<string, string[]> = {};
+    active.forEach(a => {
+      const brands = getAssetBrands(a);
+      const models = [a.carModel, ...(a.carModels || [])].filter(Boolean);
+      brands.forEach(b => {
+        if (!byBrand[b]) byBrand[b] = [];
+        models.forEach(m => { if (m && !byBrand[b].includes(m)) byBrand[b].push(m); });
+      });
+    });
+    const nextMarkets = [...new Set([...config.markets, ...inferredMarkets])];
+    const nextModels = [...new Set([...config.models, ...inferredModels])];
+    const brandsList = config.brands ?? BRANDS;
+    const nextByBrand = buildModelsByBrandMap();
+    brandsList.forEach(b => {
+      const existing = nextByBrand[b] ?? [];
+      const fromAssets = byBrand[b] ?? [];
+      nextByBrand[b] = [...new Set([...existing, ...fromAssets])];
+    });
+    Object.keys(byBrand).forEach(b => {
+      if (!brandsList.includes(b)) brandsList.push(b);
+      const existing = nextByBrand[b] ?? [];
+      nextByBrand[b] = [...new Set([...existing, ...(byBrand[b] ?? [])])];
+    });
+    await storageService.saveSystemConfig({
+      ...config,
+      markets: nextMarkets,
+      models: nextModels,
+      brands: [...new Set(brandsList)],
+      modelsByBrand: nextByBrand,
+    });
+  };
+
+  /** Default model list per brand (BYD vs Denza get different lists). */
+  const getDefaultModelsForBrand = (brand: Brand): string[] =>
+    brand === 'Denza' ? [...DENZA_MODELS] : [...CAR_MODELS];
+
+  /** Restore default markets, models, and fill empty brand model lists (Denza gets Denza models, not BYD). */
+  const handleRestoreDefaults = async () => {
+    const nextMarkets = [...new Set([...config.markets, ...MARKETS])];
+    const defaultModelsUnion = [...new Set([...CAR_MODELS, ...DENZA_MODELS])];
+    const nextModels = [...new Set([...config.models, ...defaultModelsUnion])];
+    const brandsList = config.brands ?? BRANDS;
+    const nextByBrand = { ...(config.modelsByBrand && Object.keys(config.modelsByBrand).length > 0 ? config.modelsByBrand : {}) };
+    brandsList.forEach(b => {
+      const defaults = getDefaultModelsForBrand(b);
+      const current = nextByBrand[b];
+      if (b === 'Denza') {
+        // Denza gets only Denza models (fix BYD models duplicated under Denza)
+        nextByBrand[b] = [...DENZA_MODELS];
+      } else if (!current || current.length === 0) {
+        nextByBrand[b] = [...defaults];
+      } else {
+        nextByBrand[b] = [...new Set([...current, ...defaults])];
+      }
+    });
+    await storageService.saveSystemConfig({
+      ...config,
+      markets: nextMarkets,
+      models: nextModels,
+      modelsByBrand: nextByBrand,
+    });
+  };
+
   const totalBytes = assets.reduce((acc, asset) => acc + (asset.size || resolvedAssetSizes[asset.id] || 0), 0);
   const storageFormatted = formatSize(totalBytes);
 
@@ -563,6 +631,30 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
 
             {activeTab === 'config' && (
               <div className="space-y-12 animate-in fade-in duration-500">
+                {/* Recover metadata — first under System Metadata so Restore is visible */}
+                {!isEditor && (
+                  <div className="bg-amber-50/80 p-12 rounded-[56px] border border-amber-200 shadow-sm">
+                    <h4 className="text-xs font-black text-amber-900 uppercase tracking-[0.4em] mb-2">Recover metadata</h4>
+                    <p className="text-[11px] text-amber-800 mb-8">Restore missing markets or models (e.g. Denza) from existing assets or from default lists. Existing entries are never removed.</p>
+                    <div className="flex flex-wrap gap-4">
+                      <button
+                        type="button"
+                        onClick={handleRecoverFromAssets}
+                        className="px-6 py-3 bg-amber-100 text-amber-800 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-amber-200 hover:bg-amber-200 transition-all"
+                      >
+                        Recover from assets
+                      </button>
+                      <button
+                        type="button"
+                        onClick={handleRestoreDefaults}
+                        className="px-6 py-3 bg-blue-50 text-blue-700 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-blue-200 hover:bg-blue-100 transition-all"
+                      >
+                        Restore default markets &amp; models
+                      </button>
+                    </div>
+                  </div>
+                )}
+
                 {(['markets', 'platforms'] as const).map(type => (
                    <div key={type} className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
                       <div className="flex items-center justify-between mb-10">
@@ -685,12 +777,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                 </div>
                 <div className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
                   <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Models by brand</h4>
-                  <p className="text-xs text-gray-500 mb-8">Add car models and assign them to each brand. Editors and Admins can manage models.</p>
+                  <p className="text-xs text-gray-500 mb-8">Admins can add, remove, and reorder car models per brand. Editors can view only.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     {(config.brands ?? BRANDS).map(brand => (
                       <div key={brand} className="bg-white p-8 rounded-3xl border border-gray-200">
                         <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-6">{brand} models</h5>
-                        {addingModelForBrand === brand ? (
+                        {!isEditor && addingModelForBrand === brand ? (
                           <form onSubmit={handleAddModelForBrand} className="flex gap-3 mb-6">
                             <input
                               autoFocus
@@ -703,7 +795,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                             <button type="submit" className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg></button>
                             <button type="button" onClick={() => { setAddingModelForBrand(null); setNewModelValue(''); }} className="p-3 bg-gray-100 text-gray-500 rounded-2xl"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
                           </form>
-                        ) : (
+                        ) : !isEditor ? (
                           <button
                             type="button"
                             onClick={() => setAddingModelForBrand(brand)}
@@ -711,36 +803,40 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                           >
                             + Add model to {brand}
                           </button>
-                        )}
+                        ) : null}
                         <div className="flex flex-wrap gap-3">
                           {modelsForBrand(brand).map((model, idx, arr) => (
                             <div key={model} className="group relative px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-3">
                               {model}
-                              <button
-                                type="button"
-                                onClick={() => handleMoveModelInBrand(brand, model, 'up')}
-                                disabled={idx === 0}
-                                className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="Move up"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleMoveModelInBrand(brand, model, 'down')}
-                                disabled={idx === arr.length - 1}
-                                className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                title="Move down"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                              </button>
-                              <button
-                                type="button"
-                                onClick={() => handleRemoveModelFromBrand(brand, model)}
-                                className="text-gray-300 hover:text-red-500 transition-colors"
-                              >
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
-                              </button>
+                              {!isEditor && (
+                                <>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveModelInBrand(brand, model, 'up')}
+                                    disabled={idx === 0}
+                                    className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title="Move up"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleMoveModelInBrand(brand, model, 'down')}
+                                    disabled={idx === arr.length - 1}
+                                    className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                    title="Move down"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                  </button>
+                                  <button
+                                    type="button"
+                                    onClick={() => handleRemoveModelFromBrand(brand, model)}
+                                    className="text-gray-300 hover:text-red-500 transition-colors"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
+                                  </button>
+                                </>
+                              )}
                             </div>
                           ))}
                         </div>

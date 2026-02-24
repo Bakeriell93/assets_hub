@@ -5,6 +5,8 @@ export type CarModel = string;
 
 export const MARKETS: Market[] = ['PL', 'CH', 'NL', 'DE', 'IT', 'FR'];
 export const CAR_MODELS: CarModel[] = ['Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i', 'Atto 2', 'Sealion 7'];
+/** Default models for Denza brand (BYD–Mercedes JV). */
+export const DENZA_MODELS: CarModel[] = ['D9', 'N7', 'N8'];
 export const PLATFORMS: Platform[] = ['Google', 'Meta', 'Video', 'DOOH', 'Banner'];
 
 export type AssetType = 'image' | 'video' | 'text' | 'design';
