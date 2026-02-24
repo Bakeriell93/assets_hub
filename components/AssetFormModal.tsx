@@ -587,7 +587,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     <input type="checkbox" checked={containsMasterFile} onChange={(e) => setContainsMasterFile(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-blue-600" />
                     <span className="text-xs font-bold text-gray-700">Contains master file?</span>
                   </label>
-                  <p className="text-[10px] text-gray-500 mt-0.5 ml-6">When checked, a label is shown on the asset card.</p>
+                  <p className="text-[10px] text-gray-500 mt-0.5 ml-6">When checked, a label is shown on the asset card. Tip: upload the master as a ZIP file.</p>
                 </div>
 
                 {(isPackageMode || (editingAsset && editingPackageAssets.length > 1)) && (
@@ -983,16 +983,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                                       className="w-full h-full object-cover"
                                     />
                                   ) : (
-                                    <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                                      {pkgAsset.type === 'image' ? (
-                                        <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                        </svg>
-                                      ) : (
-                                        <svg className="w-6 h-6 text-gray-400" fill="currentColor" viewBox="0 0 24 24">
-                                          <path d="M8 5v14l11-7z" />
-                                        </svg>
-                                      )}
+                                    <div className="w-full h-full bg-gray-200 flex flex-col items-center justify-center px-2 text-center">
+                                      <span className="text-[9px] font-black text-gray-700 uppercase tracking-widest">MASTER</span>
+                                      <span className="text-[8px] text-gray-500 mt-1 line-clamp-2" title={getCleanFilename(pkgAsset)}>{getCleanFilename(pkgAsset)}</span>
                                     </div>
                                   )}
                                   {isSelected && (
@@ -1286,10 +1279,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                                                 className="w-full h-full object-cover"
                                               />
                                             ) : (
-                                              <div className="w-full h-full bg-gray-200 flex items-center justify-center">
-                                                <svg className="w-6 h-6 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                </svg>
+                                              <div className="w-full h-full bg-gray-200 flex flex-col items-center justify-center px-2 text-center">
+                                                <span className="text-[9px] font-black text-gray-700 uppercase tracking-widest">MASTER</span>
+                                                <span className="text-[8px] text-gray-500 mt-1 line-clamp-2" title={f.name}>{f.name}</span>
                                               </div>
                                             )}
                                             {isSelected && (

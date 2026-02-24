@@ -522,6 +522,7 @@ function App() {
   const [selectedMarket, setSelectedMarket] = useState<Market | 'All'>('All');
   const [selectedModel, setSelectedModel] = useState<CarModel | 'All'>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
+  const [selectedMasterFilter, setSelectedMasterFilter] = useState<'All' | 'Master'>('All');
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -546,6 +547,7 @@ function App() {
   const [uploadStatus, setUploadStatus] = useState<string>('');
   const [selectedAssetIds, setSelectedAssetIds] = useState<Set<string>>(new Set());
   const [isBulkEditOpen, setIsBulkEditOpen] = useState(false);
+  const [sharedAssetIds, setSharedAssetIds] = useState<Set<string> | null>(null);
 
   // Restore session from localStorage on mount
   useEffect(() => {
@@ -560,6 +562,39 @@ function App() {
       console.warn('Failed to restore session:', err);
       localStorage.removeItem(SESSION_STORAGE_KEY);
     }
+  }, []);
+
+  // If URL has ?shared=id1,id2, show only those assets.
+  useEffect(() => {
+    const applySharedFromUrl = () => {
+      try {
+        const params = new URLSearchParams(window.location.search);
+        const raw = params.get('shared');
+        if (!raw) {
+          setSharedAssetIds(null);
+          return;
+        }
+        const ids = raw
+          .split(',')
+          .map(s => decodeURIComponent(s.trim()))
+          .filter(Boolean);
+        setSharedAssetIds(new Set(ids));
+        // Reset filters so shared links always show requested assets.
+        setSelectedBrand('All');
+        setSelectedMarket('All');
+        setSelectedModel('All');
+        setSelectedPlatform('All');
+        setSelectedMasterFilter('All');
+      } catch (e) {
+        console.warn('Failed to parse shared URL:', e);
+        setSharedAssetIds(null);
+      }
+    };
+
+    applySharedFromUrl();
+    const onPopState = () => applySharedFromUrl();
+    window.addEventListener('popstate', onPopState);
+    return () => window.removeEventListener('popstate', onPopState);
   }, []);
 
   // Load previewed assets cache from localStorage on mount
@@ -871,7 +906,28 @@ function App() {
     return terms.every(t => haystack.includes(t));
   };
 
+  const buildShareUrl = (ids: string[]): string => {
+    const encodedIds = ids.map(id => encodeURIComponent(id)).join(',');
+    const url = new URL(window.location.href);
+    url.searchParams.set('shared', encodedIds);
+    return url.toString();
+  };
+
+  const copyShareUrl = async (ids: string[]) => {
+    if (ids.length === 0) return;
+    const url = buildShareUrl(ids);
+    try {
+      await navigator.clipboard.writeText(url);
+      alert('Share link copied to clipboard.');
+    } catch {
+      // Fallback for environments without clipboard permission
+      window.prompt('Copy this share link:', url);
+    }
+  };
+
   const filteredAssets = assets.filter(a => {
+    if (sharedAssetIds && !sharedAssetIds.has(a.id)) return false;
+
     // In trash view, only show deleted assets. In other views, exclude deleted assets.
     if (viewMode === 'trash') {
       if (!a.deletedAt) return false; // Not deleted, don't show in trash
@@ -889,13 +945,14 @@ function App() {
     const brandMatch = selectedBrand === 'All' || assetBrandsNorm.includes(selectedBrandNorm);
     const mMatch = selectedMarket === 'All' || a.market === selectedMarket;
     const modelMatch = selectedModel === 'All' || assetModelsNorm.includes(selectedModelNorm);
+    const masterMatch = selectedMasterFilter === 'All' || !!a.containsMasterFile;
     const platformMatch = (a.platforms && a.platforms.length ? a.platforms.includes(selectedPlatform) : (a.platform === selectedPlatform));
     const videoContentMatch = selectedPlatform === 'Video' && assetMatchesType(a, 'video');
     const pMatch = selectedPlatform === 'All' || platformMatch || videoContentMatch;
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
-    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch;
+    return brandMatch && mMatch && modelMatch && masterMatch && pMatch && objMatch && cMatch && sMatch;
   });
 
   // Group assets by packageId - show only the first asset of each package, or standalone assets
@@ -1053,6 +1110,30 @@ function App() {
                     {p}
                   </button>
                 ))}
+              {(['All', 'Master'] as const).map(v => (
+                <button
+                  key={`master-${v}`}
+                  onClick={() => setSelectedMasterFilter(v)}
+                  className={`whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 ${
+                    selectedMasterFilter === v ? 'bg-purple-600 border-purple-600 text-white shadow-xl' : 'bg-white text-gray-400 border-gray-100 hover:border-purple-300'
+                  }`}
+                >
+                  {v === 'All' ? 'Master files: All' : 'Master files only'}
+                </button>
+              ))}
+              {sharedAssetIds && (
+                <button
+                  onClick={() => {
+                    setSharedAssetIds(null);
+                    const url = new URL(window.location.href);
+                    url.searchParams.delete('shared');
+                    window.history.replaceState({}, '', url.toString());
+                  }}
+                  className="whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
+                >
+                  Shared view active - clear
+                </button>
+              )}
             </div>
           )}
         </header>
@@ -1139,9 +1220,18 @@ function App() {
                           Select all
                         </label>
                         {selectedAssetIds.size > 0 && (
-                          <button type="button" onClick={() => setIsBulkEditOpen(true)} className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg">
-                            Bulk edit ({selectedAssetIds.size})
-                          </button>
+                          <>
+                            <button
+                              type="button"
+                              onClick={() => copyShareUrl(Array.from(selectedAssetIds))}
+                              className="px-6 py-3 bg-purple-600 hover:bg-purple-700 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg"
+                            >
+                              Share selected ({selectedAssetIds.size})
+                            </button>
+                            <button type="button" onClick={() => setIsBulkEditOpen(true)} className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg">
+                              Bulk edit ({selectedAssetIds.size})
+                            </button>
+                          </>
                         )}
                       </div>
                     )}
@@ -1243,6 +1333,22 @@ function App() {
                                       </svg>
                                     </button>
                                   )}
+                                  <button
+                                    type="button"
+                                    onClick={(e) => {
+                                      e.stopPropagation();
+                                      const ids = packageAssets && packageAssets.length > 0
+                                        ? packageAssets.map(a => a.id)
+                                        : [asset.id];
+                                      copyShareUrl(ids);
+                                    }}
+                                    className="p-1.5 rounded-lg text-gray-500 hover:bg-purple-100 hover:text-purple-600 transition-all flex-shrink-0"
+                                    title="Share"
+                                  >
+                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C9.356 12.511 10.336 12 11.429 12h2.142c1.891 0 3.429 1.567 3.429 3.5S15.462 19 13.571 19h-2.143C9.538 19 8 17.433 8 15.5M15.316 10.658C14.644 11.489 13.664 12 12.571 12h-2.143C8.538 12 7 10.433 7 8.5S8.538 5 10.429 5h2.142C14.462 5 16 6.567 16 8.5" />
+                                    </svg>
+                                  </button>
                                 </div>
                               </td>
                               <td className="px-4 py-2 text-xs text-gray-600">{brandDisplay}</td>
@@ -1275,6 +1381,12 @@ function App() {
                             setPreviewAsset(asset);
                             setPreviewPackageAssets(packageAssets || [asset]);
                             setCurrentPreviewIndex(0);
+                          }}
+                          onShare={(asset, packageAssets) => {
+                            const ids = packageAssets && packageAssets.length > 0
+                              ? packageAssets.map(a => a.id)
+                              : [asset.id];
+                            copyShareUrl(ids);
                           }}
                           onEdit={(a) => { 
                             setEditingAsset(a);
@@ -1616,6 +1728,12 @@ function App() {
                           setPreviewPackageAssets(packageAssets || [asset]);
                           setCurrentPreviewIndex(0);
                         }}
+                            onShare={(asset, packageAssets) => {
+                              const ids = packageAssets && packageAssets.length > 0
+                                ? packageAssets.map(a => a.id)
+                                : [asset.id];
+                              copyShareUrl(ids);
+                            }}
                             onEdit={(a) => { 
                           setEditingAsset(a);
                           // Get package assets if this is part of a package

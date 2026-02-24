@@ -147,6 +147,7 @@ interface AssetCardProps {
   userRole: UserRole;
   username?: string; // For download logs (shared account)
   onPreview: (asset: Asset, packageAssets?: Asset[]) => void;
+  onShare?: (asset: Asset, packageAssets?: Asset[]) => void;
   onEdit: (asset: Asset) => void;
   onDelete: (id: string) => void;
   onRestore?: (id: string) => void;
@@ -155,7 +156,7 @@ interface AssetCardProps {
   onToggleSelect?: (e: React.MouseEvent) => void;
 }
 
-const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, username, onPreview, onEdit, onDelete, onRestore, isTrashView = false, isSelected = false, onToggleSelect }) => {
+const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], userRole, username, onPreview, onShare, onEdit, onDelete, onRestore, isTrashView = false, isSelected = false, onToggleSelect }) => {
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(null);
@@ -770,6 +771,12 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                 className="bg-gray-900 px-4 py-2.5 rounded-2xl text-white hover:bg-black transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-1.5 whitespace-nowrap"
               >
                 Preview
+              </button>
+              <button
+                onClick={(e) => { e.stopPropagation(); onShare?.(asset, isPackage ? packageAssets : undefined); }}
+                className="bg-purple-600 px-4 py-2.5 rounded-2xl text-white hover:bg-purple-700 transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest flex items-center gap-1.5 whitespace-nowrap"
+              >
+                Share
               </button>
             </div>
 
