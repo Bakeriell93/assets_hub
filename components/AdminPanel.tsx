@@ -21,6 +21,7 @@ const isSuperAdmin = (user: User | null): boolean => {
 
 const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users, currentUser }) => {
   const isEditor = currentUser.role === 'Editor';
+  const isAdmin = currentUser.role === 'Admin';
   const [activeTab, setActiveTab] = useState<'users' | 'config' | 'stats' | 'security' | 'downloads'>(isEditor ? 'config' : 'users');
   const [downloadLogs, setDownloadLogs] = useState<DownloadLog[]>([]);
   const [loginLogs, setLoginLogs] = useState<LoginLog[]>([]);
@@ -720,7 +721,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                    <div key={type} className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
                       <div className="flex items-center justify-between mb-10">
                           <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">{type} Node Registry</h4>
-                          {!isEditor && (!isAddingConfig || isAddingConfig !== type) && (
+                          {(!isAddingConfig || isAddingConfig !== type) && (
                             <button 
                               onClick={() => setIsAddingConfig(type)} 
                               className="px-6 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
@@ -728,7 +729,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                               + Register {type.slice(0, -1)}
                             </button>
                           )}
-                          {!isEditor && isAddingConfig === type && (
+                          {isAddingConfig === type && (
                             <form onSubmit={handleAddConfigSubmit} className="flex gap-3">
                                <input 
                                   autoFocus
@@ -761,20 +762,18 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                               ) : (
                                 <>
                                   {item}
-                                  {!isEditor && (
-                                    <>
-                                      <button onClick={() => { setEditingConfigItem({ type, oldValue: item }); setEditingConfigNewValue(item); }} className="text-gray-300 hover:text-blue-600 transition-colors" title="Rename (updates config and existing assets)">
-                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
-                                      </button>
-                                      <button onClick={() => {
-                                          storageService.saveSystemConfig({
-                                              ...config,
-                                              [type]: config[type].filter(i => i !== item)
-                                          });
-                                      }} className="text-gray-200 hover:text-red-500 transition-colors">
-                                          <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-                                      </button>
-                                    </>
+                                  <button onClick={() => { setEditingConfigItem({ type, oldValue: item }); setEditingConfigNewValue(item); }} className="text-gray-300 hover:text-blue-600 transition-colors" title="Rename (updates config and existing assets)">
+                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.232 5.232l3.536 3.536m-2.036-5.036a2.5 2.5 0 113.536 3.536L6.5 21.036H3v-3.572L16.732 3.732z" /></svg>
+                                  </button>
+                                  {isAdmin && (
+                                    <button onClick={() => {
+                                        storageService.saveSystemConfig({
+                                            ...config,
+                                            [type]: config[type].filter(i => i !== item)
+                                        });
+                                    }} className="text-gray-200 hover:text-red-500 transition-colors">
+                                        <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                                    </button>
                                   )}
                                 </>
                               )}
@@ -788,7 +787,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                 <div className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
                   <div className="flex items-center justify-between mb-10">
                     <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em]">Brands Node Registry</h4>
-                    {!isEditor && (!isAddingConfig || isAddingConfig !== 'brands') && (
+                    {(!isAddingConfig || isAddingConfig !== 'brands') && (
                       <button
                         onClick={() => setIsAddingConfig('brands')}
                         className="px-6 py-3 bg-blue-50 text-blue-600 rounded-2xl text-[11px] font-black uppercase tracking-widest border border-blue-100 hover:bg-blue-600 hover:text-white transition-all shadow-sm"
@@ -796,7 +795,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                         + Register brand
                       </button>
                     )}
-                    {!isEditor && isAddingConfig === 'brands' && (
+                    {isAddingConfig === 'brands' && (
                       <form onSubmit={async (e) => {
                         e.preventDefault();
                         const val = newConfigValue.trim();
@@ -824,7 +823,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                     {(config.brands ?? BRANDS).map(b => (
                       <div key={b} className="group relative px-6 py-4 bg-white border border-gray-200 rounded-3xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-5 hover:border-blue-500 hover:shadow-2xl transition-all">
                         {b}
-                        {!isEditor && (
+                        {isAdmin && (
                           <button onClick={() => {
                             const brands = (config.brands ?? BRANDS).filter(x => x !== b);
                             storageService.saveSystemConfig({ ...config, brands: brands.length ? brands : [...BRANDS] });
@@ -838,12 +837,12 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                 </div>
                 <div className="bg-gray-50 p-12 rounded-[56px] border border-gray-100 shadow-sm">
                   <h4 className="text-xs font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Models by brand</h4>
-                  <p className="text-xs text-gray-500 mb-8">Admins can add, remove, and reorder car models per brand. Editors can view only.</p>
+                  <p className="text-xs text-gray-500 mb-8">Editors and Admins can add and reorder models. Only Admins can delete metadata.</p>
                   <div className="grid grid-cols-1 md:grid-cols-2 gap-10">
                     {(config.brands ?? BRANDS).map(brand => (
                       <div key={brand} className="bg-white p-8 rounded-3xl border border-gray-200">
                         <h5 className="text-[11px] font-black text-gray-500 uppercase tracking-widest mb-6">{brand} models</h5>
-                        {!isEditor && addingModelForBrand === brand ? (
+                        {addingModelForBrand === brand ? (
                           <form onSubmit={handleAddModelForBrand} className="flex gap-3 mb-6">
                             <input
                               autoFocus
@@ -856,7 +855,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                             <button type="submit" className="p-3 bg-blue-600 text-white rounded-2xl shadow-lg"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" /></svg></button>
                             <button type="button" onClick={() => { setAddingModelForBrand(null); setNewModelValue(''); }} className="p-3 bg-gray-100 text-gray-500 rounded-2xl"><svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg></button>
                           </form>
-                        ) : !isEditor ? (
+                        ) : (
                           <button
                             type="button"
                             onClick={() => setAddingModelForBrand(brand)}
@@ -864,31 +863,31 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                           >
                             + Add model to {brand}
                           </button>
-                        ) : null}
+                        )}
                         <div className="flex flex-wrap gap-3">
                           {modelsForBrand(brand).map((model, idx, arr) => (
                             <div key={model} className="group relative px-4 py-3 bg-gray-50 border border-gray-200 rounded-2xl text-[12px] font-black text-gray-900 uppercase tracking-tight flex items-center gap-3">
                               {model}
-                              {!isEditor && (
-                                <>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleMoveModelInBrand(brand, model, 'up')}
-                                    disabled={idx === 0}
-                                    className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                    title="Move up"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
-                                  </button>
-                                  <button
-                                    type="button"
-                                    onClick={() => handleMoveModelInBrand(brand, model, 'down')}
-                                    disabled={idx === arr.length - 1}
-                                    className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
-                                    title="Move down"
-                                  >
-                                    <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
-                                  </button>
+                              <>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveModelInBrand(brand, model, 'up')}
+                                  disabled={idx === 0}
+                                  className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                  title="Move up"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 15l7-7 7 7" /></svg>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => handleMoveModelInBrand(brand, model, 'down')}
+                                  disabled={idx === arr.length - 1}
+                                  className="text-gray-300 hover:text-blue-500 transition-colors disabled:opacity-30 disabled:cursor-not-allowed"
+                                  title="Move down"
+                                >
+                                  <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" /></svg>
+                                </button>
+                                {isAdmin && (
                                   <button
                                     type="button"
                                     onClick={() => handleRemoveModelFromBrand(brand, model)}
@@ -896,8 +895,8 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                                   >
                                     <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" /></svg>
                                   </button>
-                                </>
-                              )}
+                                )}
+                              </>
                             </div>
                           ))}
                         </div>
