@@ -647,14 +647,17 @@ function App() {
     try {
       // Editing should UPDATE, not create a new asset.
       if (editingAsset) {
-        // Build updates object, preserving important fields
+        // Use modal payload directly so all editable metadata (brand/models/platforms/etc.) is persisted.
         const updates: Partial<Asset> = {
           title: data.title,
           type: data.type,
+          assetTypes: data.assetTypes,
           market: data.market,
           platform: data.platform,
+          platforms: data.platforms,
           carModel: data.carModel,
-          ...(data.carModels ? { carModels: data.carModels } : {}),
+          // Keep empty array when user removes extra models.
+          ...(Array.isArray(data.carModels) ? { carModels: data.carModels } : {}),
           objectives: data.objectives,
           usageRights: data.usageRights,
           uploadedBy: data.uploadedBy,
@@ -663,13 +666,14 @@ function App() {
           cr: data.cr,
           comments: data.comments,
           content: data.content,
+          collectionIds: data.collectionIds,
+          brand: data.brand,
+          brands: data.brands,
           // Preserve these fields from original asset
           url: editingAsset.url,
           size: editingAsset.size,
           status: editingAsset.status,
           createdAt: editingAsset.createdAt,
-          // Only include collectionIds if it's provided and not undefined
-          ...(data.collectionIds !== undefined ? { collectionIds: data.collectionIds } : {}),
         };
         
         await storageService.updateAsset(editingAsset.id, updates);
