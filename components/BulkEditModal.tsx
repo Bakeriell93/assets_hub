@@ -16,7 +16,7 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, onSave, 
   const [market, setMarket] = useState<string>(AS_IS);
   const [platform, setPlatform] = useState<string>(AS_IS);
   const [carModelsAsIs, setCarModelsAsIs] = useState(true);
-  const modelsList = getModelsForBrand(config, 'All');
+  const modelsList = getModelsForBrand(config, brand || 'All');
   const [carModel, setCarModel] = useState<CarModel>(modelsList[0] || CAR_MODELS[0]);
   const [selectedCarModels, setSelectedCarModels] = useState<CarModel[]>([]);
   const [customCarModel, setCustomCarModel] = useState('');
@@ -71,15 +71,22 @@ const BulkEditModal: React.FC<BulkEditModalProps> = ({ isOpen, onClose, onSave, 
     e.preventDefault();
     // Only include fields the user explicitly changed; "As is" fields are omitted so existing values are kept
     const updates: Partial<Asset> = {};
-    if (brand) updates.brand = brand;
+    if (brand) {
+      updates.brand = brand;
+      updates.brands = [brand];
+    }
     if (market !== AS_IS) updates.market = market as Market;
-    if (platform !== AS_IS) updates.platform = platform as Platform;
+    if (platform !== AS_IS) {
+      updates.platform = platform as Platform;
+      updates.platforms = [platform as Platform];
+    }
     if (!carModelsAsIs) {
       const processedCarModels = selectedCarModels.length > 0
         ? selectedCarModels.map(m => m === 'Other' ? (customCarModel || m) : m)
         : (carModel === 'Other' ? [customCarModel || carModel] : [carModel]);
       updates.carModel = processedCarModels[0] || carModel;
-      if (processedCarModels.length > 1) updates.carModels = processedCarModels;
+      // Always set carModels in bulk edit so removing extra models persists.
+      updates.carModels = processedCarModels.length > 1 ? processedCarModels : [];
     }
     if (!objectivesAsIs) updates.objectives = selectedObjectives;
     if (usageRights !== AS_IS) updates.usageRights = usageRights as UsageRights;
