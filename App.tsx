@@ -669,6 +669,7 @@ function App() {
           collectionIds: data.collectionIds,
           brand: data.brand,
           brands: data.brands,
+          ...(data.containsMasterFile !== undefined ? { containsMasterFile: !!data.containsMasterFile } : {}),
           // Preserve these fields from original asset
           url: editingAsset.url,
           size: editingAsset.size,

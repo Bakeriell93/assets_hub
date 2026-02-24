@@ -55,6 +55,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     ? [...new Set(selectedBrands.flatMap(b => getModelsForBrand(config, b)))]
     : getModelsForBrand(config, brand);
   const [selectedPackageTypes, setSelectedPackageTypes] = useState<AssetType[]>(['image', 'video']);
+  const [containsMasterFile, setContainsMasterFile] = useState(false);
   
   const [ctr, setCtr] = useState<string>('');
   const [cpl, setCpl] = useState<string>('');
@@ -102,6 +103,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setSelectedAssetTypes(editingAsset.assetTypes?.length ? editingAsset.assetTypes : [editingAsset.type]);
       setPackageNote(editingAsset.packageNote || '');
       setSelectedPackageTypes(editingAsset.packageAssetTypes?.length ? editingAsset.packageAssetTypes : ['image', 'video']);
+      setContainsMasterFile(!!editingAsset.containsMasterFile);
       
       // If editing a package, initialize package asset titles
       if (editingPackageAssets.length > 1) {
@@ -159,6 +161,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setSelectedAssetTypes(['image']);
       setPackageNote('');
       setSelectedPackageTypes(['image', 'video']);
+      setContainsMasterFile(false);
     }
   }, [editingAsset, isOpen, config]);
 
@@ -312,6 +315,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
             packageNote: packageNote.trim() || undefined,
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
+            ...(containsMasterFile ? { containsMasterFile: true } : {}),
             ...(idx === previewAssetIndex ? { packagePreviewAssetId: 'temp_' + idx } : {})
           } as Omit<Asset, 'id' | 'createdAt'>,
           file: f
@@ -378,6 +382,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             brands: selectedBrands.length ? selectedBrands : undefined,
             packageNote: packageNote.trim() || undefined,
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
+            containsMasterFile: containsMasterFile,
             ...(newPreviewAssetId !== undefined ? { packagePreviewAssetId: newPreviewAssetId } : {}),
           };
           await storageService.updateAsset(pkgAsset.id, updates);
@@ -413,6 +418,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         collectionIds: selectedCollectionIds,
         brand: selectedBrands[0] || undefined,
         brands: selectedBrands.length ? selectedBrands : undefined,
+        containsMasterFile: containsMasterFile,
       };
       
       onSave(updates, file || undefined);
@@ -440,6 +446,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       comments: comments || undefined,
       brand: selectedBrands[0] || undefined,
       brands: selectedBrands.length ? selectedBrands : undefined,
+      ...(containsMasterFile ? { containsMasterFile: true } : {}),
     };
 
     onSave(data, file || undefined);
@@ -574,6 +581,14 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     </div>
                   </div>
                 )}
+
+                <div className="mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={containsMasterFile} onChange={(e) => setContainsMasterFile(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-blue-600" />
+                    <span className="text-xs font-bold text-gray-700">Contains master file?</span>
+                  </label>
+                  <p className="text-[10px] text-gray-500 mt-0.5 ml-6">When checked, a label is shown on the asset card.</p>
+                </div>
 
                 {(isPackageMode || (editingAsset && editingPackageAssets.length > 1)) && (
                   <div className="mb-4">
@@ -1038,7 +1053,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               type="file" 
                               required 
                               multiple
-                              accept={selectedPackageTypes.length > 1 ? '*/*' : selectedPackageTypes.includes('image') || selectedPackageTypes.includes('video') || selectedPackageTypes.includes('design') ? 'image/*,video/*,*/*' : '*/*'} 
+                              accept="*/*" 
                               onChange={async (e) => {
                                 const selectedFiles = Array.from(e.target.files || []);
                                 setFiles(selectedFiles);

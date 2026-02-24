@@ -84,6 +84,8 @@ export interface Asset {
   assetTypes?: AssetType[];
   // Soft delete (trash)
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
+  /** When true, show "Contains master file" label on the asset card */
+  containsMasterFile?: boolean;
 }
 
 export interface SystemConfig {

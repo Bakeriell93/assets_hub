@@ -821,6 +821,9 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         </div>
 
         <h3 className="text-sm font-bold text-gray-900 mb-1.5 tracking-tight leading-tight break-words">{asset.title}</h3>
+        {asset.containsMasterFile && (
+          <span className="inline-block px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider border border-amber-200 mb-2">Contains master file</span>
+        )}
         {asset.packageNote && (
           <p className="text-[10px] text-gray-500 mb-2 line-clamp-2" title={asset.packageNote}>{asset.packageNote}</p>
         )}
