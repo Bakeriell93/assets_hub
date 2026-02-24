@@ -108,6 +108,16 @@ export function getAssetPlatforms(a: { platform?: Platform; platforms?: Platform
   return (a.platforms && a.platforms.length ? a.platforms : (a.platform ? [a.platform] : []));
 }
 
+/** True if asset is a master file: has flag, type design, or file is zip/rar/psd. */
+export function assetContainsMasterFile(a: Asset): boolean {
+  if (a.containsMasterFile) return true;
+  if (a.type === 'design') return true;
+  if (a.assetTypes?.includes('design')) return true;
+  const name = (a.originalFileName || a.url || '').toLowerCase();
+  const ext = name.split('.').pop()?.replace(/\?.*$/, '') || '';
+  return ['zip', 'rar', 'psd', 'ai', 'eps'].includes(ext);
+}
+
 /** Models for a given brand; when brand is All or modelsByBrand unused, returns all models. */
 export function getModelsForBrand(config: SystemConfig, brand: Brand | 'All'): CarModel[] {
   const hasBrandSpecificModels = !!config.modelsByBrand && Object.keys(config.modelsByBrand).length > 0;

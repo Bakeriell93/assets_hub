@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Asset, UserRole, getAssetBrands, getAssetPlatforms } from '../types';
+import { Asset, UserRole, getAssetBrands, getAssetPlatforms, assetContainsMasterFile } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
 import JSZip from 'jszip';
 import { storageService } from '../services/storageService';
@@ -740,13 +740,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                </div>
             </div>
         )}
-        {((previewAsset.type === 'design') || (asset.containsMasterFile && previewAsset.type !== 'image' && previewAsset.type !== 'video')) && (
-           <div className="p-10 bg-orange-50/50 flex flex-col items-center justify-center gap-2 text-center">
-              <div className="w-16 h-16 bg-white rounded-3xl shadow-lg flex items-center justify-center">
+        {((previewAsset.type === 'design') || (assetContainsMasterFile(asset) && previewAsset.type !== 'image' && previewAsset.type !== 'video')) && (
+           <div className="p-6 bg-orange-50/50 flex flex-col items-center justify-center gap-3 text-center min-h-full">
+              <div className="w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center flex-shrink-0">
                 <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
               </div>
-              <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">Master file</span>
-              <span className="text-[10px] font-bold text-orange-700 truncate max-w-full px-2" title={getDisplayFilename(previewAsset)}>{getDisplayFilename(previewAsset)}</span>
+              <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">MASTER FILE</span>
+              <span className="text-[10px] font-bold text-orange-700 truncate max-w-full px-2 break-all text-center" title={getDisplayFilename(previewAsset)}>{getDisplayFilename(previewAsset)}</span>
            </div>
         )}
         {asset.type === 'text' && (
@@ -829,7 +829,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         </div>
 
         <h3 className="text-sm font-bold text-gray-900 mb-1.5 tracking-tight leading-tight break-words">{asset.title}</h3>
-        {asset.containsMasterFile && (
+        {assetContainsMasterFile(asset) && (
           <span className="inline-block px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider border border-amber-200 mb-2">Contains master file</span>
         )}
         {asset.packageNote && (

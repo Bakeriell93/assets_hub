@@ -13,7 +13,7 @@ import BulkEditModal from './components/BulkEditModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
-import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, AssetType, MARKETS, CAR_MODELS, PLATFORMS, getAssetBrands } from './types';
+import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, AssetType, MARKETS, CAR_MODELS, PLATFORMS, getAssetBrands, assetContainsMasterFile } from './types';
 
 type SortOption = 'newest' | 'alphabetical';
 type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
@@ -1095,7 +1095,7 @@ function App() {
     const objMatch = selectedObjectives.length === 0 || selectedObjectives.some(o => a.objectives?.includes(o));
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
-    const masterMatch = !masterFilesOnly || !!a.containsMasterFile;
+    const masterMatch = !masterFilesOnly || assetContainsMasterFile(a);
     return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch && masterMatch;
   });
 
@@ -2043,40 +2043,42 @@ function App() {
           <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}>
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}></div>
             <div className="relative max-w-6xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
-              {/* Close (X) - fixed top-right corner only */}
-              <button
-                onClick={(e) => { e.stopPropagation(); setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}
-                className="absolute top-4 right-4 z-[100] p-3 bg-white/95 hover:bg-white rounded-full shadow-xl border border-gray-100 transition-all"
-                title="Close"
-              >
-                <svg className="w-6 h-6 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
-              </button>
-
-              {/* Grid/Full toggle - fixed top-left (package only) */}
-              {isPackage && (
-                <div className="absolute top-4 left-4 z-[100] flex items-center gap-1 bg-white/95 backdrop-blur-sm rounded-full px-2 py-1.5 shadow-xl border border-gray-100">
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setPreviewViewMode('grid'); }}
-                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
-                      previewViewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Grid
-                  </button>
-                  <button
-                    onClick={(e) => { e.stopPropagation(); setPreviewViewMode('full'); }}
-                    className={`px-3 py-1 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
-                      previewViewMode === 'full' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
-                    }`}
-                  >
-                    Full
-                  </button>
+              {/* Fixed header bar: Grid/Full + Close (X) - never covered by grid */}
+              <div className="flex-shrink-0 flex items-center justify-between h-14 px-4 border-b border-gray-100 bg-white z-[200]">
+                <div className="flex items-center gap-2">
+                  {isPackage && (
+                    <>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPreviewViewMode('grid'); }}
+                        className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
+                          previewViewMode === 'grid' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        Grid
+                      </button>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setPreviewViewMode('full'); }}
+                        className={`px-3 py-1.5 rounded-full text-[10px] font-black uppercase tracking-wider transition-all ${
+                          previewViewMode === 'full' ? 'bg-blue-600 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'
+                        }`}
+                      >
+                        Full
+                      </button>
+                    </>
+                  )}
                 </div>
-              )}
+                <button
+                  onClick={(e) => { e.stopPropagation(); setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}
+                  className="p-2.5 hover:bg-gray-100 rounded-full transition-all"
+                  title="Close"
+                >
+                  <svg className="w-6 h-6 text-gray-700" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M6 18L18 6M6 6l12 12" /></svg>
+                </button>
+              </div>
 
-              {/* Prev/Next - left side below Grid/Full when package full view */}
+              {/* Prev/Next - overlay when package full view */}
               {isPackage && previewViewMode === 'full' && (
-                <div className="absolute top-14 left-4 z-[100] flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-xl border border-gray-100">
+                <div className="absolute top-20 left-4 z-[50] flex items-center gap-2 bg-white/95 backdrop-blur-sm rounded-full px-3 py-2 shadow-lg border border-gray-100">
                   {canGoPrev && (
                     <button
                       onClick={(e) => {
@@ -2105,11 +2107,11 @@ function App() {
                 </div>
               )}
 
-              {/* Download current asset - fixed bottom-left */}
+              {/* Download current asset - overlay in full view only */}
               {currentAsset.url && (currentAsset.type === 'image' || currentAsset.type === 'video' || currentAsset.type === 'design') && previewViewMode === 'full' && (
                 <button
                   onClick={(e) => handleDownloadAsset(currentAsset, e)}
-                  className="absolute bottom-4 left-4 z-[100] p-3 bg-white/95 hover:bg-white rounded-full shadow-xl border border-gray-100 transition-all"
+                  className="absolute bottom-20 left-4 z-[50] p-3 bg-white/95 hover:bg-white rounded-full shadow-lg border border-gray-100 transition-all"
                   title="Download current"
                 >
                   <svg className="w-5 h-5 text-gray-900" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -2118,56 +2120,8 @@ function App() {
                 </button>
               )}
 
-              {/* Download all as ZIP - fixed bottom-right (package only) */}
-              {isPackage && (() => {
-                const getDisplayFilename = (a: Asset) => a.originalFileName || (() => {
-                  try {
-                    const u = a.url?.split('?')[0] || '';
-                    const last = u.split('/').pop() || '';
-                    return decodeURIComponent(last).replace(/^\d+-/, '') || 'file';
-                  } catch { return 'file'; }
-                })();
-                const handleDownloadAllZip = async (e: React.MouseEvent) => {
-                  e.stopPropagation();
-                  try {
-                    const zip = new JSZip();
-                    for (const pkgAsset of previewPackageAssets) {
-                      if (!pkgAsset.url) continue;
-                      const res = await fetch(pkgAsset.url, { method: 'GET' });
-                      if (!res.ok) continue;
-                      const blob = await res.blob();
-                      zip.file(getDisplayFilename(pkgAsset), blob);
-                    }
-                    const zipBlob = await zip.generateAsync({ type: 'blob' });
-                    const url = URL.createObjectURL(zipBlob);
-                    const a = document.createElement('a');
-                    a.href = url;
-                    a.download = `${previewAsset?.title || 'package'}-${Date.now()}.zip`;
-                    a.rel = 'noopener';
-                    document.body.appendChild(a);
-                    a.click();
-                    document.body.removeChild(a);
-                    URL.revokeObjectURL(url);
-                    storageService.logDownload(previewAsset?.id || '', previewAsset?.title, 'zip', currentUser?.username);
-                  } catch (err) {
-                    console.error('ZIP download failed:', err);
-                    alert('Failed to create ZIP. Try downloading files individually.');
-                  }
-                };
-                return (
-                  <button
-                    onClick={handleDownloadAllZip}
-                    className="absolute bottom-4 right-4 z-[100] px-4 py-3 bg-white/95 hover:bg-white rounded-full shadow-xl border border-gray-100 transition-all flex items-center gap-2 text-[11px] font-black uppercase tracking-wider text-gray-900"
-                    title="Download all as ZIP"
-                  >
-                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
-                    ZIP all
-                  </button>
-                );
-              })()}
-              
-              {/* Asset Preview Content */}
-              <div className="flex-1 overflow-y-auto">
+              {/* Asset Preview Content - scrollable */}
+              <div className="flex-1 overflow-y-auto min-h-0">
                 {isPackage && previewViewMode === 'grid' ? (
                   <div className="p-6">
                     <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-4">
@@ -2378,6 +2332,56 @@ function App() {
                 )}
                 <p className="text-sm text-gray-600">Uploaded by {currentAsset.uploadedBy} • {new Date(currentAsset.createdAt).toLocaleDateString()}</p>
               </div>
+
+              {/* Fixed bottom bar: Download all (package only) */}
+              {isPackage && (() => {
+                const getDisplayFilename = (a: Asset) => a.originalFileName || (() => {
+                  try {
+                    const u = a.url?.split('?')[0] || '';
+                    const last = u.split('/').pop() || '';
+                    return decodeURIComponent(last).replace(/^\d+-/, '') || 'file';
+                  } catch { return 'file'; }
+                })();
+                const handleDownloadAllZip = async (e: React.MouseEvent) => {
+                  e.stopPropagation();
+                  try {
+                    const zip = new JSZip();
+                    for (const pkgAsset of previewPackageAssets) {
+                      if (!pkgAsset.url) continue;
+                      const res = await fetch(pkgAsset.url, { method: 'GET' });
+                      if (!res.ok) continue;
+                      const blob = await res.blob();
+                      zip.file(getDisplayFilename(pkgAsset), blob);
+                    }
+                    const zipBlob = await zip.generateAsync({ type: 'blob' });
+                    const url = URL.createObjectURL(zipBlob);
+                    const a = document.createElement('a');
+                    a.href = url;
+                    a.download = `${previewAsset?.title || 'package'}-${Date.now()}.zip`;
+                    a.rel = 'noopener';
+                    document.body.appendChild(a);
+                    a.click();
+                    document.body.removeChild(a);
+                    URL.revokeObjectURL(url);
+                    storageService.logDownload(previewAsset?.id || '', previewAsset?.title, 'zip', currentUser?.username);
+                  } catch (err) {
+                    console.error('ZIP download failed:', err);
+                    alert('Failed to create ZIP. Try downloading files individually.');
+                  }
+                };
+                return (
+                  <div className="flex-shrink-0 flex items-center justify-center py-3 px-4 border-t border-gray-100 bg-white">
+                    <button
+                      onClick={handleDownloadAllZip}
+                      className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl shadow-lg font-black text-[11px] uppercase tracking-wider flex items-center gap-2 transition-all"
+                      title="Download all as ZIP"
+                    >
+                      <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                      Download all
+                    </button>
+                  </div>
+                );
+              })()}
             </div>
           </div>
         );
