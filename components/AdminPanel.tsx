@@ -254,8 +254,22 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     setEditingConfigNewValue('');
   };
 
-  const modelsForBrand = (b: Brand): string[] =>
-    config.modelsByBrand?.[b] ?? config.models;
+  const buildModelsByBrandMap = (): Record<string, string[]> => {
+    const brandsList = config.brands ?? BRANDS;
+    const hasBrandSpecificModels = !!config.modelsByBrand && Object.keys(config.modelsByBrand).length > 0;
+    const nextByBrand: Record<string, string[]> = {};
+    brandsList.forEach(b => {
+      nextByBrand[b] = hasBrandSpecificModels
+        ? [...(config.modelsByBrand?.[b] ?? [])]
+        : [...config.models];
+    });
+    return nextByBrand;
+  };
+
+  const modelsForBrand = (b: Brand): string[] => {
+    const hasBrandSpecificModels = !!config.modelsByBrand && Object.keys(config.modelsByBrand).length > 0;
+    return hasBrandSpecificModels ? (config.modelsByBrand?.[b] ?? []) : config.models;
+  };
 
   const handleAddModelForBrand = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -267,11 +281,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
       setAddingModelForBrand(null);
       return;
     }
-    const brandsList = config.brands ?? BRANDS;
-    const nextByBrand: Record<string, string[]> = {};
-    brandsList.forEach(b => { nextByBrand[b] = [...(config.modelsByBrand?.[b] ?? config.models)]; });
+    const nextByBrand = buildModelsByBrandMap();
     nextByBrand[addingModelForBrand] = [...(nextByBrand[addingModelForBrand] ?? []), trimmed];
-    const allModels = [...new Set([...config.models, trimmed])];
+    const allModels = [...new Set([...Object.values(nextByBrand).flat(), ...config.models])];
     await storageService.saveSystemConfig({
       ...config,
       models: allModels,
@@ -283,8 +295,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
 
   const handleRemoveModelFromBrand = async (brand: Brand, model: string) => {
     const brandsList = config.brands ?? BRANDS;
-    const nextByBrand: Record<string, string[]> = {};
-    brandsList.forEach(b => { nextByBrand[b] = [...(config.modelsByBrand?.[b] ?? config.models)]; });
+    const nextByBrand = buildModelsByBrandMap();
     nextByBrand[brand] = (nextByBrand[brand] ?? []).filter(m => m !== model);
     const inOther = brandsList.some(b => b !== brand && (nextByBrand[b] ?? []).includes(model));
     const allModels = inOther ? config.models : config.models.filter(m => m !== model);
@@ -296,9 +307,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   };
 
   const handleMoveModelInBrand = async (brand: Brand, model: string, direction: 'up' | 'down') => {
-    const brandsList = config.brands ?? BRANDS;
-    const nextByBrand: Record<string, string[]> = {};
-    brandsList.forEach(b => { nextByBrand[b] = [...(config.modelsByBrand?.[b] ?? config.models)]; });
+    const nextByBrand = buildModelsByBrandMap();
     const list = [...(nextByBrand[brand] ?? [])];
     const idx = list.indexOf(model);
     if (idx < 0) return;

@@ -106,11 +106,14 @@ export function getAssetPlatforms(a: { platform?: Platform; platforms?: Platform
 
 /** Models for a given brand; when brand is All or modelsByBrand unused, returns all models. */
 export function getModelsForBrand(config: SystemConfig, brand: Brand | 'All'): CarModel[] {
-  if (brand !== 'All' && config.modelsByBrand?.[brand]?.length) return config.modelsByBrand[brand];
-  if (brand !== 'All') return config.models;
+  const hasBrandSpecificModels = !!config.modelsByBrand && Object.keys(config.modelsByBrand).length > 0;
+  if (brand !== 'All') {
+    if (hasBrandSpecificModels) return config.modelsByBrand?.[brand] ?? [];
+    return config.models;
+  }
   if (config.modelsByBrand && Object.keys(config.modelsByBrand).length > 0) {
     const all = Object.values(config.modelsByBrand).flat();
-    return [...new Set(all)];
+    if (all.length > 0) return [...new Set(all)];
   }
   return config.models;
 }
