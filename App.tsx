@@ -653,7 +653,6 @@ function App() {
           type: data.type,
           market: data.market,
           platform: data.platform,
-          carModel: data.carModel,
           objectives: data.objectives,
           usageRights: data.usageRights,
           uploadedBy: data.uploadedBy,
@@ -667,9 +666,18 @@ function App() {
           status: editingAsset.status,
           createdAt: editingAsset.createdAt,
         };
+        // Normalize models so removing models always overwrites old stored arrays.
+        const normalizedCarModels = Array.isArray(data.carModels)
+          ? data.carModels.filter(Boolean)
+          : (data.carModel ? [data.carModel] : []);
+        if (normalizedCarModels.length > 0) {
+          updates.carModel = normalizedCarModels[0];
+          updates.carModels = normalizedCarModels;
+        } else {
+          if (data.carModel !== undefined) updates.carModel = data.carModel;
+          if (data.carModels !== undefined) updates.carModels = data.carModels;
+        }
         if (data.collectionIds !== undefined) updates.collectionIds = data.collectionIds;
-        if (data.carModels !== undefined) updates.carModels = data.carModels;
-        else if (data.carModel !== undefined) updates.carModels = [data.carModel];
         if (data.brand !== undefined) updates.brand = data.brand;
         if (data.brands !== undefined) updates.brands = data.brands;
         if (data.platforms !== undefined) updates.platforms = data.platforms;
