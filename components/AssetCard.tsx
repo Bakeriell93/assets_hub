@@ -259,7 +259,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     : asset;
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(() => {
     if (previewAsset.type === 'video' && previewAsset.url)
-      return videoThumbCache.get(previewAsset.url) ?? localStorage.getItem(`video_thumb_${previewAsset.url}`);
+      return videoThumbCache.get(previewAsset.url) ?? localStorage.getItem(`video_thumb_${hashUrl(previewAsset.url)}`);
     return null;
   });
   const [packageSectionCollapsed, setPackageSectionCollapsed] = useState(true);
@@ -273,7 +273,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   // Generate video thumbnail - cached in memory + localStorage; useLayoutEffect so ref is set, with retry and multiple fallbacks
   useLayoutEffect(() => {
     if (previewAsset.type !== 'video' || !previewAsset.url) return;
-    const cacheKey = `video_thumb_${previewAsset.url}`;
+    const cacheKey = `video_thumb_${hashUrl(previewAsset.url)}`;
     const fromMem = videoThumbCache.get(previewAsset.url);
     if (fromMem) {
       setVideoThumbnail(fromMem);
@@ -311,10 +311,24 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         try {
           if (videoEl.readyState >= 2 && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
             const canvas = document.createElement('canvas');
-            canvas.width = videoEl.videoWidth;
-            canvas.height = videoEl.videoHeight;
+            // Keep card thumbnails lightweight for fast rendering and scrolling.
+            const maxSize = 480;
+            let width = videoEl.videoWidth;
+            let height = videoEl.videoHeight;
+            if (width > height) {
+              if (width > maxSize) {
+                height = (height * maxSize) / width;
+                width = maxSize;
+              }
+            } else if (height > maxSize) {
+              width = (width * maxSize) / height;
+              height = maxSize;
+            }
+            canvas.width = Math.max(1, Math.round(width));
+            canvas.height = Math.max(1, Math.round(height));
             const ctx = canvas.getContext('2d');
             if (ctx) {
+              ctx.drawImage(videoEl, 0, 0, canvas.width, canvas.height);
               const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
               videoThumbCache.set(previewAsset.url, thumbnailUrl);
               setVideoThumbnail(thumbnailUrl);
@@ -349,6 +363,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       const t1 = setTimeout(() => { if (videoEl.readyState >= 2) generateThumbnail(); }, 1500);
       const t2 = setTimeout(() => { if (videoEl.readyState >= 2) generateThumbnail(); }, 4000);
       const t3 = setTimeout(() => { if (videoEl.readyState >= 2) generateThumbnail(); }, 7000);
+      videoEl.load();
 
       return () => {
         videoEl.removeEventListener('loadedmetadata', onLoadedMetadata);

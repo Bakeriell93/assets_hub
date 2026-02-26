@@ -153,6 +153,31 @@ body {
   height: 20px !important;
   fill: #fff !important;
 }
+/* Reliable ASCII fallback icons when external Plyr sprite is unavailable. */
+.byd-video-player .plyr__controls .plyr__control svg {
+  display: none !important;
+}
+.byd-video-player .plyr__controls .plyr__control::before {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 13px;
+  font-weight: 800;
+  color: #fff;
+  line-height: 1;
+  content: '';
+}
+.byd-video-player .plyr__controls .plyr__control[data-plyr="restart"]::before { content: 'R'; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="rewind"]::before { content: '<<'; font-size: 11px; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="fast-forward"]::before { content: '>>'; font-size: 11px; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="play"]::before { content: '>'; font-size: 15px; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="play"].plyr__control--pressed::before { content: '||'; font-size: 11px; letter-spacing: 1px; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="mute"]::before { content: 'M'; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="mute"].plyr__control--pressed::before { content: 'Mx'; font-size: 11px; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="settings"]::before { content: 'S'; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="pip"]::before { content: 'PiP'; font-size: 10px; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="airplay"]::before { content: 'AP'; font-size: 10px; }
+.byd-video-player .plyr__controls .plyr__control[data-plyr="fullscreen"]::before { content: '[ ]'; font-size: 10px; }
 /* Time and progress in control bar */
 .byd-video-player .plyr__time {
   color: rgba(255, 255, 255, 0.98) !important;
