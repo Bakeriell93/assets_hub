@@ -301,6 +301,7 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
                 <div>
                   <p className="text-lg font-black text-gray-900">Click to select files</p>
                   <p className="text-sm text-gray-500 mt-1">Images, Videos, Design Files, or Text Files</p>
+                  <p className="text-[11px] text-amber-600/90 mt-1.5">Videos: use MP4 for in-browser preview. .MOV not supported — convert at <a href="https://cloudconvert.com/mov-to-mp4" target="_blank" rel="noopener noreferrer" className="underline">cloudconvert.com/mov-to-mp4</a> if needed.</p>
                 </div>
               </label>
             </div>

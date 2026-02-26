@@ -1470,6 +1470,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                             <div className="space-y-2 pointer-events-none">
                                 <p className="text-sm font-bold text-gray-600">{file ? file.name : `Select ${type} file`}</p>
                                 <p className="text-xs text-gray-400">High quality recommended</p>
+                                {(selectedAssetTypes[0] || type) === 'video' && (
+                                  <p className="text-[11px] text-amber-600/90 mt-1">For best compatibility use MP4. .MOV cannot be previewed in the browser — convert at <a href="https://cloudconvert.com/mov-to-mp4" target="_blank" rel="noopener noreferrer" className="underline pointer-events-auto">cloudconvert.com/mov-to-mp4</a> if needed.</p>
+                                )}
                             </div>
                         </div>
                     )}

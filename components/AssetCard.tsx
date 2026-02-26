@@ -363,7 +363,6 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         video.removeEventListener('loadeddata', generateThumbnail);
         clearTimeout(timeoutId);
       };
-    }
   }, [previewAsset.type, previewAsset.url]);
 
   const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';

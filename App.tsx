@@ -268,7 +268,16 @@ const VideoPlayerComponent: React.FC<{
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
   const overlaidObserverRef = useRef<MutationObserver | null>(null);
-  
+  // Force-hide Plyr's blue center button (injected once so it wins over any CSS load order)
+  useEffect(() => {
+    const id = 'byd-hide-plyr-center';
+    if (document.getElementById(id)) return;
+    const style = document.createElement('style');
+    style.id = id;
+    style.textContent = '.byd-video-player .plyr__control--overlaid, .byd-video-player .plyr > button.plyr__control, .byd-video-player .plyr [data-plyr="play"].plyr__control--overlaid { display: none !important; visibility: hidden !important; opacity: 0 !important; width: 0 !important; height: 0 !important; overflow: hidden !important; position: absolute !important; left: -9999px !important; }';
+    document.head.appendChild(style);
+  }, []);
+
   const togglePlayPause = () => {
     if (!playerRef.current || videoError) return;
     const plyr = playerRef.current;
@@ -2232,6 +2241,24 @@ function App() {
                       />
                     )}
                     {currentAsset.type === 'video' && currentAsset.url && (() => {
+              const ext = currentAsset.url.toLowerCase().split('.').pop()?.split('?')[0] || '';
+              const isMovOnly = ['mov', 'qt', 'apcn'].includes(ext);
+              if (isMovOnly) {
+                return (
+                  <div className="byd-video-player w-full flex items-center justify-center bg-black p-6 relative min-h-[320px]">
+                    <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20 p-8 text-center">
+                      <div className="max-w-md">
+                        <svg className="w-16 h-16 text-amber-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+                        </svg>
+                        <h3 className="text-xl font-black text-white mb-2 uppercase tracking-wider">Video format cannot be played in the browser</h3>
+                        <p className="text-sm text-gray-300 mb-4">.MOV / QuickTime files are not supported for in-browser preview. Download the file to watch it.</p>
+                        <a href={currentAsset.url} download className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-blue-700 transition-all">Download Video</a>
+                      </div>
+                    </div>
+                  </div>
+                );
+              }
               // Use proxy only when needed (e.g., MOV conversion)
               const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
               const isAllowedProxyHost = (u: URL) => {
@@ -2317,8 +2344,8 @@ function App() {
               
               const videoUrl = getVideoUrl(currentAsset.url);
               const videoFormat = detectVideoFormat(currentAsset.url);
-              const ext = currentAsset.url.toLowerCase().split('.').pop()?.split('?')[0] || '';
-              const isLikelyUnsupported = ['mov', 'qt', 'apcn', 'avi', 'wmv', 'flv', 'mkv', 'vob', '3gp', '3g2'].includes(ext);
+              const extOther = currentAsset.url.toLowerCase().split('.').pop()?.split('?')[0] || '';
+              const isLikelyUnsupported = ['avi', 'wmv', 'flv', 'mkv', 'vob', '3gp', '3g2'].includes(extOther);
 
               return (
                 <VideoPlayerComponent
