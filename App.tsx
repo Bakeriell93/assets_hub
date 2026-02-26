@@ -253,7 +253,7 @@ const VideoThumbnail: React.FC<{ videoUrl: string; title: string }> = ({ videoUr
   );
 };
 
-// Video Player Component with Plyr for better format support
+// Video Player Component with Plyr: YouTube-style click to play/pause, buffering indicator, no blue circle
 const VideoPlayerComponent: React.FC<{
   videoUrl: string;
   videoFormat: string | null;
@@ -261,25 +261,47 @@ const VideoPlayerComponent: React.FC<{
   originalUrl: string;
 }> = ({ videoUrl, videoFormat, isLikelyUnsupported, originalUrl }) => {
   const [videoError, setVideoError] = useState<string | null>(null);
+  const [isPlaying, setIsPlaying] = useState(false);
+  const [isBuffering, setIsBuffering] = useState(false);
+  const [showCenterIcon, setShowCenterIcon] = useState(true);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
   
+  const togglePlayPause = () => {
+    if (!playerRef.current || videoError) return;
+    const plyr = playerRef.current;
+    if (plyr.playing) {
+      plyr.pause();
+    } else {
+      plyr.play();
+    }
+  };
+  
   useEffect(() => {
     if (videoRef.current && !playerRef.current) {
-      // Initialize Plyr player with better MOV/APCN support
-      try {
-        const isMov = originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn');
-        
-        // Configure video element for better MOV streaming
-        // Use 'metadata' instead of 'auto' to reduce bandwidth - only load metadata, not full video
-        if (videoRef.current && isMov) {
-          videoRef.current.preload = 'metadata'; // Only preload metadata, not entire video
-          videoRef.current.load(); // Force load
+      const video = videoRef.current;
+      const isMov = originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn');
+      
+      const onPlay = () => { setIsPlaying(true); setIsBuffering(false); setShowCenterIcon(false); };
+      const onPause = () => { setIsPlaying(false); setShowCenterIcon(true); };
+      const onWaiting = () => { setIsBuffering(true); };
+      const onCanPlay = () => { setIsBuffering(false); };
+      const onPlaying = () => { setIsBuffering(false); };
+      const onError = (e: Event) => {
+        const el = e.currentTarget as HTMLVideoElement;
+        const error = el.error;
+        if (isMov && error?.code === 4) {
+          setTimeout(() => { if (el.error?.code === 4) setVideoError('format'); }, 2000);
+        } else if (error?.code === 4 || error?.message?.includes('Format') || error?.message?.includes('decode') || error?.message?.includes('MEDIA_ELEMENT_ERROR')) {
+          setVideoError('format');
+        } else {
+          setVideoError('network');
         }
-        
-        playerRef.current = new Plyr(videoRef.current, {
+      };
+      
+      try {
+        playerRef.current = new Plyr(video, {
           controls: [
-            'play-large',
             'restart',
             'rewind',
             'play',
@@ -298,103 +320,62 @@ const VideoPlayerComponent: React.FC<{
           keyboard: { focused: true, global: false },
           tooltips: { controls: true, seek: true },
           autoplay: false,
-          clickToPlay: true,
+          clickToPlay: false,
           hideControls: true,
           resetOnEnd: false,
           disableContextMenu: false,
           loadSprite: false,
           iconUrl: 'https://cdn.plyr.io/3.7.8/plyr.svg',
           blankVideo: 'https://cdn.plyr.io/static/blank.mp4',
-          // Better configuration for MOV files with moov-at-end
           ...(isMov ? { 
-            html5: { 
-              vhs: { 
-                overrideNative: false 
-              },
-              nativeVideoTracks: true,
-              nativeAudioTracks: true,
-              nativeTextTracks: true
-            },
-            // Force aggressive buffering for MOV
+            html5: { vhs: { overrideNative: false }, nativeVideoTracks: true, nativeAudioTracks: true, nativeTextTracks: true },
             seekTime: 5,
             volume: 1,
             muted: false
           } : {})
         });
         
-        // Handle Plyr events
-        playerRef.current.on('ready', () => {
-          console.log('Plyr player ready for:', originalUrl);
+        const plyr = playerRef.current;
+        
+        plyr.on('ready', () => {
           setVideoError(null);
+          video.addEventListener('play', onPlay);
+          video.addEventListener('pause', onPause);
+          video.addEventListener('waiting', onWaiting);
+          video.addEventListener('canplay', onCanPlay);
+          video.addEventListener('playing', onPlaying);
         });
         
-        // Listen to the underlying video element errors directly
-        if (videoRef.current) {
-          videoRef.current.addEventListener('error', (e) => {
-            const video = e.currentTarget as HTMLVideoElement;
-            const error = video.error;
-            console.error('Video element error:', {
-              code: error?.code,
-              message: error?.message,
-              url: videoUrl,
-              format: videoFormat,
-              networkState: video.networkState,
-              readyState: video.readyState
-            });
-            
-            // For MOV files, try one more time with different approach
-            if (isMov && error?.code === 4) {
-              console.log('MOV file format error, video may still load with different codec');
-              // Don't show error immediately for MOV - give it time
-              setTimeout(() => {
-                if (video.error && video.error.code === 4) {
-                  setVideoError('format');
-                }
-              }, 2000);
-            } else if (error?.code === 4 || error?.message?.includes('Format') || error?.message?.includes('decode') || error?.message?.includes('MEDIA_ELEMENT_ERROR')) {
-              setVideoError('format');
-            } else {
-              setVideoError('network');
-            }
-          }, { once: false });
-        }
-        
-        playerRef.current.on('error', (event) => {
-          console.error('Plyr error event:', event);
-          const error = (event.detail as any)?.plyr?.media?.error;
-          if (error) {
-            console.error('Plyr video playback error:', {
-              code: error.code,
-              message: error.message,
-              url: videoUrl,
-              format: videoFormat,
-            });
-          }
+        plyr.on('error', (event: unknown) => {
+          const err = (event as { detail?: { plyr?: { media?: { error?: unknown } } } })?.detail?.plyr?.media?.error;
+          if (err) setVideoError('format');
         });
         
-        playerRef.current.on('loadeddata', () => {
-          console.log('Video loaded successfully with Plyr:', originalUrl);
-          setVideoError(null);
-        });
+        video.addEventListener('error', onError);
         
-        playerRef.current.on('canplay', () => {
-          console.log('Video can play:', originalUrl);
-          setVideoError(null);
-        });
+        plyr.on('loadeddata', () => setVideoError(null));
+        plyr.on('canplay', () => setVideoError(null));
       } catch (err) {
         console.error('Failed to initialize Plyr:', err);
-        // Fallback to native video player - still try to play
       }
     }
     
-    // Cleanup
     return () => {
+      const video = videoRef.current;
+      if (video) {
+        video.removeEventListener('play', onPlay);
+        video.removeEventListener('pause', onPause);
+        video.removeEventListener('waiting', onWaiting);
+        video.removeEventListener('canplay', onCanPlay);
+        video.removeEventListener('playing', onPlaying);
+        video.removeEventListener('error', onError);
+      }
       if (playerRef.current) {
         try {
           playerRef.current.destroy();
           playerRef.current = null;
-        } catch (err) {
-          console.error('Error destroying Plyr player:', err);
+        } catch (e) {
+          console.error('Error destroying Plyr:', e);
         }
       }
     };
@@ -450,7 +431,20 @@ const VideoPlayerComponent: React.FC<{
   };
   
   return (
-    <div className="w-full flex items-center justify-center bg-black p-6 relative">
+    <div
+      className="byd-video-player w-full flex items-center justify-center bg-black p-6 relative cursor-pointer select-none"
+      onClick={(e) => {
+        const target = e.target as HTMLElement;
+        if (target.closest('.plyr__controls')) return;
+        e.preventDefault();
+        e.stopPropagation();
+        togglePlayPause();
+      }}
+      onKeyDown={(e) => { if (e.key === ' ' || e.key === 'Enter') { e.preventDefault(); togglePlayPause(); } }}
+      role="button"
+      tabIndex={0}
+      aria-label={isPlaying ? 'Pause' : 'Play'}
+    >
       {videoError && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 p-8 text-center">
           <div className="max-w-md">
@@ -467,9 +461,25 @@ const VideoPlayerComponent: React.FC<{
               href={videoUrl}
               download
               className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-blue-700 transition-all"
+              onClick={(e) => e.stopPropagation()}
             >
               Download Video
             </a>
+          </div>
+        </div>
+      )}
+      {isBuffering && (
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-[5] pointer-events-none" aria-hidden>
+          <div className="w-14 h-14 border-4 border-white/30 border-t-white rounded-full animate-spin" />
+        </div>
+      )}
+      {showCenterIcon && !videoError && (
+        <div
+          className="absolute inset-0 flex items-center justify-center z-[5] pointer-events-none"
+          aria-hidden
+        >
+          <div className="w-20 h-20 rounded-full bg-black/45 flex items-center justify-center shadow-xl">
+            <svg className="w-10 h-10 text-white ml-1.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
           </div>
         </div>
       )}
@@ -478,7 +488,7 @@ const VideoPlayerComponent: React.FC<{
         key={videoUrl}
         className="plyr__video-embed w-full h-auto max-h-[90vh]"
         playsInline
-        preload={originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn') ? 'auto' : 'metadata'}
+        preload="auto"
         muted={false}
         controlsList="nodownload"
         crossOrigin="anonymous"

@@ -16,3 +16,39 @@ body {
   width: 100%;
   min-height: 100vh;
 }
+
+/* Video player: no blue circle, YouTube-style click to play/pause */
+.byd-video-player video,
+.byd-video-player .plyr__video-wrapper,
+.byd-video-player .plyr {
+  outline: none !important;
+}
+.byd-video-player video:focus,
+.byd-video-player .plyr__control:focus {
+  outline: none !important;
+  box-shadow: none !important;
+}
+/* Replace Plyr's big blue play button with our overlay; hide the default */
+.byd-video-player .plyr__control--overlaid,
+.byd-video-player .plyr__control[data-plyr="play"] {
+  background: transparent !important;
+  color: rgba(255, 255, 255, 0.95);
+}
+.byd-video-player .plyr--full-ui .plyr__control--overlaid {
+  background: rgba(0, 0, 0, 0.35) !important;
+  border: none;
+  color: #fff;
+}
+.byd-video-player .plyr__control--overlaid:hover {
+  background: rgba(0, 0, 0, 0.5) !important;
+  color: #fff;
+}
+/* Ensure play/pause on control bar is visible */
+.byd-video-player .plyr__controls .plyr__control[aria-label="Play"],
+.byd-video-player .plyr__controls .plyr__control[aria-label="Pause"] {
+  color: #fff;
+}
+.byd-video-player .plyr--video .plyr__control.plyr__tab-focus,
+.byd-video-player .plyr__control--pressed {
+  box-shadow: none;
+}
