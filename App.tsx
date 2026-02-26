@@ -2,7 +2,7 @@
 import React, { useEffect, useState, useRef } from 'react';
 import Plyr from 'plyr';
 import JSZip from 'jszip';
-import 'plyr/dist/plyr.css';
+/* Plyr CSS loaded via CDN in index.html so index.css overrides (no blue center button) */
 import Sidebar from './components/Sidebar';
 import AssetCard from './components/AssetCard';
 import AssetFormModal from './components/AssetFormModal';
@@ -267,6 +267,7 @@ const VideoPlayerComponent: React.FC<{
   const [hasLoaded, setHasLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
+  const overlaidObserverRef = useRef<MutationObserver | null>(null);
   
   const togglePlayPause = () => {
     if (!playerRef.current || videoError) return;
@@ -340,6 +341,13 @@ const VideoPlayerComponent: React.FC<{
         
         const plyr = playerRef.current;
         
+        const removeOverlaidPlay = () => {
+          const container = video.closest('.byd-video-player');
+          if (container) {
+            container.querySelectorAll('.plyr__control--overlaid').forEach((el) => el.remove());
+          }
+        };
+        removeOverlaidPlay();
         plyr.on('ready', () => {
           setVideoError(null);
           video.addEventListener('play', onPlay);
@@ -349,9 +357,11 @@ const VideoPlayerComponent: React.FC<{
           video.addEventListener('playing', onPlaying);
           video.addEventListener('loadedmetadata', onLoadedMetadata);
           if (video.readyState >= 1) setHasLoaded(true);
+          removeOverlaidPlay();
           const container = video.closest('.byd-video-player');
-          if (container) {
-            container.querySelectorAll('.plyr__control--overlaid').forEach((el) => el.remove());
+          if (container && !overlaidObserverRef.current) {
+            overlaidObserverRef.current = new MutationObserver(removeOverlaidPlay);
+            overlaidObserverRef.current.observe(container, { childList: true, subtree: true });
           }
         });
         
@@ -370,6 +380,10 @@ const VideoPlayerComponent: React.FC<{
     }
     
     return () => {
+      if (overlaidObserverRef.current) {
+        overlaidObserverRef.current.disconnect();
+        overlaidObserverRef.current = null;
+      }
       const video = videoRef.current;
       if (video) {
         video.removeEventListener('play', onPlay);
@@ -394,25 +408,19 @@ const VideoPlayerComponent: React.FC<{
   // Generate multiple source elements for better format support
   const getVideoSources = () => {
     const sources = [];
-    const ext = originalUrl.toLowerCase().split('.').pop() || '';
+    const pathLower = originalUrl.toLowerCase().split('?')[0];
+    const ext = pathLower.split('.').pop() || '';
+    const isMov = ext === 'mov' || ext === 'qt' || pathLower.endsWith('.apcn');
     
-    // For MOV files, try multiple approaches since many contain H.264
-    if (ext === 'mov' || ext === 'qt') {
-      // Try as MP4 first (many MOV files are H.264/MP4 compatible)
-      sources.push({
-        src: videoUrl,
-        type: 'video/mp4; codecs="avc1.42E01E, mp4a.40.2"', // H.264 + AAC
-      });
+    // QuickTime MOV: use only convert-video proxy URL as video/mp4 (browsers don't play video/quicktime)
+    if (isMov) {
       sources.push({
         src: videoUrl,
         type: 'video/mp4',
       });
-      // Also try as QuickTime
-      sources.push({
-        src: videoUrl,
-        type: 'video/quicktime',
-      });
-    } else {
+      return sources;
+    }
+    if (ext !== 'avi') {
       // Add primary source for other formats
       sources.push({
         src: videoUrl,
@@ -464,7 +472,7 @@ const VideoPlayerComponent: React.FC<{
         preload="auto"
         muted={false}
         controlsList="nodownload"
-        crossOrigin="anonymous"
+        crossOrigin={videoUrl.startsWith('http') ? 'anonymous' : undefined}
       >
         {getVideoSources().map((source, index) => (
           <source key={index} src={source.src} type={source.type} />

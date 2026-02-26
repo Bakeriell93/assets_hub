@@ -28,7 +28,26 @@ body {
   outline: none !important;
   box-shadow: none !important;
 }
-/* Completely remove Plyr's big blue center play button (also removed in JS on ready) */
+/* Override Plyr theme so no blue circle in center */
+.byd-video-player .plyr {
+  --plyr-color-main: rgba(255, 255, 255, 0.9);
+}
+/* Hide ANY direct child of .plyr that is not the video wrapper or controls (removes big center button) */
+.byd-video-player .plyr > .plyr__control--overlaid,
+.byd-video-player .plyr > button.plyr__control,
+.byd-video-player .plyr > [class*="overlaid"] {
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
+  width: 0 !important;
+  height: 0 !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
+}
 .byd-video-player .plyr__control--overlaid,
 .byd-video-player .plyr--full-ui .plyr__control--overlaid,
 .byd-video-player .plyr [data-plyr="play"].plyr__control--overlaid,
@@ -43,6 +62,17 @@ body {
   overflow: hidden !important;
   position: absolute !important;
   left: -9999px !important;
+}
+/* Don't hide the play button that's inside .plyr__controls */
+.byd-video-player .plyr__controls .plyr__control {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  width: auto !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  position: relative !important;
+  left: auto !important;
 }
 .byd-video-player .plyr .plyr__video-wrapper {
   z-index: 0;
@@ -89,9 +119,26 @@ body {
   color: #fff !important;
   background: rgba(255, 255, 255, 0.15) !important;
 }
+/* Normal play/pause button on the control bar - always visible */
 .byd-video-player .plyr__controls .plyr__control[aria-label="Play"],
 .byd-video-player .plyr__controls .plyr__control[aria-label="Pause"] {
   color: #fff !important;
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  min-width: 44px !important;
+  min-height: 44px !important;
+  border-radius: 6px !important;
+  background: rgba(255, 255, 255, 0.1) !important;
+}
+.byd-video-player .plyr__controls .plyr__control[aria-label="Play"]:hover,
+.byd-video-player .plyr__controls .plyr__control[aria-label="Pause"]:hover {
+  background: rgba(255, 255, 255, 0.2) !important;
+}
+.byd-video-player .plyr__controls .plyr__control[aria-label="Play"] svg,
+.byd-video-player .plyr__controls .plyr__control[aria-label="Pause"] svg {
+  width: 22px !important;
+  height: 22px !important;
 }
 .byd-video-player .plyr--video .plyr__control.plyr__tab-focus,
 .byd-video-player .plyr__control--pressed {
