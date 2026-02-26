@@ -150,6 +150,9 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
 
     img.onload = () => {
       if (cancelled) return;
+      // Show the source image immediately; cache thumbnail generation can finish after.
+      setThumbnailUrl(thumbUrl);
+      setIsLoaded(true);
       try {
         const canvas = document.createElement('canvas');
         const maxSize = 300;
@@ -170,6 +173,7 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
         canvas.height = height;
         const ctx = canvas.getContext('2d');
         if (ctx) {
+          ctx.drawImage(img, 0, 0, width, height);
           const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
           const ts = normalizeTimestamp(assetUpdatedAt);
           imageThumbCache.set(assetId, { thumbnail, updatedAt: ts });
@@ -193,7 +197,7 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
 
     img.onerror = applyFallback;
 
-    const timeoutId = setTimeout(applyFallback, 12000);
+    const timeoutId = setTimeout(applyFallback, 5000);
 
     img.src = thumbUrl;
 

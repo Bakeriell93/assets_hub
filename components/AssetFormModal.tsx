@@ -70,6 +70,97 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [cpl, setCpl] = useState<string>('');
   const [cr, setCr] = useState<string>('');
   const [comments, setComments] = useState('');
+
+  const revokeObjectThumbnail = (url?: string) => {
+    if (url && url.startsWith('blob:')) {
+      URL.revokeObjectURL(url);
+    }
+  };
+
+  const clearPackageThumbnails = () => {
+    setPackageThumbnails(prev => {
+      Object.values(prev).forEach(revokeObjectThumbnail);
+      return {};
+    });
+  };
+
+  const clearEditPackageThumbnails = () => {
+    setEditPackageThumbnails(prev => {
+      Object.values(prev).forEach(revokeObjectThumbnail);
+      return {};
+    });
+  };
+
+  const createVideoThumbnailFromSource = (sourceUrl: string, shouldRevokeSource = false): Promise<string> => {
+    return new Promise((resolve, reject) => {
+      const video = document.createElement('video');
+      let settled = false;
+
+      const cleanup = () => {
+        video.onloadedmetadata = null;
+        video.onseeked = null;
+        video.onerror = null;
+        video.src = '';
+        if (shouldRevokeSource) revokeObjectThumbnail(sourceUrl);
+      };
+
+      const fail = (err: unknown) => {
+        if (settled) return;
+        settled = true;
+        cleanup();
+        reject(err instanceof Error ? err : new Error('Failed to create video thumbnail'));
+      };
+
+      const capture = () => {
+        if (settled) return;
+        try {
+          const maxSize = 200;
+          let width = video.videoWidth;
+          let height = video.videoHeight;
+          if (!width || !height) {
+            throw new Error('Video metadata not ready');
+          }
+          if (width > height) {
+            if (width > maxSize) {
+              height = (height * maxSize) / width;
+              width = maxSize;
+            }
+          } else if (height > maxSize) {
+            width = (width * maxSize) / height;
+            height = maxSize;
+          }
+          const canvas = document.createElement('canvas');
+          canvas.width = Math.max(1, Math.round(width));
+          canvas.height = Math.max(1, Math.round(height));
+          const ctx = canvas.getContext('2d');
+          if (!ctx) throw new Error('Canvas context unavailable');
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          settled = true;
+          const thumbnail = canvas.toDataURL('image/jpeg', 0.7);
+          cleanup();
+          resolve(thumbnail);
+        } catch (err) {
+          fail(err);
+        }
+      };
+
+      video.crossOrigin = 'anonymous';
+      video.muted = true;
+      video.playsInline = true;
+      video.preload = 'metadata';
+      video.onloadedmetadata = () => {
+        try {
+          video.currentTime = Math.min(0.5, Math.max(0, (video.duration || 1) / 2));
+        } catch {
+          capture();
+        }
+      };
+      video.onseeked = capture;
+      video.onerror = () => fail(new Error('Failed to load video'));
+      video.src = sourceUrl;
+      video.load();
+    });
+  };
   
   useEffect(() => {
     if (editingAsset) {
@@ -135,7 +226,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         setSelectedPreviewIndex(null);
       }
       setIsChangingPreview(false);
-      setEditPackageThumbnails({});
+      clearEditPackageThumbnails();
       setRemovedFromPackageIds([]);
       setNewPackageFiles([]);
       setNewPackageFileTitles({});
@@ -167,8 +258,8 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setFiles([]);
       setFileTitles({});
       setPackageAssetTitles({});
-      setPackageThumbnails({});
-      setEditPackageThumbnails({});
+      clearPackageThumbnails();
+      clearEditPackageThumbnails();
       setSelectedPreviewIndex(null);
       setIsChangingPreview(false);
       setIsPackageMode(false);
@@ -898,106 +989,32 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                           type="button"
                           onClick={async () => {
                             setIsChangingPreview(true);
-                            // Generate thumbnails for existing package assets
                             setIsGeneratingThumbnails(true);
-                            const thumbnails: Record<string, string> = {};
-                            
-                            for (const pkgAsset of editingPackageAssets) {
-                              try {
-                                if (pkgAsset.type === 'image' && pkgAsset.url) {
-                                  // Generate image thumbnail
-                                  const img = new Image();
-                                  img.crossOrigin = 'anonymous';
-                                  await new Promise<void>((resolve, reject) => {
-                                    img.onload = () => {
-                                      try {
-                                        const canvas = document.createElement('canvas');
-                                        const maxSize = 200;
-                                        let width = img.width;
-                                        let height = img.height;
-                                        
-                                        if (width > height) {
-                                          if (width > maxSize) {
-                                            height = (height * maxSize) / width;
-                                            width = maxSize;
-                                          }
-                                        } else {
-                                          if (height > maxSize) {
-                                            width = (width * maxSize) / height;
-                                            height = maxSize;
-                                          }
-                                        }
-                                        
-                                        canvas.width = width;
-                                        canvas.height = height;
-                                        const ctx = canvas.getContext('2d');
-                                        if (ctx) {
-                                          ctx.drawImage(img, 0, 0, width, height);
-                                          thumbnails[pkgAsset.id] = canvas.toDataURL('image/jpeg', 0.7);
-                                        }
-                                        resolve();
-                                      } catch (err) {
-                                        reject(err);
-                                      }
-                                    };
-                                    img.onerror = () => reject(new Error('Failed to load image'));
-                                    img.src = pkgAsset.url;
-                                  });
-                                } else if (pkgAsset.type === 'video' && pkgAsset.url) {
-                                  // Generate video thumbnail
-                                  const video = document.createElement('video');
-                                  video.crossOrigin = 'anonymous';
-                                  await new Promise<void>((resolve, reject) => {
-                                    video.onloadedmetadata = () => {
-                                      try {
-                                        video.currentTime = 0.5;
-                                      } catch {
-                                        video.currentTime = 0;
-                                      }
-                                    };
-                                    video.onseeked = () => {
-                                      try {
-                                        const canvas = document.createElement('canvas');
-                                        const maxSize = 200;
-                                        let width = video.videoWidth;
-                                        let height = video.videoHeight;
-                                        
-                                        if (width > height) {
-                                          if (width > maxSize) {
-                                            height = (height * maxSize) / width;
-                                            width = maxSize;
-                                          }
-                                        } else {
-                                          if (height > maxSize) {
-                                            width = (width * maxSize) / height;
-                                            height = maxSize;
-                                          }
-                                        }
-                                        
-                                        canvas.width = width;
-                                        canvas.height = height;
-                                        const ctx = canvas.getContext('2d');
-                                        if (ctx) {
-                                          ctx.drawImage(video, 0, 0, width, height);
-                                          thumbnails[pkgAsset.id] = canvas.toDataURL('image/jpeg', 0.7);
-                                        }
-                                        resolve();
-                                      } catch (err) {
-                                        reject(err);
-                                      }
-                                    };
-                                    video.onerror = () => reject(new Error('Failed to load video'));
-                                    video.src = pkgAsset.url;
-                                    video.muted = true;
-                                    video.load();
-                                  });
-                                }
-                              } catch (err) {
-                                console.warn(`Failed to generate thumbnail for ${pkgAsset.title}:`, err);
+                            clearEditPackageThumbnails();
+
+                            // Show image thumbnails immediately from source URL.
+                            const immediateThumbs: Record<string, string> = {};
+                            editingPackageAssets.forEach(pkgAsset => {
+                              if (pkgAsset.type === 'image' && pkgAsset.url) {
+                                immediateThumbs[pkgAsset.id] = pkgAsset.url;
                               }
+                            });
+                            if (Object.keys(immediateThumbs).length > 0) {
+                              setEditPackageThumbnails(immediateThumbs);
                             }
-                            
-                            setEditPackageThumbnails(thumbnails);
+
+                            const videoTasks = editingPackageAssets
+                              .filter(pkgAsset => pkgAsset.type === 'video' && pkgAsset.url)
+                              .map(async pkgAsset => {
+                                try {
+                                  const thumbnail = await createVideoThumbnailFromSource(pkgAsset.url as string);
+                                  setEditPackageThumbnails(prev => ({ ...prev, [pkgAsset.id]: thumbnail }));
+                                } catch (err) {
+                                  console.warn(`Failed to generate thumbnail for ${pkgAsset.title}:`, err);
+                                }
+                              });
+
+                            await Promise.allSettled(videoTasks);
                             setIsGeneratingThumbnails(false);
                           }}
                           className="px-4 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-black uppercase tracking-widest transition-all flex items-center gap-2"
@@ -1175,7 +1192,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                               setFile(null);
                               setFiles([]);
                               setFileTitles({});
-                              setPackageThumbnails({});
+                              clearPackageThumbnails();
                               setSelectedPreviewIndex(null);
                             }}
                             className="w-5 h-5 rounded border-gray-300 text-blue-600 focus:ring-blue-500"
@@ -1208,120 +1225,44 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                                   initialTitles[idx] = (idx === 0 && title.trim() ? title.trim() : null) || f.name.replace(/\.[^/.]+$/, '').replace(/[-_]/g, ' ');
                                 });
                                 setFileTitles(initialTitles);
-                                
-                                // Generate thumbnails for all files
-                                setIsGeneratingThumbnails(true);
-                                setSelectedPreviewIndex(0); // Default to first file
-                                const thumbnails: Record<number, string> = {};
-                                
-                                for (let idx = 0; idx < selectedFiles.length; idx++) {
-                                  const file = selectedFiles[idx];
-                                  try {
-                                    if (file.type.startsWith('image/')) {
-                                      // Generate image thumbnail
-                                      const img = new Image();
-                                      const objectUrl = URL.createObjectURL(file);
-                                      await new Promise<void>((resolve, reject) => {
-                                        img.onload = () => {
-                                          try {
-                                            const canvas = document.createElement('canvas');
-                                            const maxSize = 200;
-                                            let width = img.width;
-                                            let height = img.height;
-                                            
-                                            if (width > height) {
-                                              if (width > maxSize) {
-                                                height = (height * maxSize) / width;
-                                                width = maxSize;
-                                              }
-                                            } else {
-                                              if (height > maxSize) {
-                                                width = (width * maxSize) / height;
-                                                height = maxSize;
-                                              }
-                                            }
-                                            
-                                            canvas.width = width;
-                                            canvas.height = height;
-                                            const ctx = canvas.getContext('2d');
-                                            if (ctx) {
-                                              ctx.drawImage(img, 0, 0, width, height);
-                                              thumbnails[idx] = canvas.toDataURL('image/jpeg', 0.7);
-                                            }
-                                            URL.revokeObjectURL(objectUrl);
-                                            resolve();
-                                          } catch (err) {
-                                            URL.revokeObjectURL(objectUrl);
-                                            reject(err);
-                                          }
-                                        };
-                                        img.onerror = () => {
-                                          URL.revokeObjectURL(objectUrl);
-                                          reject(new Error('Failed to load image'));
-                                        };
-                                        img.src = objectUrl;
-                                      });
-                                    } else if (file.type.startsWith('video/')) {
-                                      // Generate video thumbnail
-                                      const video = document.createElement('video');
-                                      const objectUrl = URL.createObjectURL(file);
-                                      await new Promise<void>((resolve, reject) => {
-                                        video.onloadedmetadata = () => {
-                                          try {
-                                            video.currentTime = 0.5; // Seek to 0.5 seconds
-                                          } catch {
-                                            // If seeking fails, try at 0
-                                            video.currentTime = 0;
-                                          }
-                                        };
-                                        video.onseeked = () => {
-                                          try {
-                                            const canvas = document.createElement('canvas');
-                                            const maxSize = 200;
-                                            let width = video.videoWidth;
-                                            let height = video.videoHeight;
-                                            
-                                            if (width > height) {
-                                              if (width > maxSize) {
-                                                height = (height * maxSize) / width;
-                                                width = maxSize;
-                                              }
-                                            } else {
-                                              if (height > maxSize) {
-                                                width = (width * maxSize) / height;
-                                                height = maxSize;
-                                              }
-                                            }
-                                            
-                                            canvas.width = width;
-                                            canvas.height = height;
-                                            const ctx = canvas.getContext('2d');
-                                            if (ctx) {
-                                              ctx.drawImage(video, 0, 0, width, height);
-                                              thumbnails[idx] = canvas.toDataURL('image/jpeg', 0.7);
-                                            }
-                                            URL.revokeObjectURL(objectUrl);
-                                            resolve();
-                                          } catch (err) {
-                                            URL.revokeObjectURL(objectUrl);
-                                            reject(err);
-                                          }
-                                        };
-                                        video.onerror = () => {
-                                          URL.revokeObjectURL(objectUrl);
-                                          reject(new Error('Failed to load video'));
-                                        };
-                                        video.src = objectUrl;
-                                        video.muted = true;
-                                        video.load();
-                                      });
-                                    }
-                                  } catch (err) {
-                                    console.warn(`Failed to generate thumbnail for ${file.name}:`, err);
-                                  }
+
+                                clearPackageThumbnails();
+                                if (selectedFiles.length === 0) {
+                                  setIsGeneratingThumbnails(false);
+                                  setSelectedPreviewIndex(null);
+                                  return;
                                 }
-                                
-                                setPackageThumbnails(thumbnails);
+
+                                // Show image thumbnails immediately; generate video thumbs in parallel.
+                                setIsGeneratingThumbnails(true);
+                                setSelectedPreviewIndex(0);
+                                const immediateThumbs: Record<number, string> = {};
+                                const videoTasks: Promise<void>[] = [];
+
+                                selectedFiles.forEach((selectedFile, idx) => {
+                                  if (selectedFile.type.startsWith('image/')) {
+                                    immediateThumbs[idx] = URL.createObjectURL(selectedFile);
+                                    return;
+                                  }
+                                  if (selectedFile.type.startsWith('video/')) {
+                                    const objectUrl = URL.createObjectURL(selectedFile);
+                                    videoTasks.push(
+                                      createVideoThumbnailFromSource(objectUrl, true)
+                                        .then((thumbnail) => {
+                                          setPackageThumbnails(prev => ({ ...prev, [idx]: thumbnail }));
+                                        })
+                                        .catch((err) => {
+                                          console.warn(`Failed to generate thumbnail for ${selectedFile.name}:`, err);
+                                        })
+                                    );
+                                  }
+                                });
+
+                                if (Object.keys(immediateThumbs).length > 0) {
+                                  setPackageThumbnails(immediateThumbs);
+                                }
+
+                                await Promise.allSettled(videoTasks);
                                 setIsGeneratingThumbnails(false);
                               }} 
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer" 
@@ -1350,6 +1291,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                                           setFiles(newFiles);
                                           const newTitles = { ...fileTitles };
                                           const newThumbnails = { ...packageThumbnails };
+                                          revokeObjectThumbnail(newThumbnails[idx]);
                                           delete newTitles[idx];
                                           delete newThumbnails[idx];
                                           // Reindex remaining titles and thumbnails
