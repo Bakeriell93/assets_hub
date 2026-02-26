@@ -218,8 +218,14 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
       loading="lazy"
       decoding="async"
-      // OPTIMIZATION: Add fetchpriority for better resource hints
       fetchPriority="low"
+      onError={(e) => {
+        const el = e.currentTarget;
+        if (el.src !== imageUrl) {
+          el.src = imageUrl;
+          el.onerror = null;
+        }
+      }}
     />
   );
 };
@@ -276,93 +282,78 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       setVideoThumbnail(fromLs);
       return;
     }
+    setVideoThumbnail(null);
     if (!videoRef.current) return;
     const video = videoRef.current;
-      const videoUrl = getThumbnailVideoUrl(previewAsset.url);
-      let isMov = false;
+    const videoUrl = getThumbnailVideoUrl(previewAsset.url);
+    let isMov = false;
+    try {
+      const u = new URL(asset.url);
+      const path = u.pathname.toLowerCase();
+      isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
+    } catch {
+      const lower = asset.url.toLowerCase();
+      isMov = lower.endsWith('.mov') || lower.endsWith('.qt') || lower.endsWith('.apcn');
+    }
+
+    video.src = videoUrl;
+    video.crossOrigin = 'anonymous';
+    video.preload = 'metadata';
+    video.muted = true;
+    video.playsInline = true;
+    if (isMov) video.type = 'video/mp4';
+
+    const generateThumbnail = () => {
       try {
-        const u = new URL(asset.url);
-        const path = u.pathname.toLowerCase();
-        isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
-      } catch {
-        const lower = asset.url.toLowerCase();
-        isMov = lower.endsWith('.mov') || lower.endsWith('.qt') || lower.endsWith('.apcn');
-      }
-      
-      // Set video source
-      video.src = videoUrl;
-      video.crossOrigin = 'anonymous';
-      video.preload = 'metadata';
-      video.muted = true; // Muted for thumbnail generation
-      video.playsInline = true;
-      
-      // For MOV files, try multiple type hints
-      if (isMov) {
-        // Try as MP4 first (many MOV files are H.264)
-        video.type = 'video/mp4';
-      }
-      
-      const generateThumbnail = () => {
-        try {
-          if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            const ctx = canvas.getContext('2d');
-            if (ctx) {
-              const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
-              videoThumbCache.set(previewAsset.url, thumbnailUrl);
-              setVideoThumbnail(thumbnailUrl);
-              try {
-                localStorage.setItem(cacheKey, thumbnailUrl);
-              } catch (e) {
-                console.warn('Failed to cache thumbnail:', e);
-              }
+        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
+          const canvas = document.createElement('canvas');
+          canvas.width = video.videoWidth;
+          canvas.height = video.videoHeight;
+          const ctx = canvas.getContext('2d');
+          if (ctx) {
+            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+            videoThumbCache.set(previewAsset.url, thumbnailUrl);
+            setVideoThumbnail(thumbnailUrl);
+            try {
+              localStorage.setItem(cacheKey, thumbnailUrl);
+            } catch (e) {
+              console.warn('Failed to cache thumbnail:', e);
             }
           }
-        } catch (err) {
-          console.warn('Failed to generate video thumbnail:', err);
         }
-      };
+      } catch (err) {
+        console.warn('Failed to generate video thumbnail:', err);
+      }
+    };
 
-      // Try to seek to a frame for thumbnail
-      const tryGenerateThumbnail = () => {
-        if (video.readyState >= 2) {
-          try {
-            video.currentTime = 0.5; // Seek to 0.5 seconds
-          } catch (err) {
-            // If seeking fails, try to generate from current frame
-            generateThumbnail();
-          }
-        }
-      };
-
-      video.addEventListener('loadedmetadata', () => {
-        console.log('Video metadata loaded:', {
-          duration: video.duration,
-          width: video.videoWidth,
-          height: video.videoHeight,
-          readyState: video.readyState
-        });
-        tryGenerateThumbnail();
-      }, { once: true });
-      
-      video.addEventListener('seeked', generateThumbnail, { once: true });
-      video.addEventListener('loadeddata', generateThumbnail, { once: true });
-      
-      // Fallback: try after a delay
-      const timeoutId = setTimeout(() => {
-        if (!videoThumbnail && video.readyState >= 2) {
+    const tryGenerateThumbnail = () => {
+      if (video.readyState >= 2) {
+        try {
+          video.currentTime = 0.5;
+        } catch {
           generateThumbnail();
         }
-      }, 2000);
-      
-      return () => {
-        video.removeEventListener('loadedmetadata', tryGenerateThumbnail);
-        video.removeEventListener('seeked', generateThumbnail);
-        video.removeEventListener('loadeddata', generateThumbnail);
-        clearTimeout(timeoutId);
-      };
+      }
+    };
+
+    const onLoadedMetadata = () => {
+      tryGenerateThumbnail();
+    };
+
+    video.addEventListener('loadedmetadata', onLoadedMetadata);
+    video.addEventListener('seeked', generateThumbnail, { once: true });
+    video.addEventListener('loadeddata', generateThumbnail, { once: true });
+
+    const timeoutId = setTimeout(() => {
+      if (video.readyState >= 2) generateThumbnail();
+    }, 2500);
+
+    return () => {
+      video.removeEventListener('loadedmetadata', onLoadedMetadata);
+      video.removeEventListener('seeked', generateThumbnail);
+      video.removeEventListener('loadeddata', generateThumbnail);
+      clearTimeout(timeoutId);
+    };
   }, [previewAsset.type, previewAsset.url]);
 
   const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
