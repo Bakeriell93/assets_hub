@@ -524,27 +524,24 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     const fetchUrl = maybeProxyUrl(targetAsset.url);
 
     try {
-      // For videos and large files, use direct download link for better reliability
+      // For videos and design files: fetch as blob so browser downloads instead of opening in new tab
       if (targetAsset.type === 'video' || targetAsset.type === 'design') {
-        console.log('Downloading video/design file:', filename, fetchUrl);
-        
-        // For videos, use direct download with download attribute
-        // This is more reliable for large files and avoids memory issues
+        const res = await fetch(fetchUrl, { method: 'GET' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const blobUrl = URL.createObjectURL(blob);
         const a = document.createElement('a');
-        a.href = fetchUrl;
+        a.href = blobUrl;
         a.download = filename;
         a.rel = 'noopener';
         a.style.display = 'none';
         document.body.appendChild(a);
-        
-        // Trigger download
         a.click();
-        console.log('Download link clicked for video/design file');
-        storageService.logDownload(targetAsset.id, targetAsset.title, format, username);
-        // Clean up after a delay
         setTimeout(() => {
-          document.body.removeChild(a);
-        }, 1000);
+          a.remove();
+          URL.revokeObjectURL(blobUrl);
+        }, 200);
+        storageService.logDownload(targetAsset.id, targetAsset.title, format, username);
         return;
       }
       

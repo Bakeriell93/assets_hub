@@ -502,14 +502,32 @@ const VideoPlayerComponent: React.FC<{
                 ? 'This video format (.mov, .avi, etc.) is not natively supported by your browser. Please download the file to view it.'
                 : 'Your browser cannot play this video format. Please try downloading the file.'}
             </p>
-            <a
-              href={videoUrl}
-              download
+            <button
+              type="button"
               className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-blue-700 transition-all"
-              onClick={(e) => e.stopPropagation()}
+              onClick={async (e) => {
+                e.stopPropagation();
+                try {
+                  const res = await fetch(videoUrl, { method: 'GET' });
+                  if (!res.ok) throw new Error('Download failed');
+                  const blob = await res.blob();
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  const ext = (originalUrl.match(/\.([a-z0-9]+)(?:\?|$)/i)?.[1] || 'mp4');
+                  a.download = `video.${ext}`;
+                  a.rel = 'noopener';
+                  a.style.display = 'none';
+                  document.body.appendChild(a);
+                  a.click();
+                  setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 200);
+                } catch {
+                  window.open(videoUrl, '_blank');
+                }
+              }}
             >
               Download Video
-            </a>
+            </button>
           </div>
         </div>
       )}
@@ -588,6 +606,7 @@ function App() {
   
   // Sidebar
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false);
+  const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   // Upload Progress
   const [uploadProgress, setUploadProgress] = useState<number | null>(null);
   const [uploadStatus, setUploadStatus] = useState<string>('');
@@ -1231,7 +1250,15 @@ function App() {
 
   return (
     <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
-      <div className={`bg-white border-r border-gray-100 flex-shrink-0 transition-[width] duration-200 ${isSidebarCollapsed ? 'w-16' : 'w-72'}`}>
+      {/* Mobile sidebar backdrop */}
+      {isMobileMenuOpen && (
+        <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
+      )}
+      {/* Sidebar: overlay on mobile, inline on md+ */}
+      <div className={`bg-white border-r border-gray-100 flex-shrink-0 transition-[width] duration-200
+        fixed md:relative inset-y-0 left-0 z-50 md:z-auto
+        ${isMobileMenuOpen ? 'w-72 translate-x-0' : '-translate-x-full md:translate-x-0'}
+        ${isSidebarCollapsed ? 'md:w-16' : 'md:w-72'}`}>
         <Sidebar 
           config={config}
           selectedBrand={selectedBrand}
@@ -1239,20 +1266,23 @@ function App() {
           selectedModel={selectedModel}
           user={currentUser!}
           isCollapsed={isSidebarCollapsed}
-          onToggleCollapse={() => setIsSidebarCollapsed(prev => !prev)}
-          onSelectBrand={(b) => { setSelectedBrand(b); setSelectedModel('All'); }}
-          onSelectMarket={setSelectedMarket}
-          onSelectModel={setSelectedModel}
-          onOpenAdmin={() => setIsAdminPanelOpen(true)}
+          onToggleCollapse={() => { setIsSidebarCollapsed(prev => !prev); }}
+          onSelectBrand={(b) => { setSelectedBrand(b); setSelectedModel('All'); setIsMobileMenuOpen(false); }}
+          onSelectMarket={(m) => { setSelectedMarket(m); setIsMobileMenuOpen(false); }}
+          onSelectModel={(m) => { setSelectedModel(m); setIsMobileMenuOpen(false); }}
+          onOpenAdmin={() => { setIsAdminPanelOpen(true); setIsMobileMenuOpen(false); }}
           onLogout={handleLogout}
         />
       </div>
 
-      <div className="flex-1 flex flex-col h-screen overflow-hidden">
-        <header className="bg-white border-b border-gray-100 px-12 py-8 flex flex-col gap-6 sticky top-0 z-40">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-8 flex-1">
-              <div className="flex bg-gray-100 p-2 rounded-[28px] border border-gray-200 shadow-inner">
+      <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
+        <header className="bg-white border-b border-gray-100 px-4 sm:px-6 md:px-12 py-4 md:py-8 flex flex-col gap-4 md:gap-6 sticky top-0 z-30">
+          <div className="flex items-center justify-between gap-2 flex-wrap">
+            <div className="flex items-center gap-2 md:gap-8 flex-1 min-w-0">
+              <button type="button" onClick={() => setIsMobileMenuOpen(prev => !prev)} className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 md:hidden" aria-label="Menu">
+                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+              </button>
+              <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner flex-wrap gap-0.5">
                  {[
                    { id: 'repository', label: 'HUB' },
                    { id: 'analytics', label: 'ANALYTICS' },
@@ -1262,14 +1292,14 @@ function App() {
                    <button 
                     key={v.id}
                     onClick={() => setViewMode(v.id as ViewMode)}
-                    className={`px-8 py-3.5 rounded-[22px] text-[10px] font-black uppercase tracking-[0.3em] transition-all ${viewMode === v.id ? 'bg-white text-gray-900 shadow-2xl' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`px-4 sm:px-6 md:px-8 py-2.5 sm:py-3.5 rounded-[18px] md:rounded-[22px] text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] transition-all ${viewMode === v.id ? 'bg-white text-gray-900 shadow-xl md:shadow-2xl' : 'text-gray-400 hover:text-gray-600'}`}
                    >{v.label}</button>
                  ))}
               </div>
               
               {viewMode === 'repository' && (
                 <>
-                  <div className="relative flex-1 max-w-sm">
+                  <div className="relative flex-1 min-w-0 max-w-full sm:max-w-sm">
                     <svg className="w-5 h-5 absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                     <input 
                       type="text" 
@@ -1283,12 +1313,12 @@ function App() {
               )}
             </div>
             
-            <div className="flex gap-4">
-              <button onClick={() => setIsAIModalOpen(true)} className="hidden px-10 py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] hover:from-purple-700 hover:to-indigo-700 transition-all shadow-xl shadow-purple-200">AI Insights</button>
+            <div className="flex gap-2 sm:gap-4 flex-shrink-0">
+              <button onClick={() => setIsAIModalOpen(true)} className="hidden px-6 sm:px-10 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] hover:from-purple-700 hover:to-indigo-700 transition-all shadow-xl shadow-purple-200">AI Insights</button>
               {currentUser?.role !== 'Viewer' && (
                 <>
-                  <button onClick={() => setIsBulkUploadOpen(true)} className="px-10 py-4 bg-green-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-green-200 hover:bg-green-700 transition-all">BULK UPLOAD</button>
-                  <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-10 py-4 bg-blue-600 text-white rounded-[24px] text-[11px] font-black uppercase tracking-[0.3em] shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">UPLOAD</button>
+                  <button onClick={() => setIsBulkUploadOpen(true)} className="px-4 sm:px-10 py-3 sm:py-4 bg-green-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-lg sm:shadow-2xl shadow-green-200 hover:bg-green-700 transition-all">BULK UPLOAD</button>
+                  <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-4 sm:px-10 py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-lg sm:shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">UPLOAD</button>
                 </>
               )}
             </div>
@@ -1336,13 +1366,13 @@ function App() {
           )}
         </header>
 
-        <main className="flex-1 overflow-y-auto p-12 bg-[#f8f9fc]">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-12 bg-[#f8f9fc]">
           <div className="max-w-[1600px] mx-auto">
             {viewMode === 'repository' && (
               <div className="animate-in fade-in duration-700">
-                <div className="flex items-end justify-between mb-16">
-                  <div>
-                    <h1 className="text-7xl font-black text-gray-900 tracking-tighter mb-4 leading-none uppercase">
+                <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-8 sm:mb-16">
+                  <div className="min-w-0">
+                    <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-gray-900 tracking-tighter mb-4 leading-none uppercase">
                       {selectedMarket === 'All' ? 'GLOBAL' : selectedMarket} HUB
                     </h1>
                     {activeCollectionId && (
@@ -1409,8 +1439,8 @@ function App() {
                         </button>
                       </div>
                     </div>
-                    <p className="text-7xl font-black text-blue-600 leading-none tracking-tighter">{cardCount}</p>
-                    <p className="text-[12px] font-black text-gray-400 uppercase tracking-[0.5em] mt-3">Cards</p>
+                    <p className="text-5xl sm:text-6xl md:text-7xl font-black text-blue-600 leading-none tracking-tighter">{cardCount}</p>
+                    <p className="text-[11px] sm:text-[12px] font-black text-gray-400 uppercase tracking-[0.4em] sm:tracking-[0.5em] mt-2 sm:mt-3">Cards</p>
                     <p className="text-[10px] text-gray-500 mt-1.5">
                       {singleCardCount} single · {packageCardCount} package{packageCardCount === 1 ? '' : 's'} · {masterFileCardCount} master file{masterFileCardCount === 1 ? '' : 's'}
                     </p>
@@ -1493,14 +1523,18 @@ function App() {
                                           const ext = urlParts.length > 1 ? urlParts[urlParts.length - 1].split('?')[0] : 'jpg';
                                           const downloadFilename = `${filename}.${ext}`;
                                           if (asset.type === 'video' || asset.type === 'design') {
+                                            const res = await fetch(asset.url, { method: 'GET' });
+                                            if (!res.ok) throw new Error('Fetch failed');
+                                            const blob = await res.blob();
+                                            const blobUrl = URL.createObjectURL(blob);
                                             const a = document.createElement('a');
-                                            a.href = asset.url;
+                                            a.href = blobUrl;
                                             a.download = downloadFilename;
                                             a.rel = 'noopener';
                                             a.style.display = 'none';
                                             document.body.appendChild(a);
                                             a.click();
-                                            setTimeout(() => document.body.removeChild(a), 1000);
+                                            setTimeout(() => { a.remove(); URL.revokeObjectURL(blobUrl); }, 200);
                                           } else {
                                             const res = await fetch(asset.url, { method: 'GET' });
                                             if (!res.ok) throw new Error('Fetch failed');
@@ -2048,16 +2082,23 @@ function App() {
             const ext = urlParts.length > 1 ? urlParts[urlParts.length - 1].split('?')[0] : 'jpg';
             const downloadFilename = `${filename}.${ext}`;
 
-            // For videos and large files, use direct download
+            // For videos and design: fetch as blob so file downloads instead of opening in new tab
             if (asset.type === 'video' || asset.type === 'design') {
+              const res = await fetch(asset.url, { method: 'GET' });
+              if (!res.ok) throw new Error(`HTTP ${res.status}`);
+              const blob = await res.blob();
+              const blobUrl = URL.createObjectURL(blob);
               const a = document.createElement('a');
-              a.href = asset.url;
+              a.href = blobUrl;
               a.download = downloadFilename;
               a.rel = 'noopener';
               a.style.display = 'none';
               document.body.appendChild(a);
               a.click();
-              setTimeout(() => document.body.removeChild(a), 1000);
+              setTimeout(() => {
+                a.remove();
+                URL.revokeObjectURL(blobUrl);
+              }, 200);
               storageService.logDownload(asset.id, asset.title, 'original', currentUser?.username);
               return;
             }
@@ -2094,9 +2135,9 @@ function App() {
 
 
         return (
-          <div className="fixed inset-0 z-[200] flex items-center justify-center p-6" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}>
+          <div className="fixed inset-0 z-[200] flex items-center justify-center p-2 sm:p-4 md:p-6" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}>
             <div className="absolute inset-0 bg-black/80 backdrop-blur-md" onClick={() => { setPreviewAsset(null); setPreviewPackageAssets([]); setCurrentPreviewIndex(0); setPreviewViewMode('grid'); }}></div>
-            <div className="relative max-w-6xl max-h-[90vh] bg-white rounded-[40px] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
+            <div className="relative w-full max-w-6xl max-h-[95vh] sm:max-h-[90vh] bg-white rounded-2xl sm:rounded-3xl md:rounded-[40px] overflow-hidden shadow-2xl flex flex-col" onClick={(e) => e.stopPropagation()}>
               {/* Fixed header bar: Grid/Full + Close (X) - never covered by grid */}
               <div className="flex-shrink-0 flex items-center justify-between h-14 px-4 border-b border-gray-100 bg-white z-[200]">
                 <div className="flex items-center gap-2">
@@ -2253,7 +2294,32 @@ function App() {
                         </svg>
                         <h3 className="text-xl font-black text-white mb-2 uppercase tracking-wider">Video format cannot be played in the browser</h3>
                         <p className="text-sm text-gray-300 mb-4">.MOV / QuickTime files are not supported for in-browser preview. Download the file to watch it.</p>
-                        <a href={currentAsset.url} download className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-blue-700 transition-all">Download Video</a>
+                        <button
+                          type="button"
+                          onClick={async (e) => {
+                            e.stopPropagation();
+                            try {
+                              const res = await fetch(currentAsset.url, { method: 'GET' });
+                              if (!res.ok) throw new Error('Download failed');
+                              const blob = await res.blob();
+                              const url = URL.createObjectURL(blob);
+                              const a = document.createElement('a');
+                              a.href = url;
+                              const ext = (currentAsset.url.match(/\.([a-z0-9]+)(?:\?|$)/i)?.[1] || 'mov');
+                              a.download = currentAsset.originalFileName || `${(currentAsset.title || 'video').replace(/[^\w\s-]/g, '') || 'video'}.${ext}`;
+                              a.rel = 'noopener';
+                              a.style.display = 'none';
+                              document.body.appendChild(a);
+                              a.click();
+                              setTimeout(() => { a.remove(); URL.revokeObjectURL(url); }, 200);
+                            } catch {
+                              window.open(currentAsset.url, '_blank');
+                            }
+                          }}
+                          className="inline-block px-6 py-3 bg-blue-600 text-white rounded-xl font-black text-sm uppercase tracking-wider hover:bg-blue-700 transition-all"
+                        >
+                          Download Video
+                        </button>
                       </div>
                     </div>
                   </div>
