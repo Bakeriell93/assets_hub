@@ -264,6 +264,7 @@ const VideoPlayerComponent: React.FC<{
   const [isPlaying, setIsPlaying] = useState(false);
   const [isBuffering, setIsBuffering] = useState(false);
   const [showCenterIcon, setShowCenterIcon] = useState(true);
+  const [hasLoaded, setHasLoaded] = useState(false);
   const videoRef = useRef<HTMLVideoElement>(null);
   const playerRef = useRef<Plyr | null>(null);
   
@@ -278,6 +279,7 @@ const VideoPlayerComponent: React.FC<{
   };
   
   useEffect(() => {
+    setHasLoaded(false);
     if (videoRef.current && !playerRef.current) {
       const video = videoRef.current;
       const isMov = originalUrl.toLowerCase().endsWith('.mov') || originalUrl.toLowerCase().endsWith('.qt') || originalUrl.toLowerCase().endsWith('.apcn');
@@ -285,8 +287,9 @@ const VideoPlayerComponent: React.FC<{
       const onPlay = () => { setIsPlaying(true); setIsBuffering(false); setShowCenterIcon(false); };
       const onPause = () => { setIsPlaying(false); setShowCenterIcon(true); };
       const onWaiting = () => { setIsBuffering(true); };
-      const onCanPlay = () => { setIsBuffering(false); };
+      const onCanPlay = () => { setIsBuffering(false); setHasLoaded(true); };
       const onPlaying = () => { setIsBuffering(false); };
+      const onLoadedMetadata = () => { setHasLoaded(true); };
       const onError = (e: Event) => {
         const el = e.currentTarget as HTMLVideoElement;
         const error = el.error;
@@ -321,7 +324,7 @@ const VideoPlayerComponent: React.FC<{
           tooltips: { controls: true, seek: true },
           autoplay: false,
           clickToPlay: false,
-          hideControls: true,
+          hideControls: false,
           resetOnEnd: false,
           disableContextMenu: false,
           loadSprite: false,
@@ -344,6 +347,8 @@ const VideoPlayerComponent: React.FC<{
           video.addEventListener('waiting', onWaiting);
           video.addEventListener('canplay', onCanPlay);
           video.addEventListener('playing', onPlaying);
+          video.addEventListener('loadedmetadata', onLoadedMetadata);
+          if (video.readyState >= 1) setHasLoaded(true);
         });
         
         plyr.on('error', (event: unknown) => {
@@ -368,6 +373,7 @@ const VideoPlayerComponent: React.FC<{
         video.removeEventListener('waiting', onWaiting);
         video.removeEventListener('canplay', onCanPlay);
         video.removeEventListener('playing', onPlaying);
+        video.removeEventListener('loadedmetadata', onLoadedMetadata);
         video.removeEventListener('error', onError);
       }
       if (playerRef.current) {
@@ -432,7 +438,7 @@ const VideoPlayerComponent: React.FC<{
   
   return (
     <div
-      className="byd-video-player w-full flex items-center justify-center bg-black p-6 relative cursor-pointer select-none"
+      className="byd-video-player w-full flex items-center justify-center bg-black p-6 relative cursor-pointer select-none min-h-[320px]"
       onClick={(e) => {
         const target = e.target as HTMLElement;
         if (target.closest('.plyr__controls')) return;
@@ -445,8 +451,26 @@ const VideoPlayerComponent: React.FC<{
       tabIndex={0}
       aria-label={isPlaying ? 'Pause' : 'Play'}
     >
+      {/* Video first so it sits behind overlays */}
+      <video 
+        ref={videoRef}
+        key={videoUrl}
+        className="plyr__video-embed w-full h-auto max-h-[90vh] relative z-0"
+        playsInline
+        preload="auto"
+        muted={false}
+        controlsList="nodownload"
+        crossOrigin="anonymous"
+      >
+        {getVideoSources().map((source, index) => (
+          <source key={index} src={source.src} type={source.type} />
+        ))}
+        Your browser does not support the video tag.
+        <a href={videoUrl} download className="text-blue-400 underline">Download the video</a> instead.
+      </video>
+      {/* Overlays on top so play button and controls are always visible */}
       {videoError && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-10 p-8 text-center">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 z-20 p-8 text-center">
           <div className="max-w-md">
             <svg className="w-16 h-16 text-red-500 mx-auto mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
@@ -468,37 +492,27 @@ const VideoPlayerComponent: React.FC<{
           </div>
         </div>
       )}
+      {!hasLoaded && !videoError && (
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 z-10 pointer-events-none" aria-hidden>
+          <div className="w-14 h-14 border-4 border-white/30 border-t-white rounded-full animate-spin mb-3" />
+          <span className="text-sm font-medium text-white/90">Loading video…</span>
+        </div>
+      )}
       {isBuffering && (
-        <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-[5] pointer-events-none" aria-hidden>
+        <div className="absolute inset-0 flex items-center justify-center bg-black/40 z-10 pointer-events-none" aria-hidden>
           <div className="w-14 h-14 border-4 border-white/30 border-t-white rounded-full animate-spin" />
         </div>
       )}
-      {showCenterIcon && !videoError && (
+      {showCenterIcon && !videoError && hasLoaded && (
         <div
-          className="absolute inset-0 flex items-center justify-center z-[5] pointer-events-none"
+          className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
           aria-hidden
         >
-          <div className="w-20 h-20 rounded-full bg-black/45 flex items-center justify-center shadow-xl">
-            <svg className="w-10 h-10 text-white ml-1.5" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z"/></svg>
+          <div className="w-24 h-24 rounded-full bg-black/60 flex items-center justify-center shadow-2xl ring-2 ring-white/30 border-2 border-white/20" aria-hidden>
+            <svg className="w-14 h-14 text-white ml-1.5 flex-shrink-0" fill="currentColor" viewBox="0 0 24 24" aria-hidden><path d="M8 5v14l11-7z"/></svg>
           </div>
         </div>
       )}
-      <video 
-        ref={videoRef}
-        key={videoUrl}
-        className="plyr__video-embed w-full h-auto max-h-[90vh]"
-        playsInline
-        preload="auto"
-        muted={false}
-        controlsList="nodownload"
-        crossOrigin="anonymous"
-      >
-        {getVideoSources().map((source, index) => (
-          <source key={index} src={source.src} type={source.type} />
-        ))}
-        Your browser does not support the video tag.
-        <a href={videoUrl} download className="text-blue-400 underline">Download the video</a> instead.
-      </video>
     </div>
   );
 };

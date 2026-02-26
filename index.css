@@ -28,20 +28,13 @@ body {
   outline: none !important;
   box-shadow: none !important;
 }
-/* Replace Plyr's big blue play button with our overlay; hide the default */
+/* Completely hide Plyr's big blue center play button so our custom play overlay shows */
 .byd-video-player .plyr__control--overlaid,
-.byd-video-player .plyr__control[data-plyr="play"] {
-  background: transparent !important;
-  color: rgba(255, 255, 255, 0.95);
-}
 .byd-video-player .plyr--full-ui .plyr__control--overlaid {
-  background: rgba(0, 0, 0, 0.35) !important;
-  border: none;
-  color: #fff;
-}
-.byd-video-player .plyr__control--overlaid:hover {
-  background: rgba(0, 0, 0, 0.5) !important;
-  color: #fff;
+  display: none !important;
+  visibility: hidden !important;
+  opacity: 0 !important;
+  pointer-events: none !important;
 }
 /* Ensure play/pause on control bar is visible */
 .byd-video-player .plyr__controls .plyr__control[aria-label="Play"],
@@ -51,4 +44,33 @@ body {
 .byd-video-player .plyr--video .plyr__control.plyr__tab-focus,
 .byd-video-player .plyr__control--pressed {
   box-shadow: none;
+}
+/* Keep controls bar and seek bar always visible and above overlays */
+.byd-video-player .plyr__controls {
+  opacity: 1 !important;
+  visibility: visible !important;
+  z-index: 30;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+}
+.byd-video-player .plyr__progress {
+  opacity: 1 !important;
+  visibility: visible !important;
+  flex: 1;
+  min-height: 6px;
+}
+.byd-video-player .plyr__progress__buffer {
+  opacity: 1 !important;
+  visibility: visible !important;
+  color: rgba(255, 255, 255, 0.25);
+}
+.byd-video-player .plyr__progress input[type="range"] {
+  color: #3b82f6;
+  cursor: pointer;
+}
+.byd-video-player .plyr--full-ui input[type="range"] {
+  color: #3b82f6;
+}
+.byd-video-player .plyr__controls .plyr__control,
+.byd-video-player .plyr__time {
+  color: rgba(255, 255, 255, 0.9);
 }
