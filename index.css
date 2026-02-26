@@ -28,7 +28,7 @@ body {
   outline: none !important;
   box-shadow: none !important;
 }
-/* Completely remove Plyr's big blue center play button - every possible selector */
+/* Completely remove Plyr's big blue center play button (also removed in JS on ready) */
 .byd-video-player .plyr__control--overlaid,
 .byd-video-player .plyr--full-ui .plyr__control--overlaid,
 .byd-video-player .plyr [data-plyr="play"].plyr__control--overlaid,
@@ -44,8 +44,12 @@ body {
   position: absolute !important;
   left: -9999px !important;
 }
+.byd-video-player .plyr .plyr__video-wrapper {
+  z-index: 0;
+}
 /* Keep controls bar and seek bar always visible and above overlays */
-.byd-video-player .plyr__controls {
+.byd-video-player .plyr__controls,
+.byd-video-player .plyr.plyr--hide-controls .plyr__controls {
   opacity: 1 !important;
   visibility: visible !important;
   z-index: 30;

@@ -349,6 +349,10 @@ const VideoPlayerComponent: React.FC<{
           video.addEventListener('playing', onPlaying);
           video.addEventListener('loadedmetadata', onLoadedMetadata);
           if (video.readyState >= 1) setHasLoaded(true);
+          const container = video.closest('.byd-video-player');
+          if (container) {
+            container.querySelectorAll('.plyr__control--overlaid').forEach((el) => el.remove());
+          }
         });
         
         plyr.on('error', (event: unknown) => {
@@ -505,7 +509,7 @@ const VideoPlayerComponent: React.FC<{
       )}
       {showCenterIcon && !videoError && hasLoaded && (
         <div
-          className="absolute inset-0 flex items-center justify-center z-10 pointer-events-none"
+          className="absolute inset-0 flex items-center justify-center z-20 pointer-events-none"
           aria-hidden
         >
           <div className="w-24 h-24 rounded-full bg-black/60 flex items-center justify-center shadow-2xl ring-2 ring-white/30 border-2 border-white/20" aria-hidden>
