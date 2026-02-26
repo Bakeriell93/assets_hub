@@ -28,35 +28,88 @@ body {
   outline: none !important;
   box-shadow: none !important;
 }
-/* Completely hide Plyr's big blue center play button so our custom play overlay shows */
+/* Completely remove Plyr's big blue center play button - every possible selector */
 .byd-video-player .plyr__control--overlaid,
-.byd-video-player .plyr--full-ui .plyr__control--overlaid {
+.byd-video-player .plyr--full-ui .plyr__control--overlaid,
+.byd-video-player .plyr [data-plyr="play"].plyr__control--overlaid,
+.byd-video-player button.plyr__control--overlaid,
+.byd-video-player .plyr__control.plyr__control--overlaid {
   display: none !important;
   visibility: hidden !important;
   opacity: 0 !important;
   pointer-events: none !important;
-}
-/* Ensure play/pause on control bar is visible */
-.byd-video-player .plyr__controls .plyr__control[aria-label="Play"],
-.byd-video-player .plyr__controls .plyr__control[aria-label="Pause"] {
-  color: #fff;
-}
-.byd-video-player .plyr--video .plyr__control.plyr__tab-focus,
-.byd-video-player .plyr__control--pressed {
-  box-shadow: none;
+  width: 0 !important;
+  height: 0 !important;
+  overflow: hidden !important;
+  position: absolute !important;
+  left: -9999px !important;
 }
 /* Keep controls bar and seek bar always visible and above overlays */
 .byd-video-player .plyr__controls {
   opacity: 1 !important;
   visibility: visible !important;
   z-index: 30;
-  background: linear-gradient(transparent, rgba(0, 0, 0, 0.75));
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 4px !important;
+  padding: 10px 12px !important;
+  min-height: 48px !important;
+  background: linear-gradient(transparent, rgba(0, 0, 0, 0.85)) !important;
+}
+/* Force ALL control bar buttons to be visible and clickable */
+.byd-video-player .plyr__controls__inner,
+.byd-video-player .plyr__controls .plyr__controls__inner {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: center !important;
+  gap: 6px !important;
+  flex: 1 !important;
+  min-width: 0 !important;
+}
+.byd-video-player .plyr__controls .plyr__control {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
+  color: #fff !important;
+  min-width: 40px !important;
+  min-height: 40px !important;
+  padding: 8px !important;
+  border: none !important;
+  background: transparent !important;
+  cursor: pointer !important;
+  align-items: center !important;
+  justify-content: center !important;
+}
+.byd-video-player .plyr__controls .plyr__control:hover {
+  color: #fff !important;
+  background: rgba(255, 255, 255, 0.15) !important;
+}
+.byd-video-player .plyr__controls .plyr__control[aria-label="Play"],
+.byd-video-player .plyr__controls .plyr__control[aria-label="Pause"] {
+  color: #fff !important;
+}
+.byd-video-player .plyr--video .plyr__control.plyr__tab-focus,
+.byd-video-player .plyr__control--pressed {
+  box-shadow: none;
+}
+.byd-video-player .plyr__controls .plyr__control svg {
+  width: 20px !important;
+  height: 20px !important;
+  fill: currentColor !important;
+}
+/* Time and progress in control bar */
+.byd-video-player .plyr__time {
+  color: rgba(255, 255, 255, 0.95) !important;
+  font-size: 13px !important;
+  padding: 0 6px !important;
 }
 .byd-video-player .plyr__progress {
   opacity: 1 !important;
   visibility: visible !important;
-  flex: 1;
-  min-height: 6px;
+  flex: 1 !important;
+  min-height: 6px !important;
+  max-width: 100% !important;
 }
 .byd-video-player .plyr__progress__buffer {
   opacity: 1 !important;
@@ -70,7 +123,10 @@ body {
 .byd-video-player .plyr--full-ui input[type="range"] {
   color: #3b82f6;
 }
-.byd-video-player .plyr__controls .plyr__control,
-.byd-video-player .plyr__time {
-  color: rgba(255, 255, 255, 0.9);
+/* Volume and menu controls visible */
+.byd-video-player .plyr__menu,
+.byd-video-player .plyr__volume {
+  display: flex !important;
+  visibility: visible !important;
+  opacity: 1 !important;
 }
