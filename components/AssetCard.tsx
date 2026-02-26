@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
 import { Asset, UserRole, getAssetBrands, getAssetPlatforms, assetContainsMasterFile } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
 import JSZip from 'jszip';
@@ -137,20 +137,24 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
     };
 
     const thumbUrl = getThumbnailUrl();
-    
-    // Create a small image to generate thumbnail
+    let cancelled = false;
+
     const img = new Image();
     img.crossOrigin = 'anonymous';
-    
+
+    const applyFallback = () => {
+      if (cancelled) return;
+      setThumbnailUrl(thumbUrl);
+      setIsLoaded(true);
+    };
+
     img.onload = () => {
+      if (cancelled) return;
       try {
-        // Create canvas to generate thumbnail
         const canvas = document.createElement('canvas');
-        const maxSize = 300; // Max width/height for thumbnail
+        const maxSize = 300;
         let width = img.width;
         let height = img.height;
-        
-        // Calculate thumbnail dimensions maintaining aspect ratio
         if (width > height) {
           if (width > maxSize) {
             height = (height * maxSize) / width;
@@ -162,7 +166,6 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
             height = maxSize;
           }
         }
-        
         canvas.width = width;
         canvas.height = height;
         const ctx = canvas.getContext('2d');
@@ -180,25 +183,25 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
             console.warn('Failed to cache thumbnail:', e);
           }
         } else {
-          // Fallback to original URL if canvas fails
-          setThumbnailUrl(thumbUrl);
-          setIsLoaded(true);
+          applyFallback();
         }
       } catch (err) {
         console.warn('Thumbnail generation failed:', err);
-        // Fallback to original URL
-        setThumbnailUrl(thumbUrl);
-        setIsLoaded(true);
+        applyFallback();
       }
     };
-    
-    img.onerror = () => {
-      // Fallback to original URL on error
-      setThumbnailUrl(thumbUrl);
-      setIsLoaded(true);
-    };
-    
+
+    img.onerror = applyFallback;
+
+    const timeoutId = setTimeout(applyFallback, 12000);
+
     img.src = thumbUrl;
+
+    return () => {
+      cancelled = true;
+      img.src = '';
+      clearTimeout(timeoutId);
+    };
   }, [imageUrl, assetId, assetUpdatedAt]);
 
   if (!isLoaded) {
@@ -267,8 +270,8 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const canDelete = userRole === 'Editor' || userRole === 'Admin'; // Editor can now delete
   const associatedModels = [...new Set([asset.carModel, ...(asset.carModels || [])].filter(Boolean))];
 
-  // Generate video thumbnail - cached in memory + localStorage (so filter switches don't regenerate)
-  useEffect(() => {
+  // Generate video thumbnail - cached in memory + localStorage; useLayoutEffect so ref is set, with retry and multiple fallbacks
+  useLayoutEffect(() => {
     if (previewAsset.type !== 'video' || !previewAsset.url) return;
     const cacheKey = `video_thumb_${previewAsset.url}`;
     const fromMem = videoThumbCache.get(previewAsset.url);
@@ -283,77 +286,93 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       return;
     }
     setVideoThumbnail(null);
-    if (!videoRef.current) return;
-    const video = videoRef.current;
-    const videoUrl = getThumbnailVideoUrl(previewAsset.url);
-    let isMov = false;
-    try {
-      const u = new URL(asset.url);
-      const path = u.pathname.toLowerCase();
-      isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
-    } catch {
-      const lower = asset.url.toLowerCase();
-      isMov = lower.endsWith('.mov') || lower.endsWith('.qt') || lower.endsWith('.apcn');
-    }
 
-    video.src = videoUrl;
-    video.crossOrigin = 'anonymous';
-    video.preload = 'metadata';
-    video.muted = true;
-    video.playsInline = true;
-    if (isMov) video.type = 'video/mp4';
+    let cleanupFn: (() => void) | undefined;
 
-    const generateThumbnail = () => {
+    const runGeneration = (videoEl: HTMLVideoElement) => {
+      const videoUrl = getThumbnailVideoUrl(previewAsset.url);
+      let isMov = false;
       try {
-        if (video.readyState >= 2 && video.videoWidth > 0 && video.videoHeight > 0) {
-          const canvas = document.createElement('canvas');
-          canvas.width = video.videoWidth;
-          canvas.height = video.videoHeight;
-          const ctx = canvas.getContext('2d');
-          if (ctx) {
-            const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
-            videoThumbCache.set(previewAsset.url, thumbnailUrl);
-            setVideoThumbnail(thumbnailUrl);
-            try {
-              localStorage.setItem(cacheKey, thumbnailUrl);
-            } catch (e) {
-              console.warn('Failed to cache thumbnail:', e);
+        const u = new URL(asset.url);
+        isMov = u.pathname.toLowerCase().endsWith('.mov') || u.pathname.toLowerCase().endsWith('.qt') || u.pathname.toLowerCase().endsWith('.apcn');
+      } catch {
+        isMov = /\.(mov|qt|apcn)(\?|$)/i.test(asset.url || '');
+      }
+      videoEl.src = videoUrl;
+      videoEl.preload = 'auto';
+      videoEl.muted = true;
+      videoEl.playsInline = true;
+      if (videoUrl.startsWith('http') && !videoUrl.startsWith(window.location.origin)) {
+        videoEl.crossOrigin = 'anonymous';
+      }
+      if (isMov) videoEl.type = 'video/mp4';
+
+      const generateThumbnail = () => {
+        try {
+          if (videoEl.readyState >= 2 && videoEl.videoWidth > 0 && videoEl.videoHeight > 0) {
+            const canvas = document.createElement('canvas');
+            canvas.width = videoEl.videoWidth;
+            canvas.height = videoEl.videoHeight;
+            const ctx = canvas.getContext('2d');
+            if (ctx) {
+              const thumbnailUrl = canvas.toDataURL('image/jpeg', 0.8);
+              videoThumbCache.set(previewAsset.url, thumbnailUrl);
+              setVideoThumbnail(thumbnailUrl);
+              try {
+                localStorage.setItem(cacheKey, thumbnailUrl);
+              } catch (e) {
+                console.warn('Failed to cache thumbnail:', e);
+              }
             }
           }
+        } catch (err) {
+          console.warn('Failed to generate video thumbnail:', err);
         }
-      } catch (err) {
-        console.warn('Failed to generate video thumbnail:', err);
-      }
-    };
+      };
 
-    const tryGenerateThumbnail = () => {
-      if (video.readyState >= 2) {
-        try {
-          video.currentTime = 0.5;
-        } catch {
-          generateThumbnail();
+      const trySeekAndCapture = () => {
+        if (videoEl.readyState >= 2) {
+          try {
+            videoEl.currentTime = 0.5;
+          } catch {
+            generateThumbnail();
+          }
         }
-      }
+      };
+
+      const onLoadedMetadata = () => trySeekAndCapture();
+      videoEl.addEventListener('loadedmetadata', onLoadedMetadata);
+      videoEl.addEventListener('seeked', generateThumbnail, { once: true });
+      videoEl.addEventListener('loadeddata', generateThumbnail, { once: true });
+      videoEl.addEventListener('canplay', generateThumbnail, { once: true });
+
+      const t1 = setTimeout(() => { if (videoEl.readyState >= 2) generateThumbnail(); }, 1500);
+      const t2 = setTimeout(() => { if (videoEl.readyState >= 2) generateThumbnail(); }, 4000);
+      const t3 = setTimeout(() => { if (videoEl.readyState >= 2) generateThumbnail(); }, 7000);
+
+      return () => {
+        videoEl.removeEventListener('loadedmetadata', onLoadedMetadata);
+        videoEl.removeEventListener('seeked', generateThumbnail);
+        videoEl.removeEventListener('loadeddata', generateThumbnail);
+        videoEl.removeEventListener('canplay', generateThumbnail);
+        clearTimeout(t1);
+        clearTimeout(t2);
+        clearTimeout(t3);
+      };
     };
 
-    const onLoadedMetadata = () => {
-      tryGenerateThumbnail();
-    };
-
-    video.addEventListener('loadedmetadata', onLoadedMetadata);
-    video.addEventListener('seeked', generateThumbnail, { once: true });
-    video.addEventListener('loadeddata', generateThumbnail, { once: true });
-
-    const timeoutId = setTimeout(() => {
-      if (video.readyState >= 2) generateThumbnail();
-    }, 2500);
-
-    return () => {
-      video.removeEventListener('loadedmetadata', onLoadedMetadata);
-      video.removeEventListener('seeked', generateThumbnail);
-      video.removeEventListener('loadeddata', generateThumbnail);
-      clearTimeout(timeoutId);
-    };
+    if (videoRef.current) {
+      cleanupFn = runGeneration(videoRef.current);
+    } else {
+      const id = setTimeout(() => {
+        if (videoRef.current) cleanupFn = runGeneration(videoRef.current);
+      }, 0);
+      return () => {
+        clearTimeout(id);
+        cleanupFn?.();
+      };
+    }
+    return () => cleanupFn?.();
   }, [previewAsset.type, previewAsset.url]);
 
   const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
