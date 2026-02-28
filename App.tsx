@@ -1289,8 +1289,8 @@ function App() {
             <button type="button" onClick={() => setIsMobileMenuOpen(prev => !prev)} className="flex-shrink-0 p-2 rounded-xl text-gray-500 hover:bg-gray-100 md:hidden" aria-label="Menu">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
-            <div className="flex-1 min-w-0 overflow-x-auto hide-scrollbar">
-              <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner w-max min-w-0">
+            <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden hide-scrollbar">
+              <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner w-max">
                 {([
                   { id: 'repository', label: 'HUB' },
                   ...(currentUser?.role === 'Admin' ? [{ id: 'analytics', label: 'ANALYTICS' }] : []),
@@ -1300,7 +1300,7 @@ function App() {
                   <button
                     key={v.id}
                     onClick={() => setViewMode(v.id as ViewMode)}
-                    className={`flex-shrink-0 px-3 sm:px-6 md:px-8 py-2.5 sm:py-3.5 rounded-[18px] md:rounded-[22px] text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] transition-all ${viewMode === v.id ? 'bg-white text-gray-900 shadow-xl md:shadow-2xl' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`flex-shrink-0 px-3 sm:px-4 md:px-5 lg:px-8 py-2.5 sm:py-3 md:py-3.5 rounded-[18px] md:rounded-[22px] text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] md:tracking-[0.25em] lg:tracking-[0.3em] transition-all ${viewMode === v.id ? 'bg-white text-gray-900 shadow-xl md:shadow-2xl' : 'text-gray-400 hover:text-gray-600'}`}
                   >{v.label}</button>
                 ))}
               </div>
