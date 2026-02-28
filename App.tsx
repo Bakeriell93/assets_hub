@@ -1276,53 +1276,63 @@ function App() {
       </div>
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-        <header className="bg-white border-b border-gray-100 px-4 sm:px-6 md:px-12 py-4 md:py-8 flex flex-col gap-4 md:gap-6 sticky top-0 z-30">
-          <div className="flex items-center justify-between gap-2 flex-wrap">
-            <div className="flex items-center gap-2 md:gap-8 flex-1 min-w-0">
-              <button type="button" onClick={() => setIsMobileMenuOpen(prev => !prev)} className="p-2 rounded-xl text-gray-500 hover:bg-gray-100 md:hidden" aria-label="Menu">
-                <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
-              </button>
-              <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner flex-wrap gap-0.5">
-                 {[
-                   { id: 'repository', label: 'HUB' },
-                   { id: 'analytics', label: 'ANALYTICS' },
-                   { id: 'collections', label: 'PROJECTS' },
-                   { id: 'trash', label: 'TRASH' }
-                 ].map(v => (
-                   <button 
+        <header className="bg-white border-b border-gray-100 px-4 sm:px-6 md:px-12 py-4 md:py-8 flex flex-col gap-3 md:gap-6 sticky top-0 z-30">
+          {/* Row 1: Hamburger + View tabs (scroll on mobile) + Search (md only in row) + Action buttons */}
+          <div className="flex items-center gap-2 md:gap-8 min-w-0">
+            <button type="button" onClick={() => setIsMobileMenuOpen(prev => !prev)} className="flex-shrink-0 p-2 rounded-xl text-gray-500 hover:bg-gray-100 md:hidden" aria-label="Menu">
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
+            </button>
+            <div className="flex-1 min-w-0 overflow-x-auto hide-scrollbar">
+              <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner w-max md:w-auto">
+                {[
+                  { id: 'repository', label: 'HUB' },
+                  { id: 'analytics', label: 'ANALYTICS' },
+                  { id: 'collections', label: 'PROJECTS' },
+                  { id: 'trash', label: 'TRASH' }
+                ].map(v => (
+                  <button
                     key={v.id}
                     onClick={() => setViewMode(v.id as ViewMode)}
-                    className={`px-4 sm:px-6 md:px-8 py-2.5 sm:py-3.5 rounded-[18px] md:rounded-[22px] text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] transition-all ${viewMode === v.id ? 'bg-white text-gray-900 shadow-xl md:shadow-2xl' : 'text-gray-400 hover:text-gray-600'}`}
-                   >{v.label}</button>
-                 ))}
+                    className={`flex-shrink-0 px-3 sm:px-6 md:px-8 py-2.5 sm:py-3.5 rounded-[18px] md:rounded-[22px] text-[9px] sm:text-[10px] font-black uppercase tracking-[0.2em] md:tracking-[0.3em] transition-all ${viewMode === v.id ? 'bg-white text-gray-900 shadow-xl md:shadow-2xl' : 'text-gray-400 hover:text-gray-600'}`}
+                  >{v.label}</button>
+                ))}
               </div>
-              
-              {viewMode === 'repository' && (
-                <>
-                  <div className="relative flex-1 min-w-0 max-w-full sm:max-w-sm">
-                    <svg className="w-5 h-5 absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
-                    <input 
-                      type="text" 
-                      className="w-full pl-14 pr-8 py-4 bg-gray-50 rounded-[28px] outline-none border-2 border-transparent focus:bg-white focus:border-blue-600 text-sm font-bold transition-all shadow-inner"
-                      placeholder="Search BYD assets..." 
-                      value={searchQuery}
-                      onChange={e => setSearchQuery(e.target.value)}
-                    />
-                  </div>
-                </>
-              )}
             </div>
-            
+            {viewMode === 'repository' && (
+              <div className="relative flex-1 min-w-0 max-w-full sm:max-w-sm hidden md:block">
+                <svg className="w-5 h-5 absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+                <input
+                  type="text"
+                  className="w-full pl-14 pr-8 py-4 bg-gray-50 rounded-[28px] outline-none border-2 border-transparent focus:bg-white focus:border-blue-600 text-sm font-bold transition-all shadow-inner"
+                  placeholder="Search BYD assets..."
+                  value={searchQuery}
+                  onChange={e => setSearchQuery(e.target.value)}
+                />
+              </div>
+            )}
             <div className="flex gap-2 sm:gap-4 flex-shrink-0">
               <button onClick={() => setIsAIModalOpen(true)} className="hidden px-6 sm:px-10 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] hover:from-purple-700 hover:to-indigo-700 transition-all shadow-xl shadow-purple-200">AI Insights</button>
               {currentUser?.role !== 'Viewer' && (
                 <>
-                  <button onClick={() => setIsBulkUploadOpen(true)} className="px-4 sm:px-10 py-3 sm:py-4 bg-green-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-lg sm:shadow-2xl shadow-green-200 hover:bg-green-700 transition-all">BULK UPLOAD</button>
-                  <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-4 sm:px-10 py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-lg sm:shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">UPLOAD</button>
+                  <button onClick={() => setIsBulkUploadOpen(true)} className="px-3 sm:px-10 py-3 sm:py-4 bg-green-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-lg sm:shadow-2xl shadow-green-200 hover:bg-green-700 transition-all">BULK UPLOAD</button>
+                  <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-3 sm:px-10 py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-lg sm:shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">UPLOAD</button>
                 </>
               )}
             </div>
           </div>
+          {/* Row 2 (mobile only): Search full width when repository - prevents overlap */}
+          {viewMode === 'repository' && (
+            <div className="relative w-full min-w-0 md:hidden">
+              <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <input
+                type="text"
+                className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-[22px] outline-none border-2 border-transparent focus:bg-white focus:border-blue-600 text-sm font-bold transition-all shadow-inner"
+                placeholder="Search BYD assets..."
+                value={searchQuery}
+                onChange={e => setSearchQuery(e.target.value)}
+              />
+            </div>
+          )}
           
           {viewMode === 'repository' && (
             <>
@@ -2524,6 +2534,11 @@ function App() {
           </div>
         );
       })()}
+        {/* Footer credit - bottom right, subtle */}
+        <div className="fixed bottom-2 right-2 sm:bottom-3 sm:right-4 text-right pointer-events-none z-10">
+          <p className="text-[10px] text-gray-400/60">Made by Fakhri Ashour</p>
+          <p className="text-[9px] text-gray-400/50">Support on WeCom</p>
+        </div>
     </div>
   );
 }
