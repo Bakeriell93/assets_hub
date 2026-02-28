@@ -629,6 +629,13 @@ function App() {
     }
   }, []);
 
+  // Redirect non-admins off analytics view
+  useEffect(() => {
+    if (viewMode === 'analytics' && currentUser?.role !== 'Admin') {
+      setViewMode('repository');
+    }
+  }, [currentUser?.role, viewMode]);
+
   // If URL has ?shared=id1,id2, show only those assets.
   useEffect(() => {
     const applySharedFromUrl = () => {
@@ -1283,13 +1290,13 @@ function App() {
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
             <div className="flex-1 min-w-0 overflow-x-auto hide-scrollbar">
-              <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner w-max md:w-auto">
-                {[
+              <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner w-max min-w-0">
+                {([
                   { id: 'repository', label: 'HUB' },
-                  { id: 'analytics', label: 'ANALYTICS' },
+                  ...(currentUser?.role === 'Admin' ? [{ id: 'analytics', label: 'ANALYTICS' }] : []),
                   { id: 'collections', label: 'PROJECTS' },
                   { id: 'trash', label: 'TRASH' }
-                ].map(v => (
+                ] as const).map(v => (
                   <button
                     key={v.id}
                     onClick={() => setViewMode(v.id as ViewMode)}
