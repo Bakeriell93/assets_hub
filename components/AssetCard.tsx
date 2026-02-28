@@ -917,20 +917,20 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                 {asset.type === 'image' && (
                   <>
                     <a
-                      href="https://www.pxbee.com/ai-image-extender/"
+                      href="https://admorph-ai-561778234783.us-west1.run.app/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="bg-blue-600 px-4 py-2.5 rounded-2xl text-white hover:bg-blue-700 transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
-                      title="Open PxBee AI Image Extender (Story resize/outpaint)"
+                      title="Open AdMorph AI (resize/outpaint)"
                     >
                       Resize
                     </a>
                     <a
-                      href="https://ai.studio/apps/drive/1RIQCDDeZ-toZvjsRMJU4JTQDQrO4xpSt"
+                      href="https://admorph-ai-561778234783.us-west1.run.app/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="bg-[#111111] px-4 py-2.5 rounded-2xl text-white hover:bg-black transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
-                      title="Open AI Studio image edit app"
+                      title="Open AdMorph AI (edit image text)"
                     >
                       Edit Image Text
                     </a>
