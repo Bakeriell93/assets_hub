@@ -115,7 +115,7 @@ export function assetContainsMasterFile(a: Asset): boolean {
   if (a.assetTypes?.includes('design')) return true;
   const name = (a.originalFileName || a.url || '').toLowerCase();
   const ext = name.split('.').pop()?.replace(/\?.*$/, '') || '';
-  return ['zip', 'rar', 'psd', 'ai', 'eps'].includes(ext);
+  return ['zip', 'rar', 'psd', 'ai', 'eps', 'psb'].includes(ext);
 }
 
 /** Models for a given brand; when brand is All or modelsByBrand unused, returns all models. */

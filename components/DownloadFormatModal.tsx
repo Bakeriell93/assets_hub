@@ -30,14 +30,14 @@ const DownloadFormatModal: React.FC<DownloadFormatModalProps> = ({
     if (!url) return 'unknown';
     const match = url.match(/\.([a-z0-9]+)(?:\?|$)/i);
     const ext = match?.[1]?.toLowerCase() || '';
-    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'psd', 'svg'].includes(ext)) {
+    if (['jpg', 'jpeg', 'png', 'webp', 'gif', 'psd', 'psb', 'svg'].includes(ext)) {
       return ext === 'jpeg' ? 'jpg' : ext;
     }
     return 'unknown';
   };
 
   const originalFormat = detectOriginalFormat(asset.url);
-  const isDesignFile = asset.type === 'design' || ['psd', 'ai', 'eps', 'svg'].includes(originalFormat);
+  const isDesignFile = asset.type === 'design' || ['psd', 'ai', 'eps', 'svg', 'psb'].includes(originalFormat);
   const isVideo = asset.type === 'video';
   const isImage = asset.type === 'image' && !isDesignFile;
 

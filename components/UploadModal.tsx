@@ -250,7 +250,7 @@ const UploadModal: React.FC<UploadModalProps> = ({ isOpen, onClose, onSave, conf
                             <input
                                 type="file"
                                 required={true}
-                                accept={type === 'image' ? 'image/*' : type === 'video' ? 'video/*' : '*/*'}
+                                accept="*/*"
                                 onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
                                 className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             />

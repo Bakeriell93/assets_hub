@@ -1405,7 +1405,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                             <input
                               type="file"
                               required
-                              accept={selectedAssetTypes.length > 1 ? '*/*' : ((selectedAssetTypes[0] || type) === 'image' ? 'image/*' : (selectedAssetTypes[0] || type) === 'video' ? 'video/*' : '*/*')}
+                              accept="*/*"
                               onChange={(e) => setFile(e.target.files ? e.target.files[0] : null)}
                               className="absolute inset-0 w-full h-full opacity-0 cursor-pointer"
                             />

@@ -43,10 +43,11 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
 
     const newItems: BulkUploadItem[] = files.map((file, idx) => {
       // Detect type from file extension
+      const nameLower = file.name.toLowerCase();
       const ext = file.name.split('.').pop()?.toLowerCase() || '';
       let type: AssetType = 'image';
       if (['mp4', 'mov', 'avi', 'webm'].includes(ext)) type = 'video';
-      else if (['psd', 'ai', 'eps', 'pdf', 'svg'].includes(ext)) type = 'design';
+      else if (nameLower.endsWith('.psb.zip') || ['psd', 'ai', 'eps', 'pdf', 'svg', 'psb'].includes(ext)) type = 'design';
       else if (['txt', 'md'].includes(ext)) type = 'text';
 
       // Generate preview for images
@@ -287,7 +288,7 @@ const BulkUploadModal: React.FC<BulkUploadModalProps> = ({ isOpen, onClose, conf
                 onChange={handleFileSelect}
                 className="hidden"
                 id="bulk-upload-input"
-                accept="image/*,video/*,.psd,.ai,.eps,.pdf,.svg,.txt,.md"
+                accept="*/*"
               />
               <label
                 htmlFor="bulk-upload-input"

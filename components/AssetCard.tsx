@@ -505,7 +505,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const isMasterFileExtension = (a: Asset): boolean => {
     const name = (a.originalFileName || a.url || '').toLowerCase();
     const ext = name.split('.').pop()?.replace(/\?.*$/, '') || '';
-    return ['zip', 'rar', 'psd', 'ai', 'eps', 'pdf'].includes(ext);
+    return ['zip', 'rar', 'psd', 'ai', 'eps', 'pdf', 'psb'].includes(ext);
   };
 
   const showMasterFilePlaceholder =
