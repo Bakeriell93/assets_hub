@@ -958,18 +958,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
               <div className="space-y-12 animate-in fade-in duration-500">
                 <div>
                   <h3 className="text-3xl font-black text-gray-900 tracking-tight uppercase">Usage & Activity</h3>
-                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Logins and downloads — shared account: distinct users inferred by IP</p>
+                  <p className="text-xs font-bold text-gray-500 uppercase tracking-widest mt-1">Dashboard loads (each open in 24h), logins, downloads — distinct users inferred by IP</p>
                 </div>
 
                 {/* ——— OVERVIEW (time range) ——— */}
                 {(() => {
                   const rangeStart = activityRange === 'all' ? 0 : Date.now() - Number(activityRange) * 24 * 60 * 60 * 1000;
                   const inRange = <T extends { timestamp: number }>(x: T) => x.timestamp >= rangeStart;
+                  // Usage = dashboard loads (each time dashboard is opened in 24h), not just credential logins
+                  const dashboardViewsInRange = loginLogs.filter(l => inRange(l) && l.eventType === 'dashboard_view');
                   const loginsInRange = loginLogs.filter(inRange);
                   const downloadsInRange = downloadLogs.filter(inRange);
                   const uploadsInRange = assets.filter(a => (a.createdAt ?? 0) >= rangeStart);
-                  const totalLogins = loginsInRange.length;
-                  const uniqueLogins = [...new Set(loginsInRange.map(l => l.ip))].length;
+                  const totalLogins = dashboardViewsInRange.length;
+                  const uniqueLogins = [...new Set(dashboardViewsInRange.map(l => l.ip))].length;
                   const totalUploads = uploadsInRange.length;
                   const totalDownloads = downloadsInRange.length;
                   const rangeLabels: { value: ActivityRange; label: string }[] = [
@@ -996,13 +998,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                       </div>
                       <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                         <div className="p-6 rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-blue-50 to-white shadow-sm">
-                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Total logins</p>
+                          <p className="text-[10px] font-black text-blue-600 uppercase tracking-wider">Dashboard loads</p>
                           <p className="text-3xl font-black text-gray-900 mt-1">{totalLogins.toLocaleString()}</p>
+                          <p className="text-[9px] text-gray-500 mt-0.5">Times dashboard opened in period</p>
                         </div>
                         <div className="p-6 rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-emerald-50 to-white shadow-sm">
-                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Unique logins</p>
+                          <p className="text-[10px] font-black text-emerald-600 uppercase tracking-wider">Unique IPs</p>
                           <p className="text-3xl font-black text-gray-900 mt-1">{uniqueLogins.toLocaleString()}</p>
-                          <p className="text-[9px] text-gray-500 mt-0.5">Distinct IPs</p>
+                          <p className="text-[9px] text-gray-500 mt-0.5">Distinct IPs (dashboard loads)</p>
                         </div>
                         <div className="p-6 rounded-2xl border-2 border-gray-100 bg-gradient-to-br from-amber-50 to-white shadow-sm">
                           <p className="text-[10px] font-black text-amber-600 uppercase tracking-wider">Total uploads</p>
@@ -1017,9 +1020,9 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                   );
                 })()}
 
-                {/* ——— LOGINS ——— */}
+                {/* ——— LOGINS (credential + dashboard loads) ——— */}
                 <div className="bg-gray-50 p-8 rounded-[40px] border border-gray-100 shadow-sm">
-                  <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Logins</h4>
+                  <h4 className="text-[11px] font-black text-gray-900 uppercase tracking-[0.4em] mb-6">Activity log (logins &amp; dashboard loads)</h4>
                   <div className="grid grid-cols-2 md:grid-cols-4 gap-4 mb-6">
                     <div className="p-5 bg-white rounded-2xl border border-gray-100">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-wider">Total logins</p>
@@ -1080,6 +1083,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                           <thead className="sticky top-0 bg-gray-50 border-b border-gray-200">
                             <tr>
                               <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Date / Time</th>
+                              <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Event</th>
                               <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">User</th>
                               <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">Country</th>
                               <th className="px-3 py-2 font-black uppercase tracking-wider text-gray-500">IP</th>
@@ -1089,6 +1093,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                             {loginLogs.slice(0, 50).map(l => (
                               <tr key={l.id} className="hover:bg-gray-50">
                                 <td className="px-3 py-2 font-medium text-gray-700">{new Date(l.timestamp).toLocaleString()}</td>
+                                <td className="px-3 py-2">{l.eventType === 'dashboard_view' ? 'Dashboard load' : 'Login'}</td>
                                 <td className="px-3 py-2 font-bold">{l.username}</td>
                                 <td className="px-3 py-2 text-gray-600">{l.country}</td>
                                 <td className="px-3 py-2 text-gray-500 font-mono text-[10px]">{l.ip}</td>
@@ -1096,7 +1101,7 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
                             ))}
                           </tbody>
                         </table>
-                        {loginLogs.length === 0 && <p className="p-4 text-center text-gray-400 text-xs font-bold">No logins recorded yet</p>}
+                        {loginLogs.length === 0 && <p className="p-4 text-center text-gray-400 text-xs font-bold">No activity recorded yet</p>}
                       </div>
                     </div>
                   </div>

@@ -636,6 +636,15 @@ function App() {
     }
   }, [currentUser?.role, viewMode]);
 
+  // Log dashboard view once per page load (usage tracking: total logins = dashboard loads, not just credential logins)
+  const hasLoggedDashboardView = useRef(false);
+  useEffect(() => {
+    if (!isLoggedIn || !currentUser) return;
+    if (hasLoggedDashboardView.current) return;
+    hasLoggedDashboardView.current = true;
+    storageService.logDashboardView(currentUser.username);
+  }, [isLoggedIn, currentUser]);
+
   // If URL has ?shared=id1,id2, show only those assets.
   useEffect(() => {
     const applySharedFromUrl = () => {

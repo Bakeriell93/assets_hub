@@ -115,6 +115,8 @@ export interface LoginLog {
   username: string;
   ip: string;
   country: string;
+  /** 'login' = credential submit; 'dashboard_view' = dashboard loaded (same or new tab). Used for usage tracking. */
+  eventType?: 'login' | 'dashboard_view';
 }
 
 const handleError = (context: string, error: any) => {
@@ -317,6 +319,7 @@ export const storageService = {
         username,
         ip,
         country,
+        eventType: 'login',
       };
       if (!isCloudEnabled) {
         const existing = readLS<LoginLog[]>(LS_KEYS.loginLogs, []);
@@ -327,6 +330,37 @@ export const storageService = {
       await addDoc(collection(db!, LOGIN_LOGS_COLLECTION), payload);
     } catch (e) {
       console.warn('Could not log login:', e);
+    }
+  },
+
+  /** Log when the dashboard is loaded (page load / tab open while logged in). Tracks usage, not just credential logins. */
+  logDashboardView: async (username: string): Promise<void> => {
+    try {
+      let country = 'Unknown';
+      let ip = 'unknown';
+      try {
+        const ipInfo = await fetch('/api/get-ip-info').then(r => r.json());
+        ip = ipInfo.ip || 'unknown';
+        country = ipInfo.location || 'Unknown';
+      } catch {
+        // keep defaults
+      }
+      const payload: Omit<LoginLog, 'id'> = {
+        timestamp: Date.now(),
+        username,
+        ip,
+        country,
+        eventType: 'dashboard_view',
+      };
+      if (!isCloudEnabled) {
+        const existing = readLS<LoginLog[]>(LS_KEYS.loginLogs, []);
+        const id = `dash_${Date.now()}_${Math.random().toString(36).slice(2)}`;
+        writeLS(LS_KEYS.loginLogs, [{ ...payload, id }, ...existing].slice(0, 5000));
+        return;
+      }
+      await addDoc(collection(db!, LOGIN_LOGS_COLLECTION), payload);
+    } catch (e) {
+      console.warn('Could not log dashboard view:', e);
     }
   },
 
