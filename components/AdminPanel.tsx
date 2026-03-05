@@ -5,6 +5,19 @@ import { storageService, SecurityLog, DownloadLog, LoginLog } from '../services/
 import { storage } from '../services/firebase';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
 
+/** Default system metadata backup (2026-03-05). Restore button applies this as if importing the backup JSON. */
+const DEFAULT_SYSTEM_METADATA_BACKUP = {
+  models: ['Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i', 'Atto 2', 'Sealion 7', 'Atto 3 EVO', 'Atto 3', 'Atto 2 DM-i', 'DM-i Range', 'U9X', 'U9', 'U8', 'Dolphin Surf', 'Seal 6 DM-i Touring', 'Other', 'D9', 'N7', 'N8'],
+  platforms: ['Meta', 'Video', 'Banner'],
+  markets: ['PL', 'CH', 'NL', 'DE', 'IT', 'FR', 'Nordics', 'CZ', 'ES', 'Global'],
+  brands: ['BYD', 'Denza', 'Yangwang'],
+  modelsByBrand: {
+    Denza: ['D9', 'N7', 'N8'],
+    Yangwang: ['U9X', 'U9', 'U8', 'Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i', 'Atto 2', 'Sealion 7'],
+    BYD: ['DM-i Range', 'Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i', 'Atto 2', 'Sealion 7', 'Atto 3', 'Atto 2 DM-i', 'Atto 3 EVO', 'Dolphin Surf', 'Seal 6 DM-i Touring', 'Other'],
+  },
+} as const;
+
 interface AdminPanelProps {
   onClose: () => void;
   assets: Asset[];
@@ -405,31 +418,20 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     }
   };
 
-  /** Restore default markets, models, and fill empty brand model lists (Denza gets Denza models, not BYD). */
+  /** Restore system metadata from the default backup (same data as system_metadata_backup_2026-03-05.json). */
   const handleRestoreDefaults = async () => {
-    const nextMarkets = [...new Set([...config.markets, ...MARKETS])];
-    const defaultModelsUnion = [...new Set([...CAR_MODELS, ...DENZA_MODELS])];
-    const nextModels = [...new Set([...config.models, ...defaultModelsUnion])];
-    const brandsList = config.brands ?? BRANDS;
-    const nextByBrand = { ...(config.modelsByBrand && Object.keys(config.modelsByBrand).length > 0 ? config.modelsByBrand : {}) };
-    brandsList.forEach(b => {
-      const defaults = getDefaultModelsForBrand(b);
-      const current = nextByBrand[b];
-      if (b === 'Denza') {
-        // Denza gets only Denza models (fix BYD models duplicated under Denza)
-        nextByBrand[b] = [...DENZA_MODELS];
-      } else if (!current || current.length === 0) {
-        nextByBrand[b] = [...defaults];
-      } else {
-        nextByBrand[b] = [...new Set([...current, ...defaults])];
-      }
-    });
-    await storageService.saveSystemConfig({
-      ...config,
-      markets: nextMarkets,
-      models: nextModels,
-      modelsByBrand: nextByBrand,
-    });
+    const backup = DEFAULT_SYSTEM_METADATA_BACKUP;
+    const restored: SystemConfig = {
+      markets: [...backup.markets] as Market[],
+      models: [...backup.models],
+      platforms: [...backup.platforms],
+      brands: [...backup.brands] as Brand[],
+      modelsByBrand: backup.modelsByBrand
+        ? Object.fromEntries(Object.entries(backup.modelsByBrand).map(([k, v]) => [k, [...v]])) as SystemConfig['modelsByBrand']
+        : undefined,
+    };
+    await storageService.saveSystemConfig(restored);
+    alert('System metadata restored from default backup (markets, models, platforms, brands, modelsByBrand).');
   };
 
   const totalBytes = assets.reduce((acc, asset) => acc + (asset.size || resolvedAssetSizes[asset.id] || 0), 0);
