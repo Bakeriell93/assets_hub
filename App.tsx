@@ -1488,6 +1488,34 @@ function App() {
                             <button type="button" onClick={() => setIsBulkEditOpen(true)} className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg">
                               Bulk edit ({selectedAssetIds.size})
                             </button>
+                            {viewMode !== 'trash' && (
+                              <button
+                                type="button"
+                                onClick={async () => {
+                                  if (!confirm(`Move ${selectedAssetIds.size} selected item(s) to trash?`)) return;
+                                  const ids = Array.from(selectedAssetIds);
+                                  setUploadProgress(0);
+                                  setUploadStatus(`Moving ${ids.length} to trash...`);
+                                  try {
+                                    for (let i = 0; i < ids.length; i++) {
+                                      await storageService.deleteAsset(ids[i]);
+                                      setUploadProgress(((i + 1) / ids.length) * 100);
+                                    }
+                                    setSelectedAssetIds(new Set());
+                                    setUploadProgress(100);
+                                    setUploadStatus('Moved to trash');
+                                    setTimeout(() => { setUploadProgress(null); setUploadStatus(''); }, 1200);
+                                  } catch (err) {
+                                    setUploadProgress(null);
+                                    setUploadStatus('');
+                                    alert(`Failed to delete: ${err instanceof Error ? err.message : 'Unknown error'}`);
+                                  }
+                                }}
+                                className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl text-[11px] font-black uppercase tracking-widest transition-all shadow-lg"
+                              >
+                                Delete ({selectedAssetIds.size})
+                              </button>
+                            )}
                           </>
                         )}
                       </div>
@@ -2256,7 +2284,15 @@ function App() {
                             setPreviewViewMode('full');
                           }}
                         >
-                          {pkgAsset.type === 'image' && pkgAsset.url && (
+                          {(pkgAsset.type === 'design' || assetContainsMasterFile(pkgAsset)) && (
+                            <div className="w-full h-full bg-orange-50 flex flex-col items-center justify-center p-3">
+                              <svg className="w-12 h-12 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                              </svg>
+                              <span className="text-[9px] font-bold text-orange-600 uppercase mt-1 text-center line-clamp-2">Master file</span>
+                            </div>
+                          )}
+                          {pkgAsset.type === 'image' && pkgAsset.url && !assetContainsMasterFile(pkgAsset) && (
                             <img 
                               src={pkgAsset.url} 
                               alt={pkgAsset.title} 
@@ -2267,13 +2303,6 @@ function App() {
                           )}
                           {pkgAsset.type === 'video' && pkgAsset.url && (
                             <VideoThumbnail videoUrl={pkgAsset.url} title={pkgAsset.title} />
-                          )}
-                          {pkgAsset.type === 'design' && (
-                            <div className="w-full h-full bg-orange-50 flex items-center justify-center">
-                              <svg className="w-12 h-12 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
-                              </svg>
-                            </div>
                           )}
                           {pkgAsset.type === 'text' && (
                             <div className="w-full h-full bg-blue-50 flex items-center justify-center p-4">
@@ -2300,7 +2329,43 @@ function App() {
                   </div>
                 ) : (
                   <>
-                    {currentAsset.type === 'image' && currentAsset.url && (
+                    {(currentAsset.type === 'design' || assetContainsMasterFile(currentAsset)) && (() => {
+                      const getDesignFilename = (a: Asset) => {
+                        if (a.originalFileName) return a.originalFileName;
+                        if (!a.url) return 'file';
+                        try {
+                          const cleaned = (a.url || '').split('?')[0] || '';
+                          const last = cleaned.split('/').pop() || '';
+                          const decoded = decodeURIComponent(last);
+                          return (decoded.replace(/^\d+-/, '') || decoded || 'file').trim();
+                        } catch { return 'file'; }
+                      };
+                      const filename = getDesignFilename(currentAsset);
+                      return (
+                        <div className="relative p-12 flex flex-col items-center justify-center min-h-[320px] bg-gradient-to-b from-orange-50 to-white">
+                          <div className="w-20 h-20 bg-orange-100 rounded-2xl flex items-center justify-center mb-4">
+                            <svg className="w-10 h-10 text-orange-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+                            </svg>
+                          </div>
+                          <h2 className="text-2xl font-black text-gray-900 mb-2">{currentAsset.title}</h2>
+                          <p className="text-sm font-bold text-orange-600 uppercase tracking-wide">Master file — no in-browser preview</p>
+                          <p className="text-gray-600 mt-1 break-all text-center max-w-lg">{filename}</p>
+                          <p className="text-sm text-gray-500 mt-4 mb-6">Download to open in your design tool</p>
+                          {currentAsset.url && (
+                            <button
+                              type="button"
+                              onClick={(e) => handleDownloadAsset(currentAsset, e)}
+                              className="inline-flex items-center gap-2 px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white rounded-xl font-black text-sm uppercase tracking-wider transition-all shadow-lg"
+                            >
+                              <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16v1a3 3 0 003 3h10a3 3 0 003-3v-1m-4-4l-4 4m0 0l-4-4m4 4V4" /></svg>
+                              Download
+                            </button>
+                          )}
+                        </div>
+                      );
+                    })()}
+                    {currentAsset.type === 'image' && currentAsset.url && !assetContainsMasterFile(currentAsset) && (
                       <CachedImagePreview 
                         asset={currentAsset}
                         previewedAssetsCache={previewedAssetsCache}
@@ -2454,27 +2519,6 @@ function App() {
                         <p className="text-lg text-gray-700 whitespace-pre-wrap">{currentAsset.content}</p>
                       </div>
                     )}
-                    {currentAsset.type === 'design' && (() => {
-                      const getDesignFilename = (a: Asset) => {
-                        if (a.originalFileName) return a.originalFileName;
-                        if (!a.url) return 'file';
-                        try {
-                          const cleaned = a.url.split('?')[0] || '';
-                          const last = cleaned.split('/').pop() || '';
-                          const decoded = decodeURIComponent(last);
-                          return (decoded.replace(/^\d+-/, '') || decoded || 'file').trim();
-                        } catch { return 'file'; }
-                      };
-                      const filename = getDesignFilename(currentAsset);
-                      return (
-                        <div className="relative p-12 text-center">
-                          <h2 className="text-3xl font-black text-gray-900 mb-4">{currentAsset.title}</h2>
-                          <p className="text-lg font-bold text-orange-600 uppercase tracking-wide">Master file</p>
-                          <p className="text-gray-700 mt-1 break-all">{filename}</p>
-                          <p className="text-sm text-gray-500 mt-4">Download to open in your design tool</p>
-                        </div>
-                      );
-                    })()}
                   </>
                 )}
               </div>
