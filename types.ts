@@ -86,6 +86,8 @@ export interface Asset {
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
   /** When true, show "Contains master file" label on the asset card */
   containsMasterFile?: boolean;
+  /** When true, content is AI generated; show label on card and allow filter */
+  aiGenerated?: boolean;
 }
 
 export interface SystemConfig {

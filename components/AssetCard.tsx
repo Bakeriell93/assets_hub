@@ -957,6 +957,9 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         {assetContainsMasterFile(asset) && (
           <span className="inline-block px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider border border-amber-200 mb-2">Contains master file</span>
         )}
+        {asset.aiGenerated && (
+          <span className="inline-block px-2 py-0.5 rounded-md bg-violet-100 text-violet-800 text-[9px] font-black uppercase tracking-wider border border-violet-200 mb-2">AI generated</span>
+        )}
         {asset.packageNote && (
           <p className="text-[10px] text-gray-500 mb-2 line-clamp-2" title={asset.packageNote}>{asset.packageNote}</p>
         )}

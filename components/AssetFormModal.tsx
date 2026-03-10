@@ -58,6 +58,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
     : getModelsForBrand(config, brand);
   const [selectedPackageTypes, setSelectedPackageTypes] = useState<AssetType[]>(['image', 'video']);
   const [containsMasterFile, setContainsMasterFile] = useState(false);
+  const [aiGenerated, setAiGenerated] = useState(false);
   const [removedFromPackageIds, setRemovedFromPackageIds] = useState<string[]>([]);
   const [newPackageFiles, setNewPackageFiles] = useState<File[]>([]);
   const [newPackageFileTitles, setNewPackageFileTitles] = useState<Record<number, string>>({});
@@ -204,6 +205,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setPackageNote(editingAsset.packageNote || '');
       setSelectedPackageTypes(editingAsset.packageAssetTypes?.length ? editingAsset.packageAssetTypes : ['image', 'video']);
       setContainsMasterFile(!!editingAsset.containsMasterFile);
+      setAiGenerated(!!editingAsset.aiGenerated);
       
       // If editing a package, initialize package asset titles
       if (editingPackageAssets.length > 1) {
@@ -432,6 +434,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             packageNote: packageNote.trim() || undefined,
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
             ...(containsMasterFile ? { containsMasterFile: true } : {}),
+            ...(aiGenerated ? { aiGenerated: true } : {}),
             ...(idx === previewAssetIndex ? { packagePreviewAssetId: 'temp_' + idx } : {})
           } as Omit<Asset, 'id' | 'createdAt'>,
           file: f
@@ -502,6 +505,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             packageNote: packageNote.trim() || undefined,
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
             containsMasterFile: containsMasterFile,
+            aiGenerated: aiGenerated,
             ...(newPreviewAssetId !== undefined ? { packagePreviewAssetId: newPreviewAssetId } : {}),
           };
           await storageService.updateAsset(pkgAsset.id, updates);
@@ -556,8 +560,9 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         brand: selectedBrands[0] || undefined,
         brands: selectedBrands.length ? selectedBrands : undefined,
         containsMasterFile: containsMasterFile,
+        aiGenerated: aiGenerated,
       };
-      
+
       onSave(updates, file || undefined);
       return;
     }
@@ -584,6 +589,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       brand: selectedBrands[0] || undefined,
       brands: selectedBrands.length ? selectedBrands : undefined,
       ...(containsMasterFile ? { containsMasterFile: true } : {}),
+      ...(aiGenerated ? { aiGenerated: true } : {}),
     };
 
     onSave(data, file || undefined);
@@ -725,6 +731,13 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     <span className="text-xs font-bold text-gray-700">Contains master file?</span>
                   </label>
                   <p className="text-[10px] text-gray-500 mt-0.5 ml-6">When checked, a label is shown on the asset card. Tip: upload the master as a ZIP file.</p>
+                </div>
+                <div className="mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input type="checkbox" checked={aiGenerated} onChange={(e) => setAiGenerated(e.target.checked)} className="w-4 h-4 rounded border-gray-300 text-violet-600" />
+                    <span className="text-xs font-bold text-gray-700">Is this content AI generated?</span>
+                  </label>
+                  <p className="text-[10px] text-gray-500 mt-0.5 ml-6">When checked, an &quot;AI generated&quot; label is shown on the asset card and the asset can be filtered in the hub.</p>
                 </div>
 
                 {editingAsset && editingPackageAssets.length <= 1 && onConvertToPackage && (

@@ -587,6 +587,7 @@ function App() {
   const [selectedModel, setSelectedModel] = useState<CarModel | 'All'>('All');
   const [selectedPlatform, setSelectedPlatform] = useState<Platform | 'All'>('All');
   const [masterFilesOnly, setMasterFilesOnly] = useState(false);
+  const [aiGeneratedOnly, setAiGeneratedOnly] = useState(false);
   const [selectedObjectives, setSelectedObjectives] = useState<AssetObjective[]>([]);
   const [searchQuery, setSearchQuery] = useState('');
   const [sortBy, setSortBy] = useState<SortOption>('newest');
@@ -785,6 +786,7 @@ function App() {
           brand: data.brand,
           brands: data.brands,
           ...(data.containsMasterFile !== undefined ? { containsMasterFile: !!data.containsMasterFile } : {}),
+          ...(data.aiGenerated !== undefined ? { aiGenerated: !!data.aiGenerated } : {}),
           // Preserve these fields from original asset
           url: editingAsset.url,
           size: editingAsset.size,
@@ -1177,7 +1179,8 @@ function App() {
     const cMatch = !activeCollectionId || (a.collectionIds || []).some(cid => getCollectionAndDescendantIds(activeCollectionId).has(cid));
     const sMatch = matchesSearch(a, searchQuery);
     const masterMatch = !masterFilesOnly || assetContainsMasterFile(a);
-    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch && masterMatch;
+    const aiMatch = !aiGeneratedOnly || !!a.aiGenerated;
+    return brandMatch && mMatch && modelMatch && pMatch && objMatch && cMatch && sMatch && masterMatch && aiMatch;
   });
 
   // Group assets by packageId - show only the first asset of each package, or standalone assets
@@ -1222,8 +1225,9 @@ function App() {
   const cardCount = sortedAssets.length;
   const singleCardCount = standaloneAssets.length;
   const packageCardCount = packageGroups.length;
-  const masterFileCardCount = standaloneAssets.filter(a => assetContainsMasterFile(a)).length
-    + packageGroups.filter(g => g.assets.some(a => assetContainsMasterFile(a))).length;
+  const masterFileCardCount = standaloneAssets.filter(a => assetContainsMasterFile(a)).length;
+  const cardRepresentatives = [...standaloneAssets, ...packageGroups.map(g => g.representative)];
+  const aiGeneratedCardCount = cardRepresentatives.filter(a => a.aiGenerated).length;
   const allVisibleSelected = visibleRepositoryAssets.length > 0 && visibleRepositoryAssets.every(a => selectedAssetIds.has(a.id));
   const toggleSelectAll = () => {
     if (allVisibleSelected) setSelectedAssetIds(prev => { const next = new Set(prev); visibleRepositoryAssets.forEach(a => next.delete(a.id)); return next; });
@@ -1376,7 +1380,7 @@ function App() {
                   </button>
                 )}
               </div>
-              <div className="flex items-center gap-3 mt-3">
+              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-3">
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
@@ -1386,7 +1390,16 @@ function App() {
                   />
                   <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Master files</span>
                 </label>
-                <span className="text-[10px] text-gray-500">Show only assets that contain PSD, ZIP or other non-image/video files</span>
+                <label className="flex items-center gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={aiGeneratedOnly}
+                    onChange={(e) => setAiGeneratedOnly(e.target.checked)}
+                    className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                  />
+                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">AI generated</span>
+                </label>
+                <span className="text-[10px] text-gray-500">Master: PSD, ZIP, etc. · AI: content marked as AI generated</span>
               </div>
             </>
           )}
@@ -1468,7 +1481,7 @@ function App() {
                     <p className="text-5xl sm:text-6xl md:text-7xl font-black text-blue-600 leading-none tracking-tighter">{cardCount}</p>
                     <p className="text-[11px] sm:text-[12px] font-black text-gray-400 uppercase tracking-[0.4em] sm:tracking-[0.5em] mt-2 sm:mt-3">Cards</p>
                     <p className="text-[10px] text-gray-500 mt-1.5">
-                      {singleCardCount} single · {packageCardCount} package{packageCardCount === 1 ? '' : 's'} · {masterFileCardCount} master file{masterFileCardCount === 1 ? '' : 's'}
+                      {singleCardCount} single · {packageCardCount} package{packageCardCount === 1 ? '' : 's'} · {masterFileCardCount} master file{masterFileCardCount === 1 ? '' : 's'} · {aiGeneratedCardCount} AI generated
                     </p>
                     {canEdit && (
                       <div className="flex items-center gap-4 mt-2">
