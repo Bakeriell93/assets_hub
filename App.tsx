@@ -571,6 +571,43 @@ function App() {
     models: CAR_MODELS, 
     platforms: PLATFORMS 
   });
+  const DEFAULT_SYSTEM_METADATA_BACKUP = useRef<SystemConfig>({
+    markets: ['PL', 'CH', 'NL', 'DE', 'IT', 'FR', 'Nordics', 'CZ', 'ES', 'Global'],
+    models: ['Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i', 'Atto 2', 'Sealion 7', 'Atto 3 EVO', 'Atto 3', 'Atto 2 DM-i', 'DM-i Range', 'U9X', 'U9', 'U8', 'Dolphin Surf', 'Seal 6 DM-i Touring', 'Other', 'D9', 'N7', 'N8'],
+    platforms: ['Meta', 'Video', 'Banner'],
+    brands: ['BYD', 'Denza', 'Yangwang'],
+    modelsByBrand: {
+      Denza: ['D9', 'N7', 'N8'],
+      Yangwang: ['U9X', 'U9', 'U8', 'Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i', 'Atto 2', 'Sealion 7'],
+      BYD: ['DM-i Range', 'Seal', 'Seal 5', 'Seal 6', 'Seal U DM-i', 'Atto 2', 'Sealion 7', 'Atto 3', 'Atto 2 DM-i', 'Atto 3 EVO', 'Dolphin Surf', 'Seal 6 DM-i Touring', 'Other'],
+    },
+  });
+  const lastAutoMetadataRestoreAtRef = useRef<number>(0);
+  const ensureMetadataIntegrity = async (next: SystemConfig) => {
+    // If metadata is missing expected baseline entries, auto-restore the default backup.
+    // This prevents unexpected drift (e.g. losing "DM-i Range").
+    const backup = DEFAULT_SYSTEM_METADATA_BACKUP.current;
+    const hasModel = (arr: any, value: string) => Array.isArray(arr) && arr.includes(value);
+    const bydModels = (next.modelsByBrand as any)?.BYD;
+    const missingBaseline =
+      !hasModel(next.models, 'DM-i Range') ||
+      (next.modelsByBrand ? !hasModel(bydModels, 'DM-i Range') : false) ||
+      !Array.isArray(next.markets) ||
+      !Array.isArray(next.platforms);
+
+    if (!missingBaseline) return next;
+
+    const now = Date.now();
+    // Throttle: avoid restore loops if config write is racing.
+    if (now - lastAutoMetadataRestoreAtRef.current < 60_000) return backup;
+    lastAutoMetadataRestoreAtRef.current = now;
+    try {
+      await storageService.saveSystemConfig(backup);
+    } catch (e) {
+      console.warn('Auto-restore system metadata failed:', e);
+    }
+    return backup;
+  };
   const [users, setUsers] = useState<User[]>([]);
   const [collections, setCollections] = useState<Collection[]>([]);
   const [isAddingCollection, setIsAddingCollection] = useState(false);
@@ -721,7 +758,12 @@ function App() {
   useEffect(() => {
     if (isLoggedIn) {
       const unsubAssets = storageService.subscribeToAssets(setAssets);
-      const unsubConfig = storageService.subscribeToConfig(setConfig);
+      const unsubConfig = storageService.subscribeToConfig((next) => {
+        void (async () => {
+          const ensured = await ensureMetadataIntegrity(next);
+          setConfig(ensured);
+        })();
+      });
       const unsubUsers = storageService.subscribeToUsers(setUsers);
       const unsubCollections = storageService.subscribeToCollections(setCollections);
       
