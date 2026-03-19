@@ -926,13 +926,13 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                       Resize
                     </a>
                     <a
-                      href="https://admorph-ai-561778234783.us-west1.run.app/"
+                      href="https://admorph-app.vercel.app/"
                       target="_blank"
                       rel="noopener noreferrer"
                       className="bg-[#111111] px-4 py-2.5 rounded-2xl text-white hover:bg-black transition-all shadow-2xl font-black text-[9px] uppercase tracking-widest whitespace-nowrap"
-                      title="Open AdMorph AI (edit image text)"
+                      title="Edit with AI"
                     >
-                      Edit Image Text
+                      Edit with AI
                     </a>
                   </>
                 )}

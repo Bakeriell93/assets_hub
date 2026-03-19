@@ -1441,6 +1441,14 @@ function App() {
                   />
                   <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">AI generated</span>
                 </label>
+                <a
+                  href="https://admorph-app.vercel.app/"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-200 transition-all"
+                >
+                  Generate with AI
+                </a>
                 <span className="text-[10px] text-gray-500">Master: PSD, ZIP, etc. · AI: content marked as AI generated</span>
               </div>
             </>
