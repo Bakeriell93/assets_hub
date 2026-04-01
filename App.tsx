@@ -1348,7 +1348,8 @@ function App() {
               <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner w-max">
                 {([
                   { id: 'repository', label: 'HUB' },
-                  ...(currentUser?.role === 'Admin' ? [{ id: 'analytics', label: 'ANALYTICS' }] : []),
+                  // Hidden for now (keep analytics view/logic intact)
+                  ...(false ? [{ id: 'analytics', label: 'ANALYTICS' }] : []),
                   { id: 'collections', label: 'PROJECTS' },
                   { id: 'trash', label: 'TRASH' }
                 ] as const).map(v => (
