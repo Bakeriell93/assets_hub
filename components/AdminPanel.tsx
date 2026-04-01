@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { User, UserRole, Asset, SystemConfig, Brand, BRANDS, Market, MARKETS, CAR_MODELS, DENZA_MODELS, getAssetBrands } from '../types';
+import { User, UserRole, Asset, SystemConfig, Brand, BRANDS, Market, Platform, MARKETS, CAR_MODELS, DENZA_MODELS, getAssetBrands } from '../types';
 import { storageService, SecurityLog, DownloadLog, LoginLog } from '../services/storageService';
 import { storage } from '../services/firebase';
 import { getMetadata, ref as storageRef } from 'firebase/storage';
@@ -257,14 +257,21 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
     const nextList = config[type].map(v => v === oldValue ? newVal : v);
     await storageService.saveSystemConfig({ ...config, [type]: nextList });
     if (type === 'platforms') {
-      const toUpdate = assets.filter(a => a.platform === oldValue);
-      for (const a of toUpdate) {
-        await storageService.updateAsset(a.id, { platform: newVal });
+      for (const a of assets) {
+        const patch: Partial<Asset> = {};
+        if (a.platform === oldValue) patch.platform = newVal as Platform;
+        if (a.platforms?.some(p => p === oldValue)) {
+          patch.platforms = a.platforms.map(p => (p === oldValue ? newVal : p)) as Platform[];
+        }
+        if (Object.keys(patch).length > 0) {
+          await storageService.updateAsset(a.id, patch);
+        }
       }
     } else if (type === 'markets') {
-      const toUpdate = assets.filter(a => a.market === oldValue);
-      for (const a of toUpdate) {
-        await storageService.updateAsset(a.id, { market: newVal });
+      for (const a of assets) {
+        if (a.market === oldValue) {
+          await storageService.updateAsset(a.id, { market: newVal as Market });
+        }
       }
     }
     setEditingConfigItem(null);
