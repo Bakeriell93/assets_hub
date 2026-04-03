@@ -1311,13 +1311,13 @@ function App() {
   if (!isLoggedIn) return <Login onLogin={handleLogin} />;
 
   return (
-    <div className="flex h-screen bg-gray-50 overflow-hidden font-sans">
+    <div className="flex h-screen overflow-hidden font-sans bg-[var(--hub-bg)] text-[var(--hub-text)]">
       {/* Mobile sidebar backdrop */}
       {isMobileMenuOpen && (
         <div className="fixed inset-0 bg-black/50 z-40 md:hidden" onClick={() => setIsMobileMenuOpen(false)} aria-hidden />
       )}
       {/* Sidebar: overlay on mobile, inline on md+ */}
-      <div className={`bg-white border-r border-gray-100 flex-shrink-0 transition-[width] duration-200
+      <div className={`bg-[var(--hub-surface)] border-r border-[var(--hub-border)] flex-shrink-0 transition-[width] duration-200 shadow-sm
         fixed md:relative inset-y-0 left-0 z-50 md:z-auto
         ${isMobileMenuOpen ? 'w-72 translate-x-0' : '-translate-x-full md:translate-x-0'}
         ${isSidebarCollapsed ? 'md:w-16' : 'md:w-72'}`}>
@@ -1338,47 +1338,51 @@ function App() {
       </div>
 
       <div className="flex-1 flex flex-col h-screen overflow-hidden min-w-0">
-        <header className="bg-white border-b border-gray-100 px-4 sm:px-6 md:px-12 py-4 md:py-8 flex flex-col gap-3 md:gap-6 sticky top-0 z-30">
+        <header className="bg-[var(--hub-surface)] border-b border-[var(--hub-border)] px-4 sm:px-6 md:px-10 py-4 md:py-6 flex flex-col gap-4 md:gap-5 sticky top-0 z-30 shadow-sm">
           {/* Row 1: Hamburger + View tabs (scroll on mobile) + Search (md only in row) + Action buttons */}
           <div className="flex items-center gap-2 md:gap-8 min-w-0">
             <button type="button" onClick={() => setIsMobileMenuOpen(prev => !prev)} className="flex-shrink-0 p-2 rounded-xl text-gray-500 hover:bg-gray-100 md:hidden" aria-label="Menu">
               <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
             </button>
-            <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden hide-scrollbar">
-              <div className="flex bg-gray-100 p-1.5 sm:p-2 rounded-[22px] md:rounded-[28px] border border-gray-200 shadow-inner w-max">
+            <div className="flex-1 min-w-0 overflow-x-auto overflow-y-hidden hide-scrollbar" role="tablist" aria-label="Main sections">
+              <div className="flex bg-[var(--hub-elevated)] p-1 sm:p-1.5 rounded-xl sm:rounded-2xl border border-[var(--hub-border)] w-max">
                 {([
-                  { id: 'repository', label: 'HUB' },
+                  { id: 'repository', label: 'Library' },
                   // Hidden for now (keep analytics view/logic intact)
-                  ...(false ? [{ id: 'analytics', label: 'ANALYTICS' }] : []),
-                  { id: 'collections', label: 'PROJECTS' },
-                  { id: 'trash', label: 'TRASH' }
+                  ...(false ? [{ id: 'analytics', label: 'Analytics' }] : []),
+                  { id: 'collections', label: 'Projects' },
+                  { id: 'trash', label: 'Trash' }
                 ] as const).map(v => (
                   <button
                     key={v.id}
+                    type="button"
+                    role="tab"
+                    aria-selected={viewMode === v.id}
                     onClick={() => setViewMode(v.id as ViewMode)}
-                    className={`flex-shrink-0 px-3 sm:px-4 md:px-5 lg:px-8 py-2.5 sm:py-3 md:py-3.5 rounded-[18px] md:rounded-[22px] text-[9px] sm:text-[10px] font-black uppercase tracking-[0.15em] sm:tracking-[0.2em] md:tracking-[0.25em] lg:tracking-[0.3em] transition-all ${viewMode === v.id ? 'bg-white text-gray-900 shadow-xl md:shadow-2xl' : 'text-gray-400 hover:text-gray-600'}`}
+                    className={`flex-shrink-0 px-3 sm:px-5 md:px-6 py-2 sm:py-2.5 rounded-lg sm:rounded-xl text-[12px] sm:text-[13px] font-semibold transition-all ${viewMode === v.id ? 'bg-[var(--hub-surface)] text-[var(--hub-text)] shadow-sm ring-1 ring-[var(--hub-border)]' : 'text-[var(--hub-muted)] hover:text-[var(--hub-text)]'}`}
                   >{v.label}</button>
                 ))}
               </div>
             </div>
             {viewMode === 'repository' && (
-              <div className="relative flex-1 min-w-0 max-w-full sm:max-w-sm hidden md:block">
-                <svg className="w-5 h-5 absolute left-6 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <div className="relative flex-1 min-w-0 max-w-full sm:max-w-md hidden md:block">
+                <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-[var(--hub-muted)] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
                 <input
-                  type="text"
-                  className="w-full pl-14 pr-8 py-4 bg-gray-50 rounded-[28px] outline-none border-2 border-transparent focus:bg-white focus:border-blue-600 text-sm font-bold transition-all shadow-inner"
-                  placeholder="Search BYD assets..."
+                  type="search"
+                  className="w-full pl-11 pr-4 py-3 bg-[var(--hub-elevated)] rounded-xl outline-none border border-transparent focus:bg-white focus:border-[var(--hub-primary)] focus:ring-2 focus:ring-blue-500/15 text-sm text-[var(--hub-text)] placeholder:text-[var(--hub-muted)] transition-all"
+                  placeholder="Search assets by name…"
                   value={searchQuery}
                   onChange={e => setSearchQuery(e.target.value)}
+                  aria-label="Search assets"
                 />
               </div>
             )}
-            <div className="flex gap-2 sm:gap-4 flex-shrink-0">
-              <button onClick={() => setIsAIModalOpen(true)} className="hidden px-6 sm:px-10 py-3 sm:py-4 bg-gradient-to-r from-purple-600 to-indigo-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] hover:from-purple-700 hover:to-indigo-700 transition-all shadow-xl shadow-purple-200">AI Insights</button>
+            <div className="flex gap-2 sm:gap-3 flex-shrink-0 flex-wrap justify-end">
+              <button type="button" onClick={() => setIsAIModalOpen(true)} className="hidden lg:inline-flex items-center px-4 py-2.5 bg-violet-600 text-white rounded-xl text-sm font-medium hover:bg-violet-700 transition-all shadow-sm">AI insights</button>
               {currentUser?.role !== 'Viewer' && (
                 <>
-                  <button onClick={() => setIsBulkUploadOpen(true)} className="px-3 sm:px-10 py-3 sm:py-4 bg-green-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-lg sm:shadow-2xl shadow-green-200 hover:bg-green-700 transition-all">BULK UPLOAD</button>
-                  <button onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-3 sm:px-10 py-3 sm:py-4 bg-blue-600 text-white rounded-xl sm:rounded-[24px] text-[10px] sm:text-[11px] font-black uppercase tracking-[0.2em] sm:tracking-[0.3em] shadow-lg sm:shadow-2xl shadow-blue-200 hover:bg-blue-700 transition-all">UPLOAD</button>
+                  <button type="button" onClick={() => setIsBulkUploadOpen(true)} className="px-3 sm:px-5 py-2.5 bg-emerald-600 text-white rounded-xl text-sm font-medium shadow-sm hover:bg-emerald-700 transition-all">Bulk upload</button>
+                  <button type="button" onClick={() => { setEditingAsset(null); setIsAssetModalOpen(true); }} className="px-3 sm:px-5 py-2.5 bg-[var(--hub-primary)] text-white rounded-xl text-sm font-medium shadow-sm hover:bg-[var(--hub-primary-hover)] transition-all">Upload</button>
                 </>
               )}
             </div>
@@ -1386,108 +1390,116 @@ function App() {
           {/* Row 2 (mobile only): Search full width when repository - prevents overlap */}
           {viewMode === 'repository' && (
             <div className="relative w-full min-w-0 md:hidden">
-              <svg className="w-5 h-5 absolute left-4 top-1/2 -translate-y-1/2 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
+              <svg className="w-5 h-5 absolute left-3 top-1/2 -translate-y-1/2 text-[var(--hub-muted)] pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 21l-6-6m2-5a7 7 0 11-14 0 7 7 0 0114 0z" /></svg>
               <input
-                type="text"
-                className="w-full pl-12 pr-4 py-3 bg-gray-50 rounded-[22px] outline-none border-2 border-transparent focus:bg-white focus:border-blue-600 text-sm font-bold transition-all shadow-inner"
-                placeholder="Search BYD assets..."
+                type="search"
+                className="w-full pl-10 pr-4 py-3 bg-[var(--hub-elevated)] rounded-xl outline-none border border-transparent focus:bg-white focus:border-[var(--hub-primary)] focus:ring-2 focus:ring-blue-500/15 text-sm placeholder:text-[var(--hub-muted)] transition-all"
+                placeholder="Search assets…"
                 value={searchQuery}
                 onChange={e => setSearchQuery(e.target.value)}
+                aria-label="Search assets"
               />
             </div>
           )}
           
           {viewMode === 'repository' && (
             <>
-              <div className="flex gap-3 overflow-x-auto hide-scrollbar pb-1">
+              <div>
+                <p className="text-[11px] font-medium text-[var(--hub-muted)] mb-2">Platform</p>
+                <div className="flex gap-2 overflow-x-auto hide-scrollbar pb-1">
                 {['All', ...config.platforms].map(p => (
                     <button 
+                      type="button"
                       key={p} 
                       onClick={() => setSelectedPlatform(p)}
-                      className={`whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 ${selectedPlatform === p ? 'bg-blue-600 border-blue-600 text-white shadow-xl' : 'bg-white text-gray-400 border-gray-100 hover:border-blue-300'}`}
+                      className={`whitespace-nowrap px-4 py-2 text-[13px] font-medium rounded-full transition-all border ${selectedPlatform === p ? 'bg-[var(--hub-primary)] border-[var(--hub-primary)] text-white shadow-sm' : 'bg-[var(--hub-surface)] text-[var(--hub-muted)] border-[var(--hub-border)] hover:border-[var(--hub-primary)]/40 hover:text-[var(--hub-text)]'}`}
                     >
                       {p}
                     </button>
                   ))}
                 {sharedAssetIds && (
                   <button
+                    type="button"
                     onClick={() => {
                       setSharedAssetIds(null);
                       const url = new URL(window.location.href);
                       url.searchParams.delete('shared');
                       window.history.replaceState({}, '', url.toString());
                     }}
-                    className="whitespace-nowrap px-8 py-3 text-[11px] font-black uppercase tracking-widest rounded-full transition-all border-2 bg-amber-100 text-amber-800 border-amber-200 hover:bg-amber-200"
+                    className="whitespace-nowrap px-4 py-2 text-[13px] font-medium rounded-full transition-all border border-amber-200 bg-amber-50 text-amber-900 hover:bg-amber-100"
                   >
-                    Shared view active - clear
+                    Clear shared link
                   </button>
                 )}
+                </div>
               </div>
-              <div className="flex flex-wrap items-center gap-x-6 gap-y-3 mt-3">
+              <div className="flex flex-wrap items-center gap-x-5 gap-y-3 mt-2 pt-3 border-t border-[var(--hub-border)]">
+                <span className="text-[11px] font-medium text-[var(--hub-muted)] w-full sm:w-auto sm:mr-1">Quick filters</span>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={masterFilesOnly}
                     onChange={(e) => setMasterFilesOnly(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-amber-600 focus:ring-amber-500"
+                    className="w-4 h-4 rounded border-[var(--hub-border)] text-amber-600 focus:ring-amber-500/30"
                   />
-                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">Master files</span>
+                  <span className="text-[13px] font-medium text-[var(--hub-text)]">Master files (ZIP, PSD…)</span>
                 </label>
                 <label className="flex items-center gap-2 cursor-pointer">
                   <input
                     type="checkbox"
                     checked={aiGeneratedOnly}
                     onChange={(e) => setAiGeneratedOnly(e.target.checked)}
-                    className="w-4 h-4 rounded border-gray-300 text-violet-600 focus:ring-violet-500"
+                    className="w-4 h-4 rounded border-[var(--hub-border)] text-violet-600 focus:ring-violet-500/30"
                   />
-                  <span className="text-xs font-bold text-gray-700 uppercase tracking-wide">AI generated</span>
+                  <span className="text-[13px] font-medium text-[var(--hub-text)]">AI-generated only</span>
                 </label>
                 <a
                   href="https://admorph-app.vercel.app/"
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="px-5 py-2.5 rounded-xl text-[11px] font-black uppercase tracking-wider bg-violet-100 text-violet-700 border border-violet-200 hover:bg-violet-200 transition-all"
+                  className="px-4 py-2 rounded-xl text-[13px] font-medium bg-violet-50 text-violet-800 border border-violet-200 hover:bg-violet-100 transition-all"
                 >
                   Generate with AI
                 </a>
-                <span className="text-[10px] text-gray-500">Master: PSD, ZIP, etc. · AI: content marked as AI generated</span>
               </div>
             </>
           )}
         </header>
 
-        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-12 bg-[#f8f9fc]">
+        <main className="flex-1 overflow-y-auto p-4 sm:p-6 md:p-10 bg-[var(--hub-bg)]">
           <div className="max-w-[1600px] mx-auto">
             {viewMode === 'repository' && (
               <div className="animate-in fade-in duration-700">
                 <div className="flex flex-col sm:flex-row sm:items-end sm:justify-between gap-6 mb-8 sm:mb-16">
                   <div className="min-w-0">
-                    <h1 className="text-4xl sm:text-5xl md:text-7xl font-black text-gray-900 tracking-tighter mb-4 leading-none uppercase">
-                      {selectedMarket === 'All' ? 'GLOBAL' : selectedMarket} HUB
+                    <h1 className="text-2xl sm:text-3xl md:text-4xl font-semibold text-[var(--hub-text)] tracking-tight mb-2 leading-tight">
+                      {selectedMarket === 'All' ? 'All markets' : selectedMarket}
                     </h1>
+                    <p className="text-sm text-[var(--hub-muted)] mb-4 max-w-xl">Browse and manage assets. Use the sidebar for brand, model, and region; filters above refine by platform.</p>
                     {activeCollectionId && (
                       <div className="mt-3 flex flex-wrap items-center gap-3">
-                        <span className="text-[11px] font-black uppercase tracking-[0.3em] text-purple-700 bg-purple-50 border border-purple-100 px-4 py-2 rounded-full">
+                        <span className="text-[13px] font-medium text-purple-800 bg-purple-50 border border-purple-100 px-3 py-1.5 rounded-lg">
                           Folder: {collections.find(c => c.id === activeCollectionId)?.name || 'Selected'}
                         </span>
                         <button
+                          type="button"
                           onClick={() => setActiveCollectionId(null)}
-                          className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-gray-900 text-white text-[10px] font-black uppercase tracking-[0.25em] hover:bg-black transition-all shadow-lg"
+                          className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg bg-[var(--hub-text)] text-white text-[13px] font-medium hover:opacity-95 transition-all"
                           title="Leave this folder view"
                         >
                           <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M10 19l-7-7 7-7m-7 7h18" />
                           </svg>
-                          Leave Folder
+                          Back to all assets
                         </button>
                       </div>
                     )}
-                    <div className="flex items-center gap-4">
-                      <span className="flex items-center gap-3 px-4 py-2 bg-green-500/10 text-green-600 text-[11px] font-black uppercase rounded-full border border-green-500/10 tracking-widest">
-                        <span className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></span>
-                        CLOUD SYNCED
+                    <div className="flex items-center gap-3 flex-wrap">
+                      <span className="inline-flex items-center gap-2 px-3 py-1.5 bg-emerald-50 text-emerald-800 text-[12px] font-medium rounded-lg border border-emerald-100">
+                        <span className="w-2 h-2 bg-emerald-500 rounded-full" aria-hidden />
+                        Synced
                       </span>
-                      <span className="text-[11px] font-black text-gray-300 uppercase tracking-[0.3em]">Tier: {currentUser?.role}</span>
+                      <span className="text-[12px] text-[var(--hub-muted)]">Role: <span className="font-medium text-[var(--hub-text)]">{currentUser?.role}</span></span>
                     </div>
                   </div>
                   <div className="text-right flex flex-col items-end gap-3">
