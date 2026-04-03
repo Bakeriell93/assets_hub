@@ -1,20 +1,4 @@
 /* Base styles - Tailwind will handle most styling */
-:root {
-  --hub-bg: #eef1f6;
-  --hub-surface: #ffffff;
-  --hub-elevated: #f7f8fb;
-  --hub-border: #e2e6ee;
-  --hub-text: #1a1f2e;
-  --hub-muted: #5c6578;
-  --hub-primary: #2563eb;
-  --hub-primary-hover: #1d4ed8;
-  --hub-primary-soft: #eff6ff;
-  --hub-success: #059669;
-  --hub-radius: 14px;
-  --hub-radius-sm: 10px;
-  --hub-font: 'Plus Jakarta Sans', system-ui, -apple-system, sans-serif;
-}
-
 * {
   margin: 0;
   padding: 0;
@@ -23,11 +7,9 @@
 
 body {
   margin: 0;
-  font-family: var(--hub-font);
+  font-family: 'Inter', sans-serif;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
-  background-color: var(--hub-bg);
-  color: var(--hub-text);
 }
 
 #root {
