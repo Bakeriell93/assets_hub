@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect, useLayoutEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { Asset, UserRole, getAssetBrands, getAssetPlatforms, assetContainsMasterFile } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
 import JSZip from 'jszip';
@@ -150,9 +150,7 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
 
     img.onload = () => {
       if (cancelled) return;
-      // Show the source image immediately; cache thumbnail generation can finish after.
-      setThumbnailUrl(thumbUrl);
-      setIsLoaded(true);
+      // Never show full-res in the card: only reveal after downscaled JPEG (saves bandwidth, no flash).
       try {
         const canvas = document.createElement('canvas');
         const maxSize = 300;
@@ -223,7 +221,7 @@ const ImageThumbnail: React.FC<{ imageUrl: string; assetId: string; assetUpdated
       src={thumbnailUrl || imageUrl} 
       alt={title} 
       className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110" 
-      loading="lazy"
+      loading="eager"
       decoding="async"
       fetchPriority="low"
       onError={(e) => {
@@ -274,8 +272,8 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const canDelete = userRole === 'Editor' || userRole === 'Admin'; // Editor can now delete
   const associatedModels = [...new Set([asset.carModel, ...(asset.carModels || [])].filter(Boolean))];
 
-  // Generate video thumbnail - cached in memory + localStorage; useLayoutEffect so ref is set, with retry and multiple fallbacks
-  useLayoutEffect(() => {
+  // Generate video thumbnail - cached in memory + localStorage; retry until hidden <video> ref exists (fixes package cards on first paint)
+  useEffect(() => {
     if (previewAsset.type !== 'video' || !previewAsset.url) return;
     const cacheKey = `video_thumb_${hashUrl(previewAsset.url)}`;
     const fromMem = videoThumbCache.get(previewAsset.url);
@@ -291,16 +289,17 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     }
     setVideoThumbnail(null);
 
+    let cancelled = false;
     let cleanupFn: (() => void) | undefined;
 
     const runGeneration = (videoEl: HTMLVideoElement) => {
       const videoUrl = getThumbnailVideoUrl(previewAsset.url);
       let isMov = false;
       try {
-        const u = new URL(asset.url);
+        const u = new URL(previewAsset.url);
         isMov = u.pathname.toLowerCase().endsWith('.mov') || u.pathname.toLowerCase().endsWith('.qt') || u.pathname.toLowerCase().endsWith('.apcn');
       } catch {
-        isMov = /\.(mov|qt|apcn)(\?|$)/i.test(asset.url || '');
+        isMov = /\.(mov|qt|apcn)(\?|$)/i.test(previewAsset.url || '');
       }
       videoEl.src = videoUrl;
       videoEl.preload = 'auto';
@@ -380,19 +379,41 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       };
     };
 
-    if (videoRef.current) {
-      cleanupFn = runGeneration(videoRef.current);
-    } else {
-      const id = setTimeout(() => {
-        if (videoRef.current) cleanupFn = runGeneration(videoRef.current);
-      }, 0);
+    const tryAttach = () => {
+      if (cancelled) return true;
+      if (videoRef.current) {
+        cleanupFn = runGeneration(videoRef.current);
+        return true;
+      }
+      return false;
+    };
+
+    if (tryAttach()) {
       return () => {
-        clearTimeout(id);
+        cancelled = true;
         cleanupFn?.();
       };
     }
-    return () => cleanupFn?.();
-  }, [previewAsset.type, previewAsset.url]);
+
+    let raf = 0;
+    let attempts = 0;
+    const maxAttempts = 90;
+    const tick = () => {
+      if (cancelled) return;
+      if (tryAttach()) return;
+      attempts += 1;
+      if (attempts < maxAttempts) {
+        raf = requestAnimationFrame(tick);
+      }
+    };
+    raf = requestAnimationFrame(tick);
+
+    return () => {
+      cancelled = true;
+      cancelAnimationFrame(raf);
+      cleanupFn?.();
+    };
+  }, [previewAsset.type, previewAsset.url, previewAsset.id]);
 
   const useStorageProxy = import.meta.env.VITE_STORAGE_PROXY === 'true';
 
@@ -430,7 +451,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       // For MOV/APCN files, use conversion endpoint for preview/thumbnails
       const path = u.pathname.toLowerCase();
       const isMov = path.endsWith('.mov') || path.endsWith('.qt') || path.endsWith('.apcn');
-      if (isMov && asset.type === 'video') {
+      if (isMov) {
         return `/api/convert-video?url=${encodeURIComponent(u.toString())}`;
       }
       // OPTIMIZATION: Use Firebase Storage URL directly - no proxying through Vercel
@@ -820,7 +841,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                    src={videoThumbnail} 
                    alt={asset.title} 
                    className="w-full h-full object-cover" 
-                   loading="lazy"
+                   loading="eager"
                    decoding="async"
                    // OPTIMIZATION: Add fetchpriority for better resource hints
                    fetchPriority="low"
