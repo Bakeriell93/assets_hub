@@ -84,7 +84,7 @@ export interface Asset {
   assetTypes?: AssetType[];
   // Soft delete (trash)
   deletedAt?: number; // Timestamp when asset was deleted (null/undefined = not deleted)
-  /** When true, show "Contains master file" label on the asset card */
+  /** When true (explicit), show "Contains master file" label on the asset card — not inferred from file extension */
   containsMasterFile?: boolean;
   /** When true, content is AI generated; show label on card and allow filter */
   aiGenerated?: boolean;

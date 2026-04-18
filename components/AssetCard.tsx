@@ -976,13 +976,17 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
       {/* Visual Preview */}
       <div className="relative h-56 bg-gray-50 flex items-center justify-center overflow-hidden">
         {cardPreviewHidden && (
-          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-100 text-gray-500 p-6 text-center">
-            <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7h3l2-2h8l2 2h3v12H3V7zm9 4a3 3 0 100 6 3 3 0 000-6z" />
-              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 20l16-16" />
-            </svg>
-            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Preview hidden</span>
-            <span className="text-[9px] font-medium text-gray-400 max-w-[200px]">Enable &quot;Show thumbnail on hub card&quot; in Modify to show again.</span>
+          <div className="p-6 bg-orange-50/50 flex flex-col items-center justify-center gap-3 text-center min-h-full w-full">
+            <div className="w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center flex-shrink-0">
+              <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
+              </svg>
+            </div>
+            <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">ZIP archive</span>
+            <span className="text-[10px] font-bold text-orange-700 truncate max-w-full px-2 break-all text-center" title={getDisplayFilename(previewAsset)}>
+              {getDisplayFilename(previewAsset)}
+            </span>
+            <span className="text-[9px] font-medium text-orange-600/80">Card preview off — open to view contents</span>
           </div>
         )}
         {!cardPreviewHidden && isZip && zipPhase === 'loading' && (
@@ -1163,7 +1167,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
         </div>
 
         <h3 className="text-sm font-bold text-gray-900 mb-1.5 tracking-tight leading-tight break-words">{asset.title}</h3>
-        {assetContainsMasterFile(asset) && (
+        {asset.containsMasterFile === true && (
           <span className="inline-block px-2 py-0.5 rounded-md bg-amber-100 text-amber-800 text-[9px] font-black uppercase tracking-wider border border-amber-200 mb-2">Contains master file</span>
         )}
         {asset.aiGenerated && (

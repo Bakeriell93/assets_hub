@@ -436,7 +436,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             platforms: selectedPlatforms.length ? selectedPlatforms : undefined,
             packageNote: packageNote.trim() || undefined,
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
-            ...(containsMasterFile ? { containsMasterFile: true } : {}),
+            containsMasterFile,
             ...(aiGenerated ? { aiGenerated: true } : {}),
             ...(!showCardPreview ? { showCardPreview: false } : {}),
             ...(idx === previewAssetIndex ? { packagePreviewAssetId: 'temp_' + idx } : {})
@@ -594,7 +594,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       comments: comments || undefined,
       brand: selectedBrands[0] || undefined,
       brands: selectedBrands.length ? selectedBrands : undefined,
-      ...(containsMasterFile ? { containsMasterFile: true } : {}),
+      containsMasterFile,
       ...(aiGenerated ? { aiGenerated: true } : {}),
       ...(!showCardPreview ? { showCardPreview: false } : {}),
     };
