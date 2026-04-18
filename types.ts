@@ -88,6 +88,8 @@ export interface Asset {
   containsMasterFile?: boolean;
   /** When true, content is AI generated; show label on card and allow filter */
   aiGenerated?: boolean;
+  /** When false, hub grid card shows no thumbnail (placeholder only). Omitted = show preview. */
+  showCardPreview?: boolean;
 }
 
 export interface SystemConfig {

@@ -829,6 +829,7 @@ function App() {
           brands: data.brands,
           ...(data.containsMasterFile !== undefined ? { containsMasterFile: !!data.containsMasterFile } : {}),
           ...(data.aiGenerated !== undefined ? { aiGenerated: !!data.aiGenerated } : {}),
+          ...(data.showCardPreview !== undefined ? { showCardPreview: !!data.showCardPreview } : {}),
           // Preserve these fields from original asset
           url: editingAsset.url,
           size: editingAsset.size,

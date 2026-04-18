@@ -605,8 +605,10 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     return ['zip', 'rar', 'psd', 'ai', 'eps', 'pdf', 'psb'].includes(ext);
   };
 
+  const cardPreviewHidden = asset.showCardPreview === false;
   const isZip = isPreviewZipArchive(previewAsset);
-  const fetchZipUrl = isZip && previewAsset.url ? maybeProxyUrl(previewAsset.url) : '';
+  const fetchZipUrl =
+    !cardPreviewHidden && isZip && previewAsset.url ? maybeProxyUrl(previewAsset.url) : '';
 
   const [zipPhase, setZipPhase] = useState<'na' | 'loading' | 'done' | 'fail'>(() => {
     if (!isPreviewZipArchive(previewAsset)) return 'na';
@@ -618,7 +620,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   });
 
   useEffect(() => {
-    if (!isZip || !previewAsset.url || !fetchZipUrl) {
+    if (cardPreviewHidden || !isZip || !previewAsset.url || !fetchZipUrl) {
       setZipPhase('na');
       setZipThumbUrl(null);
       return;
@@ -680,7 +682,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     return () => {
       cancelled = true;
     };
-  }, [isZip, fetchZipUrl, previewAsset.id, previewAsset.createdAt, previewAsset.originalFileName]);
+  }, [cardPreviewHidden, isZip, fetchZipUrl, previewAsset.id, previewAsset.createdAt, previewAsset.originalFileName]);
 
   const rawMasterFilePlaceholder =
     previewAsset.type === 'design' ||
@@ -973,14 +975,24 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
       {/* Visual Preview */}
       <div className="relative h-56 bg-gray-50 flex items-center justify-center overflow-hidden">
-        {isZip && zipPhase === 'loading' && (
+        {cardPreviewHidden && (
+          <div className="w-full h-full flex flex-col items-center justify-center gap-2 bg-gray-100 text-gray-500 p-6 text-center">
+            <svg className="w-10 h-10 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24" aria-hidden>
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M3 7h3l2-2h8l2 2h3v12H3V7zm9 4a3 3 0 100 6 3 3 0 000-6z" />
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1.5} d="M4 20l16-16" />
+            </svg>
+            <span className="text-[10px] font-black uppercase tracking-widest text-gray-500">Preview hidden</span>
+            <span className="text-[9px] font-medium text-gray-400 max-w-[200px]">Enable &quot;Show thumbnail on hub card&quot; in Modify to show again.</span>
+          </div>
+        )}
+        {!cardPreviewHidden && isZip && zipPhase === 'loading' && (
           <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center">
             <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
             </svg>
           </div>
         )}
-        {isZip && zipPhase === 'done' && zipThumbUrl && (
+        {!cardPreviewHidden && isZip && zipPhase === 'done' && zipThumbUrl && (
           <img
             src={zipThumbUrl}
             alt={previewAsset.title || 'ZIP preview'}
@@ -989,7 +1001,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             decoding="async"
           />
         )}
-        {showMasterFilePlaceholder && (
+        {!cardPreviewHidden && showMasterFilePlaceholder && (
           <div className="p-6 bg-orange-50/50 flex flex-col items-center justify-center gap-3 text-center min-h-full w-full">
             <div className="w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center flex-shrink-0">
               <svg className="w-8 h-8 text-orange-500" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" /></svg>
@@ -998,7 +1010,11 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             <span className="text-[10px] font-bold text-orange-700 truncate max-w-full px-2 break-all text-center" title={getDisplayFilename(previewAsset)}>{getDisplayFilename(previewAsset)}</span>
           </div>
         )}
-        {!showMasterFilePlaceholder && previewAsset.type === 'image' && previewAsset.url && (
+        {!cardPreviewHidden &&
+          !showMasterFilePlaceholder &&
+          previewAsset.type === 'image' &&
+          previewAsset.url &&
+          !isZip && (
           <ImageThumbnail 
             imageUrl={previewAsset.url}
             assetId={previewAsset.id}
@@ -1006,7 +1022,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
             title={previewAsset.title}
           />
         )}
-        {!showMasterFilePlaceholder && previewAsset.type === 'video' && previewAsset.url && (
+        {!cardPreviewHidden && !showMasterFilePlaceholder && previewAsset.type === 'video' && previewAsset.url && (
             <div className="relative w-full h-full bg-gray-900">
                {videoThumbnail ? (
                  <img 
@@ -1067,7 +1083,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                </div>
             </div>
         )}
-        {!showMasterFilePlaceholder && asset.type === 'text' && (
+        {!cardPreviewHidden && !showMasterFilePlaceholder && asset.type === 'text' && (
           <div className="p-8 w-full h-full overflow-hidden relative bg-blue-50/50">
             <p className="text-gray-800 text-sm italic font-serif leading-relaxed line-clamp-5">"{asset.content}"</p>
           </div>

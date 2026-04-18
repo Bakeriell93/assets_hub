@@ -59,6 +59,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
   const [selectedPackageTypes, setSelectedPackageTypes] = useState<AssetType[]>(['image', 'video']);
   const [containsMasterFile, setContainsMasterFile] = useState(false);
   const [aiGenerated, setAiGenerated] = useState(false);
+  const [showCardPreview, setShowCardPreview] = useState(true);
   const [removedFromPackageIds, setRemovedFromPackageIds] = useState<string[]>([]);
   const [newPackageFiles, setNewPackageFiles] = useState<File[]>([]);
   const [newPackageFileTitles, setNewPackageFileTitles] = useState<Record<number, string>>({});
@@ -206,6 +207,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setSelectedPackageTypes(editingAsset.packageAssetTypes?.length ? editingAsset.packageAssetTypes : ['image', 'video']);
       setContainsMasterFile(!!editingAsset.containsMasterFile);
       setAiGenerated(!!editingAsset.aiGenerated);
+      setShowCardPreview(editingAsset.showCardPreview !== false);
       
       // If editing a package, initialize package asset titles
       if (editingPackageAssets.length > 1) {
@@ -273,6 +275,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       setPackageNote('');
       setSelectedPackageTypes(['image', 'video']);
       setContainsMasterFile(false);
+      setShowCardPreview(true);
       setRemovedFromPackageIds([]);
       setNewPackageFiles([]);
       setNewPackageFileTitles({});
@@ -435,6 +438,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
             ...(containsMasterFile ? { containsMasterFile: true } : {}),
             ...(aiGenerated ? { aiGenerated: true } : {}),
+            ...(!showCardPreview ? { showCardPreview: false } : {}),
             ...(idx === previewAssetIndex ? { packagePreviewAssetId: 'temp_' + idx } : {})
           } as Omit<Asset, 'id' | 'createdAt'>,
           file: f
@@ -506,6 +510,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             packageAssetTypes: selectedPackageTypes.length > 0 ? selectedPackageTypes : undefined,
             containsMasterFile: containsMasterFile,
             aiGenerated: aiGenerated,
+            showCardPreview,
             ...(newPreviewAssetId !== undefined ? { packagePreviewAssetId: newPreviewAssetId } : {}),
           };
           await storageService.updateAsset(pkgAsset.id, updates);
@@ -561,6 +566,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         brands: selectedBrands.length ? selectedBrands : undefined,
         containsMasterFile: containsMasterFile,
         aiGenerated: aiGenerated,
+        showCardPreview,
       };
 
       onSave(updates, file || undefined);
@@ -590,6 +596,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
       brands: selectedBrands.length ? selectedBrands : undefined,
       ...(containsMasterFile ? { containsMasterFile: true } : {}),
       ...(aiGenerated ? { aiGenerated: true } : {}),
+      ...(!showCardPreview ? { showCardPreview: false } : {}),
     };
 
     onSave(data, file || undefined);
@@ -738,6 +745,21 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
                     <span className="text-xs font-bold text-gray-700">Is this content AI generated?</span>
                   </label>
                   <p className="text-[10px] text-gray-500 mt-0.5 ml-6">When checked, an &quot;AI generated&quot; label is shown on the asset card and the asset can be filtered in the hub.</p>
+                </div>
+
+                <div className="mb-4">
+                  <label className="flex items-center gap-2 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={showCardPreview}
+                      onChange={(e) => setShowCardPreview(e.target.checked)}
+                      className="w-4 h-4 rounded border-gray-300 text-blue-600"
+                    />
+                    <span className="text-xs font-bold text-gray-700">Show thumbnail on hub card</span>
+                  </label>
+                  <p className="text-[10px] text-gray-500 mt-0.5 ml-6">
+                    Uncheck to hide the preview image on the grid card (still opens in full preview when clicked).
+                  </p>
                 </div>
 
                 {editingAsset && editingPackageAssets.length <= 1 && onConvertToPackage && (
