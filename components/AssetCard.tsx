@@ -9,6 +9,8 @@ import { storageService } from '../services/storageService';
 const imageThumbCache = new Map<string, { thumbnail: string; updatedAt: number }>();
 const imageThumbCacheByUrl = new Map<string, string>();
 const videoThumbCache = new Map<string, string>();
+/** First image inside .zip cards — data URLs keyed by asset id + updatedAt */
+const zipInnerThumbCache = new Map<string, string>();
 
 const IMG_THUMB_URL_PREFIX = 'img_thumb_url_';
 
@@ -26,6 +28,80 @@ function normalizeTimestamp(v: number | unknown): number {
   if (v && typeof (v as { toMillis?: () => number }).toMillis === 'function') return (v as { toMillis: () => number }).toMillis();
   if (typeof v === 'string') return parseInt(v, 10) || 0;
   return 0;
+}
+
+function isPreviewZipArchive(a: Asset): boolean {
+  if (!a.url) return false;
+  const ref = ((a.originalFileName || a.url).split('?')[0] || '').toLowerCase();
+  return ref.endsWith('.zip');
+}
+
+function zipInnerCacheKey(a: Asset): string {
+  return `${a.id}_${normalizeTimestamp(a.createdAt)}`;
+}
+
+async function downscaleImageBlobToJpegDataUrl(blob: Blob, maxSize: number, quality: number): Promise<string> {
+  if (typeof createImageBitmap === 'function') {
+    const bmp = await createImageBitmap(blob);
+    try {
+      let w = bmp.width;
+      let h = bmp.height;
+      if (w <= 0 || h <= 0) throw new Error('invalid image size');
+      if (w > h) {
+        if (w > maxSize) {
+          h = Math.round((h * maxSize) / w);
+          w = maxSize;
+        }
+      } else if (h > maxSize) {
+        w = Math.round((w * maxSize) / h);
+        h = maxSize;
+      }
+      const canvas = document.createElement('canvas');
+      canvas.width = w;
+      canvas.height = h;
+      const ctx = canvas.getContext('2d');
+      if (!ctx) throw new Error('no canvas context');
+      ctx.drawImage(bmp, 0, 0, w, h);
+      return canvas.toDataURL('image/jpeg', quality);
+    } finally {
+      bmp.close();
+    }
+  }
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const u = URL.createObjectURL(blob);
+    img.onload = () => {
+      try {
+        let w = img.width;
+        let h = img.height;
+        if (w > h) {
+          if (w > maxSize) {
+            h = Math.round((h * maxSize) / w);
+            w = maxSize;
+          }
+        } else if (h > maxSize) {
+          w = Math.round((w * maxSize) / h);
+          h = maxSize;
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width = w;
+        canvas.height = h;
+        const ctx = canvas.getContext('2d');
+        if (!ctx) throw new Error('no canvas context');
+        ctx.drawImage(img, 0, 0, w, h);
+        resolve(canvas.toDataURL('image/jpeg', quality));
+      } catch (e) {
+        reject(e);
+      } finally {
+        URL.revokeObjectURL(u);
+      }
+    };
+    img.onerror = () => {
+      URL.revokeObjectURL(u);
+      reject(new Error('image load failed'));
+    };
+    img.src = u;
+  });
 }
 
 function getCachedImageThumb(assetId: string, assetUpdatedAt: number | unknown): string | null {
@@ -529,10 +605,90 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     return ['zip', 'rar', 'psd', 'ai', 'eps', 'pdf', 'psb'].includes(ext);
   };
 
-  const showMasterFilePlaceholder =
+  const isZip = isPreviewZipArchive(previewAsset);
+  const fetchZipUrl = isZip && previewAsset.url ? maybeProxyUrl(previewAsset.url) : '';
+
+  const [zipPhase, setZipPhase] = useState<'na' | 'loading' | 'done' | 'fail'>(() => {
+    if (!isPreviewZipArchive(previewAsset)) return 'na';
+    return zipInnerThumbCache.has(zipInnerCacheKey(previewAsset)) ? 'done' : 'loading';
+  });
+  const [zipThumbUrl, setZipThumbUrl] = useState<string | null>(() => {
+    if (!isPreviewZipArchive(previewAsset)) return null;
+    return zipInnerThumbCache.get(zipInnerCacheKey(previewAsset)) ?? null;
+  });
+
+  useEffect(() => {
+    if (!isZip || !previewAsset.url || !fetchZipUrl) {
+      setZipPhase('na');
+      setZipThumbUrl(null);
+      return;
+    }
+    const key = zipInnerCacheKey(previewAsset);
+    const cached = zipInnerThumbCache.get(key);
+    if (cached) {
+      setZipThumbUrl(cached);
+      setZipPhase('done');
+      return;
+    }
+    setZipPhase('loading');
+    setZipThumbUrl(null);
+    let cancelled = false;
+    const run = async () => {
+      try {
+        const res = await fetch(fetchZipUrl, { method: 'GET', mode: 'cors', credentials: 'omit' });
+        if (!res.ok) throw new Error(`HTTP ${res.status}`);
+        const blob = await res.blob();
+        const z = await JSZip.loadAsync(blob);
+        const names = Object.keys(z.files)
+          .filter((n) => {
+            const e = z.files[n];
+            return !e.dir && !n.startsWith('__MACOSX/') && !n.includes('/__MACOSX/');
+          })
+          .sort((a, b) => a.localeCompare(b, undefined, { numeric: true, sensitivity: 'base' }));
+        const imageRe = /\.(jpe?g|png|webp|gif)$/i;
+        let pick: string | undefined;
+        for (const n of names) {
+          const base = n.split('/').pop() || n;
+          if (base === '.DS_Store') continue;
+          if (imageRe.test(base)) {
+            pick = n;
+            break;
+          }
+        }
+        if (cancelled) return;
+        if (!pick) {
+          setZipPhase('fail');
+          return;
+        }
+        const f = z.file(pick);
+        if (!f) {
+          setZipPhase('fail');
+          return;
+        }
+        const imgBlob = await f.async('blob');
+        const dataUrl = await downscaleImageBlobToJpegDataUrl(imgBlob, 300, 0.72);
+        if (cancelled) return;
+        zipInnerThumbCache.set(key, dataUrl);
+        setZipThumbUrl(dataUrl);
+        setZipPhase('done');
+      } catch (e) {
+        console.warn('Zip card preview failed:', e);
+        if (!cancelled) setZipPhase('fail');
+      }
+    };
+    void run();
+    return () => {
+      cancelled = true;
+    };
+  }, [isZip, fetchZipUrl, previewAsset.id, previewAsset.createdAt, previewAsset.originalFileName]);
+
+  const rawMasterFilePlaceholder =
     previewAsset.type === 'design' ||
     assetContainsMasterFile(asset) ||
     isMasterFileExtension(previewAsset);
+  const hideMasterForZipPreview =
+    isZip && (zipPhase === 'loading' || (zipPhase === 'done' && !!zipThumbUrl));
+  const showMasterFilePlaceholder = rawMasterFilePlaceholder && !hideMasterForZipPreview;
 
   const convertImageFormat = async (imageUrl: string, format: 'webp' | 'png' | 'jpg'): Promise<Blob> => {
     return new Promise((resolve, reject) => {
@@ -817,6 +973,22 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
       {/* Visual Preview */}
       <div className="relative h-56 bg-gray-50 flex items-center justify-center overflow-hidden">
+        {isZip && zipPhase === 'loading' && (
+          <div className="w-full h-full bg-gray-200 animate-pulse flex items-center justify-center">
+            <svg className="w-12 h-12 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+            </svg>
+          </div>
+        )}
+        {isZip && zipPhase === 'done' && zipThumbUrl && (
+          <img
+            src={zipThumbUrl}
+            alt={previewAsset.title || 'ZIP preview'}
+            className="w-full h-full object-cover transition-transform duration-700 group-hover:scale-110"
+            loading="lazy"
+            decoding="async"
+          />
+        )}
         {showMasterFilePlaceholder && (
           <div className="p-6 bg-orange-50/50 flex flex-col items-center justify-center gap-3 text-center min-h-full w-full">
             <div className="w-14 h-14 bg-white rounded-2xl shadow-lg flex items-center justify-center flex-shrink-0">
