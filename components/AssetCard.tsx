@@ -607,6 +607,18 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
 
   const cardPreviewHidden = asset.showCardPreview === false;
   const isZip = isPreviewZipArchive(previewAsset);
+  /** Shown when hub thumbnail is hidden — never label as ZIP unless the preview file is a .zip */
+  const hiddenCardPreviewLabel = isZip
+    ? 'ZIP archive'
+    : isPackage
+      ? 'Package'
+      : previewAsset.type === 'video'
+        ? 'Video file'
+        : previewAsset.type === 'design' || isMasterFileExtension(previewAsset)
+          ? 'Design file'
+          : previewAsset.type === 'text'
+            ? 'Text asset'
+            : 'Image file';
   const fetchZipUrl =
     !cardPreviewHidden && isZip && previewAsset.url ? maybeProxyUrl(previewAsset.url) : '';
 
@@ -982,7 +994,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
               </svg>
             </div>
-            <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">ZIP archive</span>
+            <span className="text-[10px] font-black text-orange-600 uppercase tracking-widest">{hiddenCardPreviewLabel}</span>
             <span className="text-[10px] font-bold text-orange-700 truncate max-w-full px-2 break-all text-center" title={getDisplayFilename(previewAsset)}>
               {getDisplayFilename(previewAsset)}
             </span>
