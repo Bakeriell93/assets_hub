@@ -1145,7 +1145,10 @@ function App() {
   const getAssociatedBrands = (a: Asset) =>
     [...new Set(getAssetBrands(a).map(normalizeTag).filter(Boolean))];
   const getAssociatedModels = (a: Asset) =>
-    [...new Set([a.carModel, ...(a.carModels || [])].map(normalizeTag).filter(Boolean))];
+    [...new Set([
+      a.carModel,
+      ...(Array.isArray(a.carModels) ? a.carModels : []),
+    ].map(normalizeTag).filter(Boolean))];
   const matchesSearch = (a: Asset, rawQuery: string) => {
     const q = normalize(rawQuery).trim();
     if (!q) return true;
@@ -1161,7 +1164,7 @@ function App() {
       a.carModel,
       a.brand,
       a.packageNote,
-      ...(a.carModels ? { carModels: a.carModels } : {}),
+      ...(Array.isArray(a.carModels) ? a.carModels : []),
       ...(a.objectives || []),
       a.uploadedBy,
       a.usageRights,

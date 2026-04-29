@@ -346,7 +346,10 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const isAdmin = userRole === 'Admin';
   const canEdit = userRole === 'Editor' || userRole === 'Admin';
   const canDelete = userRole === 'Editor' || userRole === 'Admin'; // Editor can now delete
-  const associatedModels = [...new Set([asset.carModel, ...(asset.carModels || [])].filter(Boolean))];
+  const associatedModels = [...new Set([
+    asset.carModel,
+    ...(Array.isArray(asset.carModels) ? asset.carModels : []),
+  ].filter(Boolean))];
 
   // Generate video thumbnail - cached in memory + localStorage; retry until hidden <video> ref exists (fixes package cards on first paint)
   useEffect(() => {

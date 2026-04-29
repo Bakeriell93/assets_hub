@@ -349,11 +349,14 @@ const AdminPanel: React.FC<AdminPanelProps> = ({ onClose, assets, config, users,
   const handleRecoverFromAssets = async () => {
     const active = assets.filter(a => !a.deletedAt);
     const inferredMarkets = [...new Set(active.map(a => a.market).filter(Boolean))];
-    const inferredModels = [...new Set(active.flatMap(a => [a.carModel, ...(a.carModels || [])].filter(Boolean)))];
+    const inferredModels = [...new Set(active.flatMap(a => [
+      a.carModel,
+      ...(Array.isArray(a.carModels) ? a.carModels : []),
+    ].filter(Boolean)))];
     const byBrand: Record<string, string[]> = {};
     active.forEach(a => {
       const brands = getAssetBrands(a);
-      const models = [a.carModel, ...(a.carModels || [])].filter(Boolean);
+      const models = [a.carModel, ...(Array.isArray(a.carModels) ? a.carModels : [])].filter(Boolean);
       brands.forEach(b => {
         if (!byBrand[b]) byBrand[b] = [];
         models.forEach(m => { if (m && !byBrand[b].includes(m)) byBrand[b].push(m); });
