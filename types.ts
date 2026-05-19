@@ -112,14 +112,34 @@ export function getAssetPlatforms(a: { platform?: Platform; platforms?: Platform
   return (a.platforms && a.platforms.length ? a.platforms : (a.platform ? [a.platform] : []));
 }
 
-/** True if asset is a master file: has flag, type design, or file is zip/rar/psd. */
-export function assetContainsMasterFile(a: Asset): boolean {
-  if (a.containsMasterFile) return true;
+/** True when this file itself is a non-previewable master/archive (type or extension only). */
+export function assetIsMasterFormatFile(a: Asset): boolean {
   if (a.type === 'design') return true;
   if (a.assetTypes?.includes('design')) return true;
   const name = (a.originalFileName || a.url || '').toLowerCase();
   const ext = name.split('.').pop()?.replace(/\?.*$/, '') || '';
-  return ['zip', 'rar', 'psd', 'ai', 'eps', 'psb'].includes(ext);
+  return ['zip', 'rar', 'psd', 'ai', 'eps', 'pdf', 'psb'].includes(ext);
+}
+
+/** True for master-file filter / package label: explicit flag or master-format file. */
+export function assetContainsMasterFile(a: Asset): boolean {
+  if (a.containsMasterFile) return true;
+  return assetIsMasterFormatFile(a);
+}
+
+/** Resolve package card thumbnail target from shared packagePreviewAssetId. */
+export function getPackagePreviewAsset(pkgAssets: Asset[]): Asset {
+  const sorted = [...pkgAssets].sort((a, b) => (a.packageOrder ?? 0) - (b.packageOrder ?? 0));
+  const previewId = sorted.find(a => a.packagePreviewAssetId)?.packagePreviewAssetId;
+  if (previewId) {
+    return sorted.find(a => a.id === previewId) || sorted[0];
+  }
+  return sorted[0];
+}
+
+/** First asset in package order (card title / metadata row). */
+export function getPackageLeadAsset(pkgAssets: Asset[]): Asset {
+  return [...pkgAssets].sort((a, b) => (a.packageOrder ?? 0) - (b.packageOrder ?? 0))[0];
 }
 
 /** Models for a given brand; when brand is All or modelsByBrand unused, returns all models. */

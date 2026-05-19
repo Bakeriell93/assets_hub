@@ -13,7 +13,7 @@ import BulkEditModal from './components/BulkEditModal';
 import Login from './components/Login';
 import { storageService } from './services/storageService';
 import { authService } from './services/authService';
-import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, AssetType, MARKETS, CAR_MODELS, PLATFORMS, getAssetBrands, assetContainsMasterFile } from './types';
+import { Asset, Platform, Market, CarModel, User, UserRole, AssetObjective, SystemConfig, Collection, Brand, AssetType, MARKETS, CAR_MODELS, PLATFORMS, getAssetBrands, assetContainsMasterFile, assetIsMasterFormatFile, getPackageLeadAsset } from './types';
 
 type SortOption = 'newest' | 'alphabetical';
 type ViewMode = 'repository' | 'analytics' | 'collections' | 'trash';
@@ -1246,13 +1246,11 @@ function App() {
 
   const packageGroups = Array.from(packageMap.values())
     .map(pkgAssets => {
-      const sorted = pkgAssets.sort((a, b) => (a.packageOrder || 0) - (b.packageOrder || 0));
-      const previewAsset = sorted.find(a => a.packagePreviewAssetId && pkgAssets.some(pa => pa.id === a.packagePreviewAssetId));
-      const representative = previewAsset || sorted[0];
+      const sorted = [...pkgAssets].sort((a, b) => (a.packageOrder ?? 0) - (b.packageOrder ?? 0));
       return {
-        packageId: pkgAssets[0].packageId!,
+        packageId: sorted[0].packageId!,
         assets: sorted,
-        representative
+        representative: getPackageLeadAsset(sorted),
       };
     });
 
@@ -2352,7 +2350,7 @@ function App() {
                             setPreviewViewMode('full');
                           }}
                         >
-                          {(pkgAsset.type === 'design' || assetContainsMasterFile(pkgAsset)) && (
+                          {assetIsMasterFormatFile(pkgAsset) && (
                             <div className="w-full h-full bg-orange-50 flex flex-col items-center justify-center p-3">
                               <svg className="w-12 h-12 text-orange-500 flex-shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 21h10a2 2 0 002-2V9.414a1 1 0 00-.293-.707l-5.414-5.414A1 1 0 0012.586 3H7a2 2 0 00-2 2v14a2 2 0 002 2z" />
@@ -2360,7 +2358,7 @@ function App() {
                               <span className="text-[9px] font-bold text-orange-600 uppercase mt-1 text-center line-clamp-2">Master file</span>
                             </div>
                           )}
-                          {pkgAsset.type === 'image' && pkgAsset.url && !assetContainsMasterFile(pkgAsset) && (
+                          {pkgAsset.type === 'image' && pkgAsset.url && !assetIsMasterFormatFile(pkgAsset) && (
                             <img 
                               src={pkgAsset.url} 
                               alt={pkgAsset.title} 
@@ -2397,7 +2395,7 @@ function App() {
                   </div>
                 ) : (
                   <>
-                    {(currentAsset.type === 'design' || assetContainsMasterFile(currentAsset)) && (() => {
+                    {assetIsMasterFormatFile(currentAsset) && (() => {
                       const getDesignFilename = (a: Asset) => {
                         if (a.originalFileName) return a.originalFileName;
                         if (!a.url) return 'file';
@@ -2433,7 +2431,7 @@ function App() {
                         </div>
                       );
                     })()}
-                    {currentAsset.type === 'image' && currentAsset.url && !assetContainsMasterFile(currentAsset) && (
+                    {currentAsset.type === 'image' && currentAsset.url && !assetIsMasterFormatFile(currentAsset) && (
                       <CachedImagePreview 
                         asset={currentAsset}
                         previewedAssetsCache={previewedAssetsCache}

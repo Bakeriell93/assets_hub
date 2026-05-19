@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useRef } from 'react';
-import { Asset, UserRole, getAssetBrands, getAssetPlatforms, assetContainsMasterFile } from '../types';
+import { Asset, UserRole, getAssetBrands, getAssetPlatforms, assetIsMasterFormatFile, getPackagePreviewAsset } from '../types';
 import DownloadFormatModal from './DownloadFormatModal';
 import JSZip from 'jszip';
 import { storageService } from '../services/storageService';
@@ -330,11 +330,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
   const [isConfirmingDelete, setIsConfirmingDelete] = useState(false);
   const [isDownloadModalOpen, setIsDownloadModalOpen] = useState(false);
   const isPackage = packageAssets.length > 1;
-  const previewAsset = isPackage 
-    ? (asset.packagePreviewAssetId 
-        ? packageAssets.find(a => a.id === asset.packagePreviewAssetId) || packageAssets[0]
-        : packageAssets[0])
-    : asset;
+  const previewAsset = isPackage ? getPackagePreviewAsset(packageAssets) : asset;
   const [videoThumbnail, setVideoThumbnail] = useState<string | null>(() => {
     if (previewAsset.type === 'video' && previewAsset.url)
       return videoThumbCache.get(previewAsset.url) ?? localStorage.getItem(`video_thumb_${hashUrl(previewAsset.url)}`);
@@ -699,10 +695,7 @@ const AssetCard: React.FC<AssetCardProps> = ({ asset, packageAssets = [asset], u
     };
   }, [cardPreviewHidden, isZip, fetchZipUrl, previewAsset.id, previewAsset.createdAt, previewAsset.originalFileName]);
 
-  const rawMasterFilePlaceholder =
-    previewAsset.type === 'design' ||
-    assetContainsMasterFile(asset) ||
-    isMasterFileExtension(previewAsset);
+  const rawMasterFilePlaceholder = assetIsMasterFormatFile(previewAsset);
   const hideMasterForZipPreview =
     isZip && (zipPhase === 'loading' || (zipPhase === 'done' && !!zipThumbUrl));
   const showMasterFilePlaceholder = rawMasterFilePlaceholder && !hideMasterForZipPreview;

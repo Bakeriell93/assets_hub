@@ -217,14 +217,12 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         });
         setPackageAssetTitles(titles);
         
-        // Find current preview asset
-        const currentPreviewId = editingAsset.packagePreviewAssetId;
+        // Find current preview asset (shared id on all package members)
+        const currentPreviewId =
+          editingPackageAssets.find(a => a.packagePreviewAssetId)?.packagePreviewAssetId ||
+          editingAsset.packagePreviewAssetId;
         const currentPreviewIndex = editingPackageAssets.findIndex(a => a.id === currentPreviewId);
-        if (currentPreviewIndex >= 0) {
-          setSelectedPreviewIndex(currentPreviewIndex);
-        } else {
-          setSelectedPreviewIndex(0);
-        }
+        setSelectedPreviewIndex(currentPreviewIndex >= 0 ? currentPreviewIndex : 0);
       } else {
         setPackageAssetTitles({});
         setSelectedPreviewIndex(null);
@@ -467,10 +465,13 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
         const hasMainTitleChange = nextMainTitle.length > 0 && nextMainTitle !== originalTitle;
         const remainingAssets = editingPackageAssets.filter(a => !removedFromPackageIds.includes(a.id));
         
-        // Determine the new preview asset ID if preview was changed (use index in remaining list, clamped)
-        let newPreviewAssetId: string | undefined = undefined;
-        if (isChangingPreview && selectedPreviewIndex !== null && remainingAssets.length > 0) {
-          const idx = Math.min(selectedPreviewIndex, remainingAssets.length - 1);
+        // Persist selected package cover (index in remaining assets after removals)
+        let newPreviewAssetId: string | undefined;
+        if (remainingAssets.length > 0) {
+          const idx =
+            selectedPreviewIndex !== null
+              ? Math.min(selectedPreviewIndex, remainingAssets.length - 1)
+              : 0;
           newPreviewAssetId = remainingAssets[idx].id;
         }
         
@@ -511,7 +512,7 @@ const AssetFormModal: React.FC<AssetFormModalProps> = ({ isOpen, onClose, onSave
             containsMasterFile: containsMasterFile,
             aiGenerated: aiGenerated,
             showCardPreview,
-            ...(newPreviewAssetId !== undefined ? { packagePreviewAssetId: newPreviewAssetId } : {}),
+            ...(newPreviewAssetId ? { packagePreviewAssetId: newPreviewAssetId } : {}),
           };
           await storageService.updateAsset(pkgAsset.id, updates);
         }
